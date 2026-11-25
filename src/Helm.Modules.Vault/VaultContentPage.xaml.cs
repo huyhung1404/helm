@@ -1,103 +1,79 @@
-using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
-using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Desktop;
-using Helm.Core.Services;
+using Helm.Core.Modules;
 using Helm.Core.Settings;
 using Helm.Modules.Vault.Platform;
-using Helm.Modules.Vault.Session;
+using Helm.Modules.Vault.Ui;
 using Helm.Modules.Vault.ViewModels;
 
 namespace Helm.Modules.Vault;
 
-/// <summary>The settings page: the module (for the Enable card) and the shared settings view model.</summary>
-public sealed partial class VaultPageViewModel(VaultModule module, VaultSettingsViewModel settings, AutoTypeService autoType) : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
-{
-    public VaultModule Module { get; } = module;
-
-    public VaultSettingsViewModel Settings { get; } = settings;
-
-    public Helm.Core.Hotkeys.HotkeyGesture DefaultAutoTypeHotkey => VaultWindowsSettings.DefaultAutoTypeHotkey;
-
-    /// <summary>The auto-type shortcut (Windows-only setting); empty turns auto-type off.</summary>
-    public Helm.Core.Hotkeys.HotkeyGesture AutoTypeHotkey
-    {
-        get => autoType.Settings.Current.AutoTypeHotkey;
-        set
-        {
-            if (value == AutoTypeHotkey) return;
-            autoType.Settings.Update(s => s.AutoTypeHotkey = value);
-            OnPropertyChanged();
-        }
-    }
-
-    public bool AutoTypePressEnter
-    {
-        get => autoType.Settings.Current.AutoTypePressEnter;
-        set
-        {
-            if (value == AutoTypePressEnter) return;
-            autoType.Settings.Update(s => s.AutoTypePressEnter = value);
-            OnPropertyChanged();
-        }
-    }
-}
-
-/// <summary>The vault page: the module (is it on?), the shared vault screens, and the way to its settings.</summary>
-public sealed partial class VaultContentViewModel(VaultModule module, VaultAppViewModel app, IShellNavigation navigation)
-{
-    public VaultModule Module { get; } = module;
-
-    public VaultAppViewModel App { get; } = app;
-
-    [RelayCommand]
-    private void OpenSettings() => navigation.ShowPage(typeof(VaultPage));
-}
-
+/// <summary>
+/// The vault, opened from the menu, Home and Utilities (see <see cref="IModuleContent"/>): the shared Avalonia
+/// <see cref="VaultView"/> inside this WPF page, plus what only Windows does: while the vault is on screen Helm's window
+/// stays out of screenshots and screen sharing (when the setting is on), and leaving the page, hiding Helm or minimizing
+/// it forgets what was typed and hides what was shown.
+/// </summary>
 public partial class VaultContentPage : Page
 {
-    private readonly VaultContentViewModel _viewModel;
+    private readonly VaultAppViewModel _app;
+    private readonly VaultSettingsViewModel _settingsViewModel;
     private readonly IWindowService _windows;
     private readonly ISettingsStore<VaultSettings> _settings;
     private nint _protected;
+    private Window? _window;
 
-    public VaultContentPage(VaultContentViewModel viewModel, IWindowService windows, ISettingsStoreFactory settings)
+    public VaultContentPage(VaultModule module, VaultAppViewModel app, VaultSettingsViewModel settingsViewModel, VaultWindowsSettingsViewModel windowsSettings,
+        IWindowService windows, ISettingsStoreFactory settings)
     {
-        _viewModel = viewModel;
+        _app = app;
+        _settingsViewModel = settingsViewModel;
         _windows = windows;
         _settings = settings.Get<VaultSettings>(VaultSettings.StoreId);
-        DataContext = viewModel;
         InitializeComponent();
-        // Any use of the vault counts as activity for the auto-lock.
-        PreviewKeyDown += (_, _) => viewModel.App.Session.Touch();
-        PreviewMouseDown += (_, _) => viewModel.App.Session.Touch();
+        Host.Show(() => new VaultView(module, app, settingsViewModel, new WindowsHost(windowsSettings)));
         Loaded += OnLoaded;
-        Unloaded += (_, _) => Unprotect();
-        Views.PageLeaveGuard.Attach(this, viewModel.App, () =>
+        Unloaded += OnUnloaded;
+        IsVisibleChanged += (_, e) =>
         {
-            viewModel.App.ForgetTypedSecrets();
-            viewModel.App.Items.HideRevealed();
-        });
-        viewModel.App.PropertyChanged += OnAppChanged;
+            if (e.NewValue is false) Forget();
+        };
         _settings.Changed += (_, _) => Dispatcher.BeginInvoke(Protect);
+        app.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(VaultAppViewModel.Screen) && IsLoaded) Dispatcher.BeginInvoke(Protect);
+        };
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         Protect();
-        Dispatcher.BeginInvoke(View.FocusFirstInput);
+        if (_window is not null) _window.StateChanged -= OnWindowState;
+        _window = Window.GetWindow(this);
+        if (_window is not null) _window.StateChanged += OnWindowState;
     }
 
-    private void OnAppChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnUnloaded(object sender, RoutedEventArgs e)
     {
-        if (e.PropertyName != nameof(VaultAppViewModel.Screen) || !IsLoaded) return;
-        Dispatcher.BeginInvoke(() =>
-        {
-            Protect();
-            View.FocusFirstInput();
-        });
+        if (_window is not null) _window.StateChanged -= OnWindowState;
+        _window = null;
+        Unprotect();
+        Forget();
+    }
+
+    private void OnWindowState(object? sender, EventArgs e)
+    {
+        if (_window?.WindowState == WindowState.Minimized) Forget();
+    }
+
+    /// <summary>The page is no longer in front of the user: nothing typed or revealed stays for whoever comes next.</summary>
+    private void Forget()
+    {
+        _app.ForgetTypedSecrets();
+        _app.Items.HideRevealed();
+        _settingsViewModel.ForgetTypedSecrets();
     }
 
     /// <summary>
@@ -119,5 +95,13 @@ public partial class VaultContentPage : Page
         if (_protected == 0) return;
         _windows.SetExcludedFromCapture(_protected, false);
         _protected = 0;
+    }
+
+    /// <summary>What only Windows adds to the shared page.</summary>
+    private sealed class WindowsHost(VaultWindowsSettingsViewModel windowsSettings) : IVaultPageHost
+    {
+        public Avalonia.Controls.Control? CreatePlatformSettings() => AutoTypeSettingsCard.Create(windowsSettings);
+
+        public bool CanLockWithSystem => true;
     }
 }

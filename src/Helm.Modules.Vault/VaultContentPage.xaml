@@ -1,52 +1,12 @@
-<!-- Vault itself (the navigation pane and the Home tile open it). Its settings are VaultPage, one click away. -->
 <Page x:Class="Helm.Modules.Vault.VaultContentPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-      xmlns:views="clr-namespace:Helm.Modules.Vault.Views"
-      Title="Vault" ScrollViewer.CanContentScroll="False">
-    <Grid Margin="24,16,24,16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+      xmlns:uiw="clr-namespace:Helm.Ui.Windows;assembly=Helm.Ui.Windows"
+      ScrollViewer.CanContentScroll="False"
+      Title="Vault">
 
-        <DockPanel Margin="0,0,0,12">
-            <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
-                <ui:Button Content="Lock" Icon="{ui:SymbolIcon LockClosed24}" Margin="0,0,8,0" Command="{Binding App.LockCommand}"
-                           Visibility="{Binding App.IsItems, Converter={StaticResource BoolToVisibility}}" />
-                <ui:Button Content="Guide" Icon="{ui:SymbolIcon BookInformation24}" Margin="0,0,8,0" Command="{Binding App.ShowGuideCommand}"
-                           ToolTip="How to use Vault: passwords, backups, recovery"
-                           Visibility="{Binding App.IsGuideOpen, Converter={StaticResource InverseBoolToVisibility}}" />
-                <ui:Button Content="Back to the vault" Icon="{ui:SymbolIcon ArrowLeft24}" Margin="0,0,8,0" Command="{Binding App.CloseGuideCommand}"
-                           Visibility="{Binding App.IsGuideOpen, Converter={StaticResource BoolToVisibility}}" />
-                <ui:Button Content="Settings" Icon="{ui:SymbolIcon Settings24}" Command="{Binding OpenSettingsCommand}" ToolTip="Vault settings: locking, backup, password" />
-            </WrapPanel>
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Image Source="{x:Static local:VaultIcon.Image}" Width="32" Height="32" Margin="0,0,12,0" xmlns:local="clr-namespace:Helm.Modules.Vault" />
-                <TextBlock Text="Vault" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <!-- Open, and when it locks for being idle -->
-                <Border Margin="14,0,0,0" Padding="10,3" CornerRadius="12" VerticalAlignment="Center" BorderThickness="1"
-                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                        ToolTip="Vault locks after a while without use (Settings → Locking)"
-                        Visibility="{Binding App.IsItems, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel Orientation="Horizontal">
-                        <Ellipse Width="8" Height="8" Fill="{DynamicResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" Margin="0,0,7,0" />
-                        <TextBlock Text="Unlocked" FontSize="12.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding App.LockCountdown, StringFormat=' · {0}'}" FontSize="12.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   VerticalAlignment="Center" Visibility="{Binding App.LockCountdown, Converter={StaticResource NotEmptyToVisibility}}" />
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-        </DockPanel>
-
-        <ui:InfoBar Grid.Row="1" Margin="0,0,0,12" Severity="Informational" IsClosable="False" Title="Vault is turned off"
-                    Message="Turn it on in its settings to use it." IsOpen="{Binding Module.IsEnabled, Converter={StaticResource InverseBool}}" />
-
-        <views:VaultView x:Name="View" Grid.Row="2" DataContext="{Binding App}" IsEnabled="{Binding DataContext.Module.IsEnabled, RelativeSource={RelativeSource AncestorType=Page}}"
-                         Visibility="{Binding App.IsGuideOpen, Converter={StaticResource InverseBoolToVisibility}}" />
-        <!-- The guide works whether the vault is set up, locked, open or turned off -->
-        <views:VaultGuideView Grid.Row="2" Visibility="{Binding App.IsGuideOpen, Converter={StaticResource BoolToVisibility}}" />
-    </Grid>
+    <!-- The vault itself (menu, Home tile, Utilities) is the shared Avalonia page, Helm.Modules.Vault.UI/VaultView: the same
+         view on every platform. This WPF page only hosts it and does the Windows parts (hiding the window from screen
+         capture, forgetting what was typed when the page is left, hidden or minimized). Its settings are a sheet inside it. -->
+    <uiw:AvaloniaHost x:Name="Host" />
 </Page>

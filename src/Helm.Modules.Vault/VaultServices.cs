@@ -23,9 +23,7 @@ public static class VaultServices
             sp.GetRequiredService<VaultSession>(), sp.GetRequiredService<Helm.Modules.Vault.Items.VaultStore>(),
             () => sp.GetRequiredService<Helm.Core.Services.IShellNavigation>().ShowPage(typeof(VaultContentPage))));
         services.AddVaultCore();
-        // Settings page through AddHelmModule; the vault itself is the content page (navigation pane, Home tile).
-        return services.AddHelmModule<VaultModule, VaultPage, VaultPageViewModel>()
-            .AddSingleton<VaultContentViewModel>()
-            .AddSingleton<VaultContentPage>();
+        // The vault page is the module's only page: its settings are a sheet inside it.
+        return services.AddHelmModule<VaultModule, VaultContentPage, VaultWindowsSettingsViewModel>();
     }
 }

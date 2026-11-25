@@ -38,7 +38,8 @@ public sealed class VaultModule(
     public override ModuleGroup Group => ModuleGroup.SecurityAndServers;
     public override SymbolRegular Icon => SymbolRegular.ShieldKeyhole24;
     public override System.Windows.Media.ImageSource IconImage => VaultIcon.Image;
-    public override Type SettingsPageType => typeof(VaultPage);
+    // The settings are a sheet inside the vault page (the gear): one page.
+    public override Type SettingsPageType => typeof(VaultContentPage);
     public Type ContentPageType => typeof(VaultContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys =>
         autoType.Settings.Current.AutoTypeHotkey.IsEmpty ? []

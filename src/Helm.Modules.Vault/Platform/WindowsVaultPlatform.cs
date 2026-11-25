@@ -99,19 +99,8 @@ internal sealed class WindowsVaultPlatform : IVaultPlatform
 
     public void CopyText(string text) => _clipboard.Copy(text, clearAfter: null);
 
-    public async Task<bool> ConfirmAsync(string title, string message, string confirmText)
-    {
-        var box = new WpfUiMessageBox
-        {
-            Title = title,
-            Content = message,
-            PrimaryButtonText = confirmText,
-            CloseButtonText = "Cancel",
-            MinWidth = 380,
-            Owner = Owner,
-        };
-        return await box.ShowDialogAsync().ConfigureAwait(true) == WpfUiMessageBoxResult.Primary;
-    }
+    /// <summary>Helm's own confirmation sheet, drawn by the vault page that is on screen.</summary>
+    public Task<bool> ConfirmAsync(string title, string message, string confirmText) => Ui.VaultDialogs.ConfirmAsync(title, message, confirmText);
 
     public Task<string?> PickBackupLocationAsync(CancellationToken ct)
     {
