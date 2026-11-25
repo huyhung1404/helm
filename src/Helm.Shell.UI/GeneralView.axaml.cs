@@ -42,7 +42,7 @@ public partial class GeneralView : UserControl
             Grid.SetColumn(Detail, 0);
             Rail.IsVisible = !_showingPart;
             Detail.IsVisible = _showingPart;
-            BackButton.IsVisible = true;
+            BackRow.IsVisible = true;
         }
         else
         {
@@ -50,7 +50,7 @@ public partial class GeneralView : UserControl
             Grid.SetColumn(Detail, 1);
             Rail.IsVisible = true;
             Detail.IsVisible = true;
-            BackButton.IsVisible = false;
+            BackRow.IsVisible = false;
         }
     }
 

@@ -49,11 +49,9 @@
         <Grid x:Name="Page" ColumnDefinitions="290,*" ColumnSpacing="28" Margin="40,28,40,0">
 
             <!-- The parts, each with how it stands -->
-            <ScrollViewer x:Name="Rail" HorizontalScrollBarVisibility="Disabled" Padding="0,0,0,24">
+            <Grid x:Name="Rail" RowDefinitions="*,Auto">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="0,0,0,12">
                 <StackPanel>
-                    <TextBlock Classes="eyebrow" Text="HELM" />
-                    <TextBlock Classes="display" Text="General" Margin="0,8,0,4" />
-                    <TextBlock Classes="muted" FontSize="14" Text="{Binding Version, StringFormat='Helm {0}'}" Margin="0,0,0,20" />
                     <ItemsControl ItemsSource="{Binding Sections}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:GeneralSection">
@@ -74,32 +72,39 @@
                     </ItemsControl>
                 </StackPanel>
             </ScrollViewer>
+            <TextBlock Grid.Row="1" Classes="muted" Text="{Binding Version, StringFormat=\'Helm {0}\'}" Margin="4,4,0,16" />
+            </Grid>
 
             <!-- The chosen part -->
             <Grid x:Name="Detail" Grid.Column="1" RowDefinitions="Auto,*">
-                <Button x:Name="BackButton" Classes="ghost" HorizontalAlignment="Left" Margin="0,0,0,12" IsVisible="False" Click="Back_Click" AutomationProperties.Name="Back to General">
+                <StackPanel x:Name="BackRow" Orientation="Horizontal" Spacing="12" Margin="0,0,0,12" IsVisible="False">
+                <Button x:Name="BackButton" Classes="ghost" Click="Back_Click" AutomationProperties.Name="Back to General">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" />
                         <TextBlock Text="General" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
+                <TextBlock Classes="title" Text="{Binding Selected.Title}" VerticalAlignment="Center" />
+                </StackPanel>
                 <ScrollViewer x:Name="Scroller" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" Padding="0,0,14,24" core:ScrollFade.Enabled="True">
-                    <Panel MaxWidth="760" HorizontalAlignment="Left">
+                    <Panel>
 
                         <!-- TOOLS -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsTools}" core:Motion.EnterOnShow="True">
-                            <Grid ColumnDefinitions="*,Auto">
-                                <StackPanel>
-                                    <TextBlock Classes="title" Text="Tools" />
-                                    <TextBlock Classes="muted" FontSize="14" Text="A tool that is off is hidden from the menu and Home, and does nothing in the background. Its data stays." />
-                                </StackPanel>
-                                <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding ToggleSortCommand}" ToolTip.Tip="Change the order" AutomationProperties.Name="Sort tools">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <ic:SymbolIcon Symbol="ArrowSort" FontSize="14" />
-                                        <TextBlock Text="{Binding SortLabel}" FontSize="13" />
+                            <Border Classes="glass">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <StackPanel>
+                                        <TextBlock Classes="head" Text="Tools" />
+                                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="A tool that is off is hidden from the menu and Home, and does nothing in the background. Its data stays." />
                                     </StackPanel>
-                                </Button>
-                            </Grid>
+                                    <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding ToggleSortCommand}" ToolTip.Tip="Change the order" AutomationProperties.Name="Sort tools">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ic:SymbolIcon Symbol="ArrowSort" FontSize="14" />
+                                            <TextBlock Text="{Binding SortLabel}" FontSize="13" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Border>
                             <ItemsControl ItemsSource="{Binding Tools}" AutomationProperties.Name="Tools">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="home:HomeTool">
@@ -120,10 +125,6 @@
 
                         <!-- SYNC -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsSync}" core:Motion.EnterOnShow="True">
-                            <StackPanel>
-                                <TextBlock Classes="title" Text="Sync" />
-                                <TextBlock Classes="muted" FontSize="14" Text="End-to-end encrypted: neither the server nor whoever invited you can read your data." TextWrapping="Wrap" />
-                            </StackPanel>
                             <Border Classes="glass">
                                 <StackPanel Spacing="12">
                                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
@@ -132,6 +133,7 @@
                                             <TextBlock Classes="head" Text="{Binding AccountName}" />
                                             <TextBlock Classes="muted" Text="{Binding SyncStatus}" />
                                             <TextBlock Classes="muted" Text="{Binding Usage}" />
+                                            <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,6,0,0" Text="End-to-end encrypted: neither the server nor whoever invited you can read your data." />
                                         </StackPanel>
                                     </Grid>
                                     <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding SyncNowCommand}">
@@ -218,10 +220,6 @@
 
                         <!-- UPDATES -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsUpdates}" core:Motion.EnterOnShow="True">
-                            <StackPanel>
-                                <TextBlock Classes="title" Text="Updates" />
-                                <TextBlock Classes="muted" FontSize="14" Text="{Binding Version, StringFormat='This is Helm {0}.'}" />
-                            </StackPanel>
                             <Border Classes="glass">
                                 <StackPanel Spacing="12">
                                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
@@ -280,7 +278,6 @@
 
                         <!-- APPEARANCE & STARTUP -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsAppearance}" core:Motion.EnterOnShow="True">
-                            <TextBlock Classes="title" Text="{Binding Selected.Title}" />
                             <Border Classes="glass">
                                 <StackPanel Spacing="6">
                                     <TextBlock Text="Theme" />
@@ -310,10 +307,12 @@
 
                         <!-- RUNNING IN BACKGROUND -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsBackground}" core:Motion.EnterOnShow="True">
-                            <StackPanel>
-                                <TextBlock Classes="title" Text="Running in background" />
-                                <TextBlock Classes="muted" FontSize="14" TextWrapping="Wrap" Text="Tools that keep working while their page is closed. Stop turns the tool off." />
-                            </StackPanel>
+                            <Border Classes="glass">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Classes="head" Text="Running in background" />
+                                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Tools that keep working while their page is closed. Stop turns the tool off." />
+                                </StackPanel>
+                            </Border>
                             <Border Classes="glass" Padding="24,22" IsVisible="{Binding !HasJobs}">
                                 <TextBlock Classes="muted" FontSize="14" HorizontalAlignment="Center" Text="Nothing is running in the background." />
                             </Border>
@@ -342,7 +341,6 @@
 
                         <!-- HELP & TROUBLESHOOTING -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsHelp}" core:Motion.EnterOnShow="True">
-                            <TextBlock Classes="title" Text="Help &amp; troubleshooting" />
                             <Border Classes="glass">
                                 <StackPanel Spacing="12">
                                     <StackPanel Spacing="2">
