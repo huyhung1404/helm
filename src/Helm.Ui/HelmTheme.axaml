@@ -35,6 +35,16 @@
                     <BoxShadows x:Key="HelmGlassShadow">0 1 1 0 #141C2A40, 0 6 14 -6 #2E1C2A40, inset 0 1 0 0 #CCFFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmLiftShadow">0 1 1 0 #1A1C2A40, 0 12 22 -6 #401C2A40, inset 0 1 0 0 #FFFFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmHeroShadow">0 16 40 0 #241C2A40</BoxShadows>
+                    <!-- Switches in Helm's teal instead of the system accent (blue): the knob stays readable on it -->
+                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#0E9688" />
+                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#0B8478" />
+                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#09766B" />
+                    <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#0E9688" />
+                    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#0B8478" />
+                    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#09766B" />
+                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#FFFFFF" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="HelmPageBackground" Color="#202020" />
@@ -59,6 +69,15 @@
                     <BoxShadows x:Key="HelmGlassShadow">0 1 1 0 #40000000, 0 6 14 -6 #66000000, inset 0 1 0 0 #1AFFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmLiftShadow">0 1 1 0 #4D000000, 0 12 22 -6 #80000000, inset 0 1 0 0 #29FFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmHeroShadow">0 20 48 0 #73000000</BoxShadows>
+                    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#2FD3C1" />
+                    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#4FE0D0" />
+                    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#26B8A8" />
+                    <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#2FD3C1" />
+                    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#4FE0D0" />
+                    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#26B8A8" />
+                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#0B1716" />
+                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#0B1716" />
+                    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#0B1716" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
