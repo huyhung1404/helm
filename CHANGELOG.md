@@ -3,6 +3,17 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.91.0] - 2026-11-25
+
+### Changed
+- **Quick Capture and Helm Keyboard have Helm's new look on PC.** The capture box (Win+Alt+N) is a glass card with the target
+  buttons, the text, what will be saved and the keys; Enter, Shift+Enter, Tab, Ctrl+1…9 and Esc work as before. Both tools'
+  settings are pages in the same look, the first card being the switch that turns the tool on or off. Quick Capture's settings on
+  the phone have the new look too.
+
+### Removed
+- **Shortcut Guide (hold Ctrl, Alt or Win to see the shortcuts of the app in front) is gone.** It was used too little to keep.
+
 ## [0.90.0] - 2026-11-25
 
 ### Changed
