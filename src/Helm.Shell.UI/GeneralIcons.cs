@@ -24,13 +24,11 @@ public static class GeneralIcons
         _ => null,
     };
 
-    /// <summary>Four rounded squares, the last one filled: the tools, some on.</summary>
+    /// <summary>A switch that is on: turning tools on and off.</summary>
     private static readonly Lazy<IImage> Tools = new(() => Draw(0xFF7B5CFA, 0xFFE25CFF, (pen, fill, g) =>
     {
-        g.Add(pen, new RectangleGeometry(new Rect(6, 6, 38, 38), 10, 10));
-        g.Add(pen, new RectangleGeometry(new Rect(56, 6, 38, 38), 10, 10));
-        g.Add(pen, new RectangleGeometry(new Rect(6, 56, 38, 38), 10, 10));
-        g.Fill(fill, new RectangleGeometry(new Rect(51, 51, 48, 48), 13, 13));
+        g.Add(pen, new RectangleGeometry(new Rect(6, 26, 88, 48), 24, 24));
+        g.Fill(fill, new EllipseGeometry(new Rect(54, 36, 28, 28)));
     }));
 
     /// <summary>Two arrows chasing each other round: sync, in Helm's own blue.</summary>
@@ -63,12 +61,13 @@ public static class GeneralIcons
         g.Add(pen, Geometry.Parse("M5 55H25L37 20L55 82L67 44L75 55H95"));
     }));
 
-    /// <summary>A question mark in a ring: help.</summary>
-    private static readonly Lazy<IImage> Help = new(() => Draw(0xFF06AEFF, 0xFF6366F1, (pen, fill, g) =>
+    /// <summary>A lifebuoy: help when something goes wrong.</summary>
+    private static readonly Lazy<IImage> Help = new(() => Draw(0xFF06AEFF, 0xFF6366F1, (pen, _, g) =>
     {
         g.Add(pen, new EllipseGeometry(new Rect(6, 6, 88, 88)));
-        g.Add(pen, Geometry.Parse("M36 39A14 14 0 1 1 57 51C52 54 50 57 50 62"));
-        g.Fill(fill, new EllipseGeometry(new Rect(44, 70, 12, 12)));
+        g.Add(pen, new EllipseGeometry(new Rect(31, 31, 38, 38)));
+        // Four bands between the rings, on the diagonals.
+        g.Add(pen, Geometry.Parse("M36.6 36.6L19.6 19.6M63.4 36.6L80.4 19.6M36.6 63.4L19.6 80.4M63.4 63.4L80.4 80.4"));
     }));
 
     private sealed class Drawing(DrawingGroup group)

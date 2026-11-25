@@ -35,7 +35,7 @@
                     <BoxShadows x:Key="HelmGlassShadow">0 1 1 0 #141C2A40, 0 6 14 -6 #2E1C2A40, inset 0 1 0 0 #CCFFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmLiftShadow">0 1 1 0 #1A1C2A40, 0 12 22 -6 #401C2A40, inset 0 1 0 0 #FFFFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmHeroShadow">0 16 40 0 #241C2A40</BoxShadows>
-                    <!-- Switches in Helm's teal instead of the system accent (blue): the knob stays readable on it -->
+                    <!-- Switches when on: Helm's teal unless BackdropTint gives the colour of the background where they sit -->
                     <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#0E9688" />
                     <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#0B8478" />
                     <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#09766B" />
@@ -734,5 +734,9 @@
                 <KeyFrame Cue="100%"><Setter Property="ScaleTransform.ScaleX" Value="1" /><Setter Property="ScaleTransform.ScaleY" Value="1" /></KeyFrame>
             </Animation>
         </Style.Animations>
+    </Style>
+    <!-- Every switch takes the colour of the background where it sits (BackdropTint); the teal above is its fallback -->
+    <Style Selector="ToggleSwitch">
+        <Setter Property="ui:BackdropTint.Enabled" Value="True" />
     </Style>
 </Styles>
