@@ -38,7 +38,7 @@ Branch `spike/avalonia-host`. Question: can Helm move to one Avalonia UI one too
 - Backspace did nothing in the WPF-hosted page: WPF-UI's NavigationViewContentPresenter marks Backspace handled, so WPF
   never dispatches it to the child window. Fixed in AvaloniaHost: a key WPF swallowed while a hosted window has focus is
   sent to it with SendMessage (WPF has no focused element then; check focus with Win32 GetFocus/IsChild). Works.
-- Open: whether the in-progress (composing) word is visible. The text box does hold it (TextPresenter.PreeditText).
+- The word being composed shows underlined in the text box (Avalonia preedit). Works.
 - Keyboard changes must ship in Helm Keyboard before any Avalonia page ships.
 
 ## Not tested (hand tests)
