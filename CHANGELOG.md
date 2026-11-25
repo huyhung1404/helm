@@ -3,6 +3,21 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.90.0] - 2026-11-25
+
+### Changed
+- **Notes and Scratch have Helm's new look, on PC and on the phone.** Same flow as before (the wall of cards; a note opens
+  over it on PC and in its place on the phone; Scratch keeps selecting, drag to move, paste and drop), now with the search and
+  the add buttons on a bar that stays on top, cards that light up, a round-cornered Trash button with a count in the bottom
+  right corner, and glass confirmations.
+- **Notes and Scratch have no separate settings page any more.** The gear opens the settings as a sheet over the page, and
+  its first card is the switch that turns the tool on or off. Home → Utilities opens the tool itself.
+
+### Added
+- Search boxes have a clear button and say what was found; an empty Notes or Scratch says how to put something in.
+- Scratch on PC has a Files button (before: Ctrl+V or drop only) and a Paste button.
+- Right-click (hold, on a phone) a note card: Pin, Copy, Trash or Restore.
+
 ## [0.89.0] - 2026-11-25
 
 ### Changed
