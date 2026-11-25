@@ -13,8 +13,18 @@
             <Setter Property="TextDecorations" Value="Strikethrough" />
             <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
         </Style>
-        <Style Selector="Border.glass.danger">
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmDanger}" />
+        <!-- The whole card says how bad it is: red, yellow, or plain -->
+        <Style Selector="Border.alert.danger">
+            <Setter Property="Background" Value="{DynamicResource HelmAlertDanger}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmAlertDangerStroke}" />
+        </Style>
+        <Style Selector="Border.alert.warning">
+            <Setter Property="Background" Value="{DynamicResource HelmAlertWarning}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmAlertWarningStroke}" />
+        </Style>
+        <Style Selector="Border.alert.info">
+            <Setter Property="Background" Value="{DynamicResource HelmAlertInfo}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmAlertInfoStroke}" />
         </Style>
         <!-- A card of Today is the way into its tool: the whole card is the button -->
         <Style Selector="Button.card">
@@ -77,18 +87,13 @@
                     <ItemsControl ItemsSource="{Binding Alerts}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:HomeAlert">
-                                <Border Classes="glass fade" Classes.danger="{Binding IsDanger}" Padding="16,12,10,12" Margin="0,0,0,8">
-                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                                        <Panel VerticalAlignment="Center">
-                                            <ic:SymbolIcon Symbol="ErrorCircle" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding IsDanger}" />
-                                            <ic:SymbolIcon Symbol="Warning" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource HelmWarning}" IsVisible="{Binding IsWarning}" />
-                                            <ic:SymbolIcon Symbol="Info" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource TextControlForeground}" IsVisible="{Binding IsInfo}" />
-                                        </Panel>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <Border Classes="glass alert fade" Classes.danger="{Binding IsDanger}" Classes.warning="{Binding IsWarning}" Classes.info="{Binding IsInfo}" Padding="16,12,10,12" Margin="0,0,0,8">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
                                             <TextBlock Classes="muted" Text="{Binding Detail}" />
                                         </StackPanel>
-                                        <Button Grid.Column="2" Classes="ghost" VerticalAlignment="Center" Content="{Binding ActionText}" Command="{Binding ActCommand}" />
+                                        <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center" Content="{Binding ActionText}" Command="{Binding ActCommand}" />
                                     </Grid>
                                 </Border>
                             </DataTemplate>
