@@ -18,8 +18,10 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - No decorative "featured" cards when items are equal (no "Up next" hero for an unordered list).
 - Tabs replace everything under them, from the page title down, and scroll to the top.
 - Content page ↔ settings: a gear on the content page opens the tool's settings as a **sheet over the page** (no
-  navigating away; Done / X closes it). Tracker: `TrackerSettingsView`. A WPF settings page may stay for Home →
-  Utilities until it moves.
+  navigating away; Done / X closes it). Tracker: `TrackerSettingsView`. A tool that has moved has **no separate
+  settings page**: its `SettingsPageType` is its content page (Home → Utilities and search open that), the sheet holds
+  the tool's on/off switch as its first card, and the WPF settings page is deleted. A tool that has not moved yet keeps
+  its WPF settings page until it does.
 - Confirmations (delete…) are `GlassDialogs` (a `Sheet`): the question, what happens, Cancel + the action as a pill. A
   view model gets it through `IDialogService`; the view swaps it in (`viewModel.UseDialogs(new GlassDialogs(() => this))`).
   Never the OS or WPF-UI dialog.

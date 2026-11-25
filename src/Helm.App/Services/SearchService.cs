@@ -72,7 +72,8 @@ internal sealed class SearchService(IServiceProvider services, IModuleHost modul
         foreach (var module in modules.Modules)
         {
             results.Add(new SearchResult(module.DisplayName, module.Group.DisplayName(), module.SettingsPageType, null, 2));
-            AddCards(results, module.SettingsPageType, module.DisplayName);
+            // A tool whose settings are a sheet in its content page has no cards to index.
+            if (module.SettingsPageType != (module as IModuleContent)?.ContentPageType) AddCards(results, module.SettingsPageType, module.DisplayName);
         }
         return results;
     }

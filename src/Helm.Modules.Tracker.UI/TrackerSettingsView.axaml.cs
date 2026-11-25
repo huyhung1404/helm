@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Helm.Core.Modules;
 
 namespace Helm.Modules.Tracker.Ui;
 
@@ -12,13 +13,20 @@ public partial class TrackerSettingsView : UserControl
 
     private readonly TrackerViewModel? _viewModel;
 
-    public TrackerSettingsView(TrackerViewModel viewModel, Action close)
+    public TrackerSettingsView(TrackerViewModel viewModel, IModule module, Action close)
     {
         _viewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
         CloseButton.Click += (_, _) => close();
         DoneButton.Click += (_, _) => close();
+        // The tool's on/off switch (it used to be on a settings page of its own).
+        EnableSwitch.IsChecked = module.IsEnabled;
+        EnableSwitch.IsCheckedChanged += (_, _) => module.IsEnabled = EnableSwitch.IsChecked == true;
+        module.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IModule.IsEnabled)) Avalonia.Threading.Dispatcher.UIThread.Post(() => EnableSwitch.IsChecked = module.IsEnabled);
+        };
     }
 
     // A list's name is edited in its row and saved when the field loses focus or on Enter.

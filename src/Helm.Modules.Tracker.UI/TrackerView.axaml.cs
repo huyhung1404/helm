@@ -98,9 +98,9 @@ public partial class TrackerView : UserControl
     /// <summary>The gear: Tracker's settings as a sheet over the page, not a page to navigate to.</summary>
     private void Settings_Click(object? sender, RoutedEventArgs e)
     {
-        if (_viewModel is null) return;
+        if (_viewModel is null || _module is null) return;
         SheetHandle? sheet = null;
-        sheet = Sheet.Show(this, new TrackerSettingsView(_viewModel, () => sheet?.Close()), 480);
+        sheet = Sheet.Show(this, new TrackerSettingsView(_viewModel, _module, () => sheet?.Close()), 480);
         if (sheet is null) return;
         _settingsOpen = true;
         sheet.Closed += () => _settingsOpen = false;
