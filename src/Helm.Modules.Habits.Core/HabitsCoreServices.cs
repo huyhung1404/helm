@@ -33,6 +33,8 @@ public static class HabitsCoreServices
             sp.GetRequiredService<ISyncedCollection<HabitCheck>>(),
             sp.GetRequiredService<ISyncedCollection<HabitLapse>>()));
         services.AddSingleton(sp => new HabitReminderService(sp.GetRequiredService<HabitsStore>(), sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>()));
+        // Home's "today": the habits to build, ticked right there.
+        services.AddSingleton<Helm.Core.Today.ITodaySource>(sp => new HabitsTodaySource(sp.GetRequiredService<HabitsStore>()));
         // The AI agents' tools for the habits (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, HabitsMcpTools>();
         // Windows registers it again through AddHelmModule; one instance either way.

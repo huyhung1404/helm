@@ -37,6 +37,8 @@ public static class TrackerCoreServices
         services.AddSingleton(sp => new TrackerReminderService(
             sp.GetRequiredService<TrackerStore>(), sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>(),
             debts: sp.GetService<Helm.Modules.Wallet.DebtBook>(), bills: sp.GetService<Helm.Modules.Wallet.BillBook>()));
+        // Home's "today": tasks due today or overdue.
+        services.AddSingleton<Helm.Core.Today.ITodaySource>(sp => new TrackerTodaySource(sp.GetRequiredService<TrackerStore>()));
         // Quick Capture: "/t buy milk tomorrow 9h".
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, TaskCaptureTarget>();
         // Other tools hand tasks over (Missions sends a step here).

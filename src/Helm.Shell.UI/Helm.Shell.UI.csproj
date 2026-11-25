@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
   </ItemGroup>
 
 </Project>
