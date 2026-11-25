@@ -29,8 +29,19 @@ Branch `spike/avalonia-host`. Question: can Helm move to one Avalonia UI one too
   content. WPF popups are separate windows and should draw above it (not verified).
 - The page must opt out of WPF-UI's scroller (`ScrollViewer.CanContentScroll="False"`); Avalonia scrolls itself.
 
+## Vietnamese typing (hand-tested with Anh)
+- Helm Keyboard could not type into ANY Avalonia text box (Gallery too): Avalonia is an IMM32 app, it reaches TSF
+  through a transitory context, and text inserted straight into it never reaches the app. Fixed in the keyboard:
+  compose when the context is TS_SS_TRANSITORY. Works.
+- The space ending a word was lost (Avalonia ignores WM_CHAR after inserting a composition result). Fixed in the
+  keyboard: the word-ending character is committed with the word. Works.
+- Backspace did nothing in the WPF-hosted page: WPF-UI's NavigationViewContentPresenter marks Backspace handled, so WPF
+  never dispatches it to the child window. Fixed in AvaloniaHost: a key WPF swallowed while a hosted window has focus is
+  sent to it with SendMessage (WPF has no focused element then; check focus with Win32 GetFocus/IsChild). Works.
+- Open: whether the in-progress (composing) word is visible. The text box does hold it (TextPresenter.PreeditText).
+- Keyboard changes must ship in Helm Keyboard before any Avalonia page ships.
+
 ## Not tested (hand tests)
-- Typing Vietnamese with Helm's own keyboard into an Avalonia text box inside WPF (TSF through WinForms hosting).
 - Focus and Tab moving between WPF and the Avalonia page; Esc/shortcuts while focus is inside the page.
 - Per-monitor DPI when dragging the window between screens of different scale.
 - The search popup and other WPF popups over the page.

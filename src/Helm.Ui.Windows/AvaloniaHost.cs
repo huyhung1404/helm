@@ -19,16 +19,17 @@ public sealed class AvaloniaHost : WindowsFormsHost
     {
         HelmAvalonia.EnsureStarted();
         Child = _inner;
-        // While focus is in the page, WPF still matches keys against routed commands up the tree (the tab's Frame binds
-        // Backspace to "Back", others Ctrl+C, Delete…). A command that cannot run still marks the key handled, and WPF
-        // then never hands the message to the page: Backspace did nothing. Say "not here, keep routing" for every
-        // routed command aimed at the page, so the key stays unhandled and reaches Avalonia.
-        System.Windows.Input.CommandManager.AddPreviewCanExecuteHandler(this, (_, e) =>
+        // While focus is in the page WPF still routes every key up its own tree first, and a key something there marks
+        // handled never reaches the page: WPF-UI's NavigationViewContentPresenter (the tab's Frame) takes Backspace so
+        // the Frame does not go back. Such a key is sent straight to the focused Avalonia window (SendMessage skips
+        // WPF's message pre-processing, so it is not taken a second time).
+        System.Windows.Input.InputManager.Current.PostProcessInput += ForwardSwallowedKey;
+        Unloaded += (_, _) => System.Windows.Input.InputManager.Current.PostProcessInput -= ForwardSwallowedKey;
+        Loaded += (_, _) =>
         {
-            e.CanExecute = false;
-            e.ContinueRouting = true;
-            e.Handled = true;
-        });
+            System.Windows.Input.InputManager.Current.PostProcessInput -= ForwardSwallowedKey;
+            System.Windows.Input.InputManager.Current.PostProcessInput += ForwardSwallowedKey;
+        };
         // The hosted window is a real HWND: it does not follow WPF render transforms such as the tab's slide-in, and
         // stays where the animation started. Re-place it once the animation is over (a layout pass re-syncs it).
         Loaded += (_, _) =>
@@ -43,6 +44,33 @@ public sealed class AvaloniaHost : WindowsFormsHost
             timer.Start();
         };
     }
+
+    private void ForwardSwallowedKey(object? sender, System.Windows.Input.ProcessInputEventArgs e)
+    {
+        if (InputLog.On && e.StagingItem.Input is System.Windows.Input.KeyEventArgs { Key: System.Windows.Input.Key.Back } probe
+            && probe.RoutedEvent == System.Windows.Input.Keyboard.KeyDownEvent)
+        {
+            var f = GetFocus();
+            InputLog.Write($"wpf   forward check: handled={probe.Handled} focusWithin={IsKeyboardFocusWithin} wpfFocus={System.Windows.Input.Keyboard.FocusedElement?.GetType().Name} getFocus=0x{f:X} host=0x{Handle:X} isChild={IsChild(Handle, f)}");
+        }
+        if (e.StagingItem.Input is not System.Windows.Input.KeyEventArgs { Handled: true } key
+            || key.RoutedEvent != System.Windows.Input.Keyboard.KeyDownEvent
+            // WPF has no focused element of its own while a hosted window has focus: ask Win32 instead (below).
+            || key.Key is System.Windows.Input.Key.ImeProcessed or System.Windows.Input.Key.System or System.Windows.Input.Key.DeadCharProcessed)
+            return;
+        var focus = GetFocus();
+        if (focus == IntPtr.Zero || Handle == IntPtr.Zero || !IsChild(Handle, focus)) return;
+        var virtualKey = System.Windows.Input.KeyInterop.VirtualKeyFromKey(key.Key);
+        var scan = MapVirtualKeyW((uint)virtualKey, 0);
+        InputLog.Write($"wpf   forwarding swallowed {key.Key} to the page");
+        SendMessageW(focus, 0x0100, virtualKey, (nint)(1 | (scan << 16)));                                  // WM_KEYDOWN
+        SendMessageW(focus, 0x0101, virtualKey, unchecked((nint)(1 | (scan << 16) | 0xC0000000)));          // WM_KEYUP
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetFocus();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool IsChild(IntPtr parent, IntPtr child);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint MapVirtualKeyW(uint code, uint mapType);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern nint SendMessageW(IntPtr hwnd, uint msg, nint wParam, nint lParam);
 
     public Avalonia.Controls.Control? Page
     {
