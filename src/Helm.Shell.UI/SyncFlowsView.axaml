@@ -1,0 +1,166 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shell="using:Helm.Shell.ViewModels"
+             x:Class="Helm.General.SyncFlowsView"
+             x:DataType="shell:SyncViewModel">
+
+    <!-- What sync asks of the user beyond a status line: connect this device, unlock it, save the recovery key, change the
+         passphrase, remove a device, decide on deletions from another device. The same screens as on the phone before,
+         in General's look, bound to the real SyncViewModel. -->
+    <StackPanel Spacing="14">
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+        <Border Classes="infobar warning" IsVisible="{Binding HasError}">
+            <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- 1. Not connected: an invite code or a device token -->
+        <Border Classes="glass" IsVisible="{Binding IsNotConnected}">
+            <StackPanel Spacing="10">
+                <TextBlock Classes="head" Text="Connect this device" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Sync needs an invite code (to create your account) or a device token (to add this device to an account you already have)." />
+                <RadioButton GroupName="SyncConnect" Content="I have an invite code" IsChecked="{Binding UseInvite}" />
+                <RadioButton GroupName="SyncConnect" Content="I have a device token" IsChecked="{Binding UseToken}" />
+                <StackPanel Spacing="8" IsVisible="{Binding UseInvite}">
+                    <TextBox Classes="glass mono" PlaceholderText="Invite code (helm_inv_…)" Text="{Binding InviteCode}" AutomationProperties.Name="Invite code" />
+                    <TextBox Classes="glass" PlaceholderText="Account name, e.g. your name" Text="{Binding AccountNameInput}" AutomationProperties.Name="Account name" />
+                    <TextBox Classes="glass" PlaceholderText="This device's name" Text="{Binding DeviceName}" AutomationProperties.Name="Device name" />
+                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Create account" Command="{Binding ConnectCommand}" />
+                </StackPanel>
+                <StackPanel Spacing="8" IsVisible="{Binding UseToken}">
+                    <TextBox Classes="glass mono" PlaceholderText="Device token (helm_pat_…)" Text="{Binding TokenInput}" AutomationProperties.Name="Device token" />
+                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Connect" Command="{Binding ConnectCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 2. Connected, the key is needed: create the passphrase (first device) or unlock -->
+        <StackPanel Spacing="14" IsVisible="{Binding NeedsKey}">
+            <Border Classes="infobar" IsVisible="{Binding KeyChangedElsewhere}">
+                <StackPanel>
+                    <TextBlock Text="The account key was changed" Classes="title" FontSize="15" />
+                    <TextBlock TextWrapping="Wrap" Text="A device was removed on another device and the key was changed. Enter your passphrase once to keep syncing; nothing on this device was lost." />
+                </StackPanel>
+            </Border>
+            <Border Classes="glass" IsVisible="{Binding IsCheckingPassphrase}">
+                <TextBlock Text="Checking the account…" Classes="secondary" />
+            </Border>
+            <Border Classes="glass" IsVisible="{Binding IsCreatingPassphrase}">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="head" Text="{Binding AccountName, StringFormat='Create the passphrase for {0}'}" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="It encrypts your data before it leaves this device and unlocks sync on your other devices. Nobody can reset it for you." />
+                    <TextBox Classes="glass revealPasswordButton" PasswordChar="●" Text="{Binding Passphrase}" AutomationProperties.Name="New passphrase"
+                             PlaceholderText="{Binding MinPassphraseLength, StringFormat='Passphrase (at least {0} characters)'}" />
+                    <TextBlock Text="{Binding PassphraseStrengthText}" Classes="secondary" />
+                    <TextBox Classes="glass revealPasswordButton" PasswordChar="●" Text="{Binding PassphraseConfirm}" PlaceholderText="Repeat the passphrase" AutomationProperties.Name="Repeat passphrase" />
+                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Create passphrase and start syncing" Command="{Binding CreatePassphraseCommand}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="glass" IsVisible="{Binding IsUnlocking}">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="head" Text="{Binding AccountName, StringFormat='Unlock {0} on this device'}" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Enter the passphrase you created on your first device, or use your recovery key." />
+                    <TextBox Classes="glass revealPasswordButton" PasswordChar="●" Text="{Binding Passphrase}" PlaceholderText="Passphrase" AutomationProperties.Name="Passphrase"
+                             IsVisible="{Binding !UseRecoveryKey}" />
+                    <TextBox Classes="glass mono" Text="{Binding RecoveryKeyInput}" PlaceholderText="Recovery key (HELM-…)" AutomationProperties.Name="Recovery key"
+                             IsVisible="{Binding UseRecoveryKey}" />
+                    <CheckBox Content="Use the recovery key instead" IsChecked="{Binding UseRecoveryKey}" />
+                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Unlock" Command="{Binding UnlockCommand}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Recovery key, shown once after the passphrase is created -->
+        <Border Classes="glass" IsVisible="{Binding IsShowingRecoveryKey}">
+            <StackPanel Spacing="8">
+                <Border Classes="infobar warning">
+                    <StackPanel>
+                        <TextBlock Text="{Binding RecoveryKeyTitle}" Classes="title" FontSize="15" />
+                        <TextBlock TextWrapping="Wrap" Text="It is shown only this once. If you forget the passphrase, this key is the only way back into your data. Store it in a password manager or print it." />
+                    </StackPanel>
+                </Border>
+                <TextBox Classes="glass mono" Text="{Binding RecoveryKeyToShow, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AutomationProperties.Name="Your recovery key" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="ghost" Content="Copy" Command="{Binding CopyRecoveryKeyCommand}" />
+                    <Button Classes="pill" Content="I saved it" Command="{Binding DismissRecoveryKeyCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Deletions from another device wait for the user -->
+        <Border Classes="glass" IsVisible="{Binding HasHold}">
+            <StackPanel Spacing="8">
+                <Border Classes="infobar warning">
+                    <StackPanel>
+                        <TextBlock Text="{Binding HoldTitle}" Classes="title" FontSize="15" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding HoldText}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+                <WrapPanel>
+                    <Button Classes="pill" Content="Delete them here too" Command="{Binding ApplyHeldCommand}" Margin="0,0,8,8" />
+                    <Button Classes="ghost" Content="Keep and restore them" Command="{Binding KeepHeldCommand}" Margin="0,0,0,8" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- The passphrase is still protected the older way -->
+        <Border Classes="glass" IsVisible="{Binding NeedsProtectionUpgrade}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Strengthen passphrase protection" Classes="head" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Your passphrase is protected the older way (PBKDF2). Enter it once to switch to Argon2id, which makes guessing it far harder. Nothing else changes." />
+                <TextBox Classes="glass revealPasswordButton" PasswordChar="●" Text="{Binding UpgradePassphrase}" PlaceholderText="Your passphrase" AutomationProperties.Name="Passphrase to strengthen" />
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Strengthen" Command="{Binding UpgradeProtectionCommand}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Change the passphrase -->
+        <Border Classes="glass" IsVisible="{Binding IsChangingPassphrase}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Change passphrase" Classes="head" />
+                <TextBox Classes="glass revealPasswordButton" PasswordChar="●" Text="{Binding ChangeCurrentSecret}" PlaceholderText="Current passphrase"
+                         AutomationProperties.Name="Current passphrase" IsVisible="{Binding !ChangeWithRecoveryKey}" />
+                <TextBox Classes="glass mono" Text="{Binding ChangeCurrentSecret}" PlaceholderText="Recovery key (HELM-…)"
+                         AutomationProperties.Name="Recovery key to change the passphrase" IsVisible="{Binding ChangeWithRecoveryKey}" />
+                <CheckBox Content="I forgot it: use the recovery key" IsChecked="{Binding ChangeWithRecoveryKey}" />
+                <TextBox Classes="glass revealPasswordButton" PasswordChar="●" Text="{Binding ChangeNewPassphrase}" AutomationProperties.Name="New passphrase"
+                         PlaceholderText="{Binding MinPassphraseLength, StringFormat='New passphrase (at least {0} characters)'}" />
+                <TextBlock Classes="secondary" Text="{Binding ChangeStrengthText}" />
+                <TextBox Classes="glass revealPasswordButton" PasswordChar="●" Text="{Binding ChangeConfirmPassphrase}" PlaceholderText="Repeat the new passphrase"
+                         AutomationProperties.Name="Repeat new passphrase" />
+                <WrapPanel>
+                    <Button Classes="pill" Content="Change passphrase" Command="{Binding ChangePassphraseCommand}" Margin="0,0,8,8" />
+                    <Button Classes="ghost" Content="Cancel" Command="{Binding CancelChangePassphraseCommand}" Margin="0,0,0,8" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+        <Border Classes="infobar" IsVisible="{Binding HasPassphraseChangedText}">
+            <TextBlock TextWrapping="Wrap" Text="{Binding PassphraseChangedText}" />
+        </Border>
+
+        <!-- Remove a device: offer to change the account key too -->
+        <Border Classes="glass" IsVisible="{Binding IsRemovingDevice}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding RemovingDeviceText}" Classes="head" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Recommended: also change the account key, so that device can never read anything written from now on. Your other devices will ask for the passphrase once, and you get a new recovery key." />
+                <TextBox Classes="glass revealPasswordButton" PasswordChar="●" Text="{Binding RemovePassphrase}" PlaceholderText="Your passphrase" AutomationProperties.Name="Passphrase to change the key" />
+                <WrapPanel>
+                    <Button Classes="pill" Content="Remove and change key" Command="{Binding RemoveDeviceAndChangeKeyCommand}" Margin="0,0,8,8" />
+                    <Button Classes="ghost" Content="Remove only" Command="{Binding RemoveDeviceOnlyCommand}" Margin="0,0,8,8" />
+                    <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRemoveDeviceCommand}" Margin="0,0,8,8" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- A new device's token, shown once -->
+        <Border Classes="glass" IsVisible="{Binding HasNewDeviceToken}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="New device token" Classes="head" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Copy this token now; it is shown only once. On the new device: General → Sync → I have a device token, then unlock with your passphrase." />
+                <TextBox Classes="glass mono" Text="{Binding NewDeviceToken, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AutomationProperties.Name="New device token" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="ghost" Content="Copy" Command="{Binding CopyNewDeviceTokenCommand}" />
+                    <Button Classes="pill" Content="Done" Command="{Binding DismissNewDeviceTokenCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

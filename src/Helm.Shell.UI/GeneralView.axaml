@@ -4,6 +4,7 @@
              xmlns:core="using:Helm.Core.Ui"
              xmlns:vm="using:Helm.General"
              xmlns:home="using:Helm.Home"
+             xmlns:local="using:Helm.General"
              x:Class="Helm.General.GeneralView"
              x:DataType="vm:GeneralViewModel">
 
@@ -123,6 +124,8 @@
 
                         <!-- SYNC -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsSync}" core:Motion.EnterOnShow="True">
+                            <local:SyncFlowsView DataContext="{Binding Sync}" IsVisible="{Binding $parent[UserControl].((vm:GeneralViewModel)DataContext).ShowSyncFlow}" />
+                            <StackPanel Spacing="14" IsVisible="{Binding ShowSyncSummary}">
                             <Border Classes="glass">
                                 <StackPanel Spacing="12">
                                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
@@ -187,10 +190,10 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Add a device that shows an 18-digit pairing code: it gets its own token and the key, nobody types the passphrase." />
+                                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Name the new device to get its token. Copy it once and enter it on that device, then unlock there with your passphrase." />
                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                        <TextBox Classes="glass mono" PlaceholderText="18-digit pairing code" Text="{Binding PairingCode}" AutomationProperties.Name="Pairing code" />
-                                        <Button Grid.Column="1" Classes="pill" Content="Add device" Command="{Binding PairCommand}" />
+                                        <TextBox Classes="glass mono" PlaceholderText="Device name, e.g. Laptop" Text="{Binding PairingCode}" AutomationProperties.Name="New device name" />
+                                        <Button Grid.Column="1" Classes="pill" Content="Create token" Command="{Binding PairCommand}" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -214,6 +217,7 @@
                                     </Button>
                                 </StackPanel>
                             </Border>
+                            </StackPanel>
                         </StackPanel>
 
                         <!-- UPDATES -->

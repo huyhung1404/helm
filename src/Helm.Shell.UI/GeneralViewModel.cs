@@ -70,7 +70,8 @@ public interface IGeneralHost
 {
     Task SyncNowAsync();
 
-    Task PairDeviceAsync(string code);
+    /// <summary>Makes a token for a new device with this name.</summary>
+    Task PairDeviceAsync(string deviceName);
 
     Task ChangePassphraseAsync();
 
@@ -140,6 +141,29 @@ public sealed partial class GeneralViewModel : ObservableObject
     }
 
     public string Version { get; }
+
+    /// <summary>The real sync view model, when Helm (not the Gallery) fills General: its first-run screens, passphrase change and held deletions are shown from it.</summary>
+    public Helm.Shell.ViewModels.SyncViewModel? Sync { get; private set; }
+
+    /// <summary>Something in sync needs more than a line: connect, unlock, a recovery key, a passphrase change, deletions waiting.</summary>
+    public bool ShowSyncFlow => Sync is { } s && (!s.IsReady || s.IsShowingRecoveryKey || s.IsChangingPassphrase || s.HasHold || s.IsRemovingDevice
+        || s.NeedsProtectionUpgrade || s.HasNewDeviceToken || s.HasError);
+
+    /// <summary>The settled state: account, what syncs, devices. Shown when sync is connected (or in the Gallery, which has no real sync).</summary>
+    public bool ShowSyncSummary => Sync is not { } s || s.IsReady;
+
+    public void AttachSync(Helm.Shell.ViewModels.SyncViewModel sync)
+    {
+        Sync = sync;
+        sync.PropertyChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(ShowSyncFlow));
+            OnPropertyChanged(nameof(ShowSyncSummary));
+        };
+        OnPropertyChanged(nameof(Sync));
+        OnPropertyChanged(nameof(ShowSyncFlow));
+        OnPropertyChanged(nameof(ShowSyncSummary));
+    }
 
     /// <summary>Windows (and later macOS): startup, tray, administrator mode, the update channel's install-on-restart.</summary>
     public bool IsDesktop { get; }
