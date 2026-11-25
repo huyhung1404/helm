@@ -1,0 +1,170 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Keyboard"
+             xmlns:uiw="using:Helm.Ui.Windows"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Keyboard.KeyboardView"
+             x:DataType="vm:KeyboardViewModel">
+
+    <!-- Helm Keyboard's settings: the tool has no page of content, so this is its page. One card per subject, a switch on the
+         right or a field under its name; the first card turns the tool on or off. -->
+    <Panel>
+        <core:Backdrop />
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" core:ScrollFade.Enabled="True">
+            <StackPanel x:Name="Page" Margin="40,28,40,40" Spacing="14" MaxWidth="820" HorizontalAlignment="Stretch">
+                <StackPanel Margin="0,0,0,6">
+                    <TextBlock Classes="eyebrow" Text="WINDOWS KEYBOARD" />
+                    <TextBlock Classes="display" Text="Helm Keyboard" />
+                    <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" TextWrapping="Wrap"
+                               Text="Type Vietnamese with Telex, go round English, Vietnamese and Chinese with one shortcut, and let every app and web site keep the keyboard you last used in it." />
+                </StackPanel>
+
+                <!-- On or off -->
+                <Border Classes="glass">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Helm Keyboard is on" Classes="head" />
+                            <TextBlock Text="Off stops the switch shortcut and remembering the keyboard of each app. The input method stays installed." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch x:Name="EnableSwitch" Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" AutomationProperties.Name="Helm Keyboard on or off" />
+                    </Grid>
+                </Border>
+
+                <!-- Install -->
+                <Border Classes="glass">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Input method" Classes="head" />
+                            <TextBlock Text="{Binding InstallDescription}" Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding InstallButton}"
+                                Command="{Binding InstallCommand}" IsVisible="{Binding CanInstall}" />
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding UninstallCommand}" IsVisible="{Binding IsInstalled}"
+                                AutomationProperties.Name="Remove Helm Keyboard">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                                <TextBlock Text="Remove" Foreground="{DynamicResource HelmDanger}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- Switching -->
+                <Border Classes="glass">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="Switching" Classes="head" />
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Switch keyboard shortcut" />
+                            <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Shortcuts}" SelectedValueBinding="{ReflectionBinding Value}"
+                                      SelectedValue="{Binding Shortcut}" AutomationProperties.Name="Switch keyboard shortcut">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate DataType="vm:IChoice">
+                                        <TextBlock Text="{Binding Label}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Text="Goes round English, Vietnamese and Chinese in the app you are typing in." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Spacing="6" IsEnabled="{Binding IsOwnHotkey}">
+                            <TextBlock Text="Your own shortcut" />
+                            <uiw:HotkeyBox x:Name="OwnHotkey" Classes="ghost" HorizontalAlignment="Stretch" MinHeight="40" />
+                            <TextBlock Text="Used when the shortcut above is set to a shortcut of your own." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsEnabled="{Binding HasChinese}">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Include Chinese" />
+                                <TextBlock Text="Needs a Chinese keyboard, such as Sogou, in Windows' keyboard list." Classes="secondary" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding IncludeChinese}" OnContent="" OffContent="" AutomationProperties.Name="Include Chinese" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Show the keyboard on screen" />
+                                <TextBlock Text="EN, VI or 中 appears for a moment after the shortcut." Classes="secondary" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding ShowIndicator}" OnContent="" OffContent="" AutomationProperties.Name="Show the keyboard on screen" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <TextBlock Text="Play a sound when switching" VerticalAlignment="Center" />
+                            <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding PlaySound}" OnContent="" OffContent="" AutomationProperties.Name="Play a sound when switching" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Leave the shortcut to a computer you control" TextWrapping="Wrap" />
+                                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                           Text="In Chrome Remote Desktop, Remote Desktop, UltraViewer and the like, the shortcut switches the other computer's keyboard (with Helm there), and this one stays English. Your own shortcut (like Ctrl+Alt+K) cannot reach it." />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding RemoteGetsShortcut}" OnContent="" OffContent="" AutomationProperties.Name="Leave the shortcut to a computer you control" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Typing -->
+                <Border Classes="glass">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="Typing Vietnamese (Telex)" Classes="head" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="New tone placement" />
+                                <TextBlock Text="Puts the tone on the second vowel of oa, oe and uy: hoà, khoẻ, thuý (off: hòa, khỏe, thúy)." Classes="secondary" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding ModernToneStyle}" OnContent="" OffContent="" AutomationProperties.Name="New tone placement" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Check spelling" />
+                                <TextBlock Text="Words that cannot be Vietnamese, such as windows or class, stay as you type them." Classes="secondary" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding SpellCheck}" OnContent="" OffContent="" AutomationProperties.Name="Check spelling" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Excluded apps -->
+                <Border Classes="glass">
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Excluded apps" Classes="head" />
+                            <TextBlock Text="Programs Helm never switches the keyboard for, one per line (e.g. Unity.exe)." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBox x:Name="ExcludedBox" Classes="glass" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" MaxHeight="240"
+                                 VerticalContentAlignment="Top" PlaceholderText="Example: Unity.exe" AutomationProperties.Name="Excluded apps" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Remembered apps -->
+                <Border Classes="glass">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Apps with their own keyboard" Classes="head" />
+                            <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !HasApps}"
+                                       Text="Every app and web site starts in English. Switch the keyboard in an app, or on a web page, and Helm gives it back the next time you use that app or open that site, on every PC you sync." />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Apps}" IsVisible="{Binding HasApps}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:KeyboardAppRow">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10" Margin="0,0,0,8">
+                                        <ic:SymbolIcon Symbol="Globe" FontSize="18" VerticalAlignment="Center" Foreground="{DynamicResource HelmSecondaryText}" IsVisible="{Binding IsSite}" />
+                                        <ic:SymbolIcon Symbol="Apps" FontSize="18" VerticalAlignment="Center" Foreground="{DynamicResource HelmSecondaryText}" IsVisible="{Binding !IsSite}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <ComboBox Grid.Column="2" Classes="glass" MinWidth="140" AutomationProperties.Name="Keyboard"
+                                                  ItemsSource="{Binding $parent[UserControl].((vm:KeyboardViewModel)DataContext).Modes}" SelectedValueBinding="{ReflectionBinding Value}" SelectedValue="{Binding Mode}">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate DataType="vm:IChoice">
+                                                    <TextBlock Text="{Binding Label}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                        <Button Grid.Column="3" Classes="ghost" Content="Forget" Command="{Binding $parent[UserControl].((vm:KeyboardViewModel)DataContext).ForgetCommand}"
+                                                CommandParameter="{Binding}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

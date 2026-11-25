@@ -8,7 +8,13 @@ using Helm.Core.Settings;
 
 namespace Helm.Modules.Keyboard;
 
-public sealed record Choice<T>(T Value, string Label);
+/// <summary>A label a list shows (the page binds to this, whatever the value's type).</summary>
+public interface IChoice
+{
+    string Label { get; }
+}
+
+public sealed record Choice<T>(T Value, string Label) : IChoice;
 
 /// <summary>An app with a keyboard of its own, in the list on the settings page.</summary>
 public sealed partial class KeyboardAppRow : ObservableObject
@@ -32,9 +38,6 @@ public sealed partial class KeyboardAppRow : ObservableObject
 
     /// <summary>What the row shows: the site on its own ("facebook.com"), or the app's file name.</summary>
     public string Display => IsSite ? App["web:".Length..] : App;
-
-    /// <summary>A globe for a web site, the apps symbol for an app.</summary>
-    public Wpf.Ui.Controls.SymbolRegular Icon => IsSite ? Wpf.Ui.Controls.SymbolRegular.Globe24 : Wpf.Ui.Controls.SymbolRegular.Apps24;
 
     partial void OnModeChanged(KeyboardMode value) => _apps.Remember(App, value);
 }

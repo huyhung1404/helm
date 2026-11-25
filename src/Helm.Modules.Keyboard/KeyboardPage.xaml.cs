@@ -1,12 +1,12 @@
-using Helm.Core.Ui;
+using System.Windows.Controls;
 
 namespace Helm.Modules.Keyboard;
 
-public partial class KeyboardPage : ModulePageBase
+public partial class KeyboardPage : Page
 {
     public KeyboardPage(KeyboardViewModel viewModel)
     {
-        DataContext = viewModel;
         InitializeComponent();
+        Host.Show(() => new KeyboardView(viewModel));
     }
 }
