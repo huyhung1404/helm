@@ -17,6 +17,8 @@ internal static class TsfIds
     public static readonly Guid PropAttribute = new("34b45670-7526-11d2-a147-00105a2799b5");        // GUID_PROP_ATTRIBUTE
     public static readonly Guid PropInputScope = new("1713dd5a-68e7-4a5b-9af6-592a595c778d");       // GUID_PROP_INPUTSCOPE
     public const int IS_URL = 1;
+    /// <summary>TS_SS_TRANSITORY: an IMM32 control seen through Windows' emulation; it keeps only composed text.</summary>
+    public const uint TS_SS_TRANSITORY = 0x4;
     public static readonly Guid KeyboardDisabled = new("71a5b253-1951-466b-9fbc-9c8808fa84f2");    // GUID_COMPARTMENT_KEYBOARD_DISABLED
     public static readonly Guid EmptyContext = new("d7487dbf-804e-41c5-894d-ad96fd4eea13");        // GUID_COMPARTMENT_EMPTYCONTEXT
     public static readonly Guid InputProcessorProfiles = new("33c53a50-f456-4884-b049-85fd643ecfed"); // CLSID_TF_InputProcessorProfiles
@@ -57,6 +59,13 @@ internal unsafe struct TfLangBarItemInfo
     public uint Style;
     public uint Sort;
     public fixed char Description[32];
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct TsStatus
+{
+    public uint DynamicFlags;
+    public uint StaticFlags;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -225,7 +234,7 @@ internal partial interface ITfContext
     [PreserveSig] int _6();
     [PreserveSig] int _7();
     [PreserveSig] int _8();
-    [PreserveSig] int _9();
+    [PreserveSig] int GetStatus(out TsStatus status);
     [PreserveSig] int GetProperty(in Guid guid, out ITfProperty? property);
     [PreserveSig] int GetAppProperty(in Guid guid, out ITfReadOnlyProperty? property);
 }

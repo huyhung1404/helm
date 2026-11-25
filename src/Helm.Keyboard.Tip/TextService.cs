@@ -471,6 +471,14 @@ internal sealed unsafe partial class TextService
     private void LearnKind(ITfContext context, uint ec)
     {
         _kindKnown = true;
+        // IMM32 apps (Avalonia, older Win32 controls) reach TSF through a transitory context: text set straight into
+        // it never reaches the app, only a finished composition does. Typing into it silently loses every letter.
+        if (context.GetStatus(out var status) >= 0 && (status.StaticFlags & TsfIds.TS_SS_TRANSITORY) != 0)
+        {
+            if (Log.IsVerbose) Log.Info("transitory context (IMM32 app): composing");
+            _composeOnly = true;
+            return;
+        }
         if (RangeAtCaret(context, ec) is not { } range || context.GetAppProperty(TsfIds.PropInputScope, out var property) < 0
             || property is null)
         {
