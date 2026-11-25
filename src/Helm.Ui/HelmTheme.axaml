@@ -30,7 +30,10 @@
                     <SolidColorBrush x:Key="HelmEyebrow" Color="#0B7F74" />
                     <SolidColorBrush x:Key="HelmPillBackground" Color="#1C1F28" />
                     <SolidColorBrush x:Key="HelmPillForeground" Color="#FFFFFF" />
-                    <BoxShadows x:Key="HelmGlassShadow">0 6 18 0 #141C2A40</BoxShadows>
+                    <!-- Stacked cards: a tight contact shadow, a short soft one under the bottom edge (negative spread keeps it out of the gap
+                         between cards) and a thin light edge on top: they sit on the page like cards, no dark band between them. -->
+                    <BoxShadows x:Key="HelmGlassShadow">0 1 1 0 #141C2A40, 0 6 14 -6 #2E1C2A40, inset 0 1 0 0 #CCFFFFFF</BoxShadows>
+                    <BoxShadows x:Key="HelmLiftShadow">0 1 1 0 #1A1C2A40, 0 12 22 -6 #401C2A40, inset 0 1 0 0 #FFFFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmHeroShadow">0 16 40 0 #241C2A40</BoxShadows>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
@@ -53,7 +56,8 @@
                     <SolidColorBrush x:Key="HelmEyebrow" Color="#2FD3C1" />
                     <SolidColorBrush x:Key="HelmPillBackground" Color="#F5F8FC" />
                     <SolidColorBrush x:Key="HelmPillForeground" Color="#161A22" />
-                    <BoxShadows x:Key="HelmGlassShadow">0 8 24 0 #4D000000</BoxShadows>
+                    <BoxShadows x:Key="HelmGlassShadow">0 1 1 0 #40000000, 0 6 14 -6 #66000000, inset 0 1 0 0 #1AFFFFFF</BoxShadows>
+                    <BoxShadows x:Key="HelmLiftShadow">0 1 1 0 #4D000000, 0 12 22 -6 #80000000, inset 0 1 0 0 #29FFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmHeroShadow">0 20 48 0 #73000000</BoxShadows>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
@@ -253,7 +257,7 @@
         </Setter>
     </Style>
     <Style Selector="Button.glass:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="BoxShadow" Value="{DynamicResource HelmHeroShadow}" />
+        <Setter Property="BoxShadow" Value="{DynamicResource HelmLiftShadow}" />
         <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
         <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
     </Style>
@@ -521,7 +525,7 @@
     </Style>
     <Style Selector="Border.glass.lift:pointerover">
         <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
-        <Setter Property="BoxShadow" Value="{DynamicResource HelmHeroShadow}" />
+        <Setter Property="BoxShadow" Value="{DynamicResource HelmLiftShadow}" />
     </Style>
 
     <Style Selector="Border.shimmer">

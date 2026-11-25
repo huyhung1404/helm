@@ -36,6 +36,14 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   the tab bar is one borderless pill (`SubtleFillColorTertiaryBrush`) with pill tabs.
 - Cards: `Border.glass` (radius 12, glass fill, thin stroke, soft shadow); `.glass.hero` (radius 16) for the one big
   card (first run). Sheets/dialogs: `Border.sheet` / `HelmSheetBackground` (solid, radius 26, 28 on top of a phone sheet, stroke): a floating card is more rounded than the cards under it, never sharper. Popup lists: radius 12.
+- **Stacked cards sit on the page, they are not smudged onto it.** The card shadow (`HelmGlassShadow`, `HelmLiftShadow` on
+  hover) is three layers: a tight contact shadow, a short soft one under the bottom edge with a **negative spread** (it
+  never reaches into the gap between cards) and a thin light edge on top (`inset 0 1 0 0`). Never a wide dark blur
+  (`0 8 24 0 black`): in a list it fills the gaps and shows as a black band under every card. Hover changes the
+  shadow layers one for one, so the transition is smooth. Hero and sheets keep the big shadow (`HelmHeroShadow`).
+- **A scrolling list keeps room for its scrollbar and shadows**: a `ScrollViewer` inside a column has `Padding="0,0,14,14"`,
+  so the bar never touches the cards and the last card's shadow is not cut off. (A page-wide scroller needs it only
+  when the page margin is under 16.)
 - Colours only from HelmTheme keys: `HelmGlass`, `HelmGlassHover`, `HelmGlassStroke`, `HelmGlassStrokeStrong` (the
   chosen thing), `HelmEyebrow` (teal accent text), `HelmPillBackground/Foreground`, `HelmSecondaryText`,
   `HelmDanger`, `HelmSuccess`. Never a raw hex in a page.
@@ -68,6 +76,9 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - Phone: actions are icons in one row (labels `TextBlock.label` hidden), side-by-side things stack, lists of cards go
   two by two or scroll sideways with the scrollbar hidden. The tabs and the gear stay on the **right**, as on PC (on a
   phone on their own line under the date, right-aligned).
+- **Text never runs out of its card.** Text beside an icon or a button is in a `Grid` with an `Auto,*` column (the text in
+  the `*` column, `TextWrapping="Wrap"`), never in a horizontal `StackPanel` (a StackPanel gives its children
+  unlimited width, so a long sentence is cut at the card's edge). Check every message and warning at Phone 390.
 - Every floating card (date picker, settings, confirmation) is `Sheet.Show(anchor, body)`: a card in the middle on PC, a
   sheet from the bottom on a phone. It opens over the nearest ancestor with class `screen` (the Gallery's phone frame)
   or the window, keeps the page's light/dark, and grows into place.
