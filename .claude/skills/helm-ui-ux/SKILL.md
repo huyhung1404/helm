@@ -33,7 +33,7 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   lined up with it (`Backdrop.Canvas`, set by `AvaloniaHost`). No panel, border or divider between shell and page:
   the tab bar is one borderless pill (`SubtleFillColorTertiaryBrush`) with pill tabs.
 - Cards: `Border.glass` (radius 12, glass fill, thin stroke, soft shadow); `.glass.hero` (radius 16) for the one big
-  card (first run). Sheets/dialogs/popup lists: `Border.sheet` / `HelmSheetBackground` (solid, radius 18, stroke).
+  card (first run). Sheets/dialogs: `Border.sheet` / `HelmSheetBackground` (solid, radius 26, 28 on top of a phone sheet, stroke): a floating card is more rounded than the cards under it, never sharper. Popup lists: radius 12.
 - Colours only from HelmTheme keys: `HelmGlass`, `HelmGlassHover`, `HelmGlassStroke`, `HelmGlassStrokeStrong` (the
   chosen thing), `HelmEyebrow` (teal accent text), `HelmPillBackground/Foreground`, `HelmSecondaryText`,
   `HelmDanger`, `HelmSuccess`. Never a raw hex in a page.

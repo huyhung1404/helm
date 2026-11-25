@@ -74,7 +74,7 @@ public static class Sheet
                 },
             },
         };
-        if (phone) card.CornerRadius = new CornerRadius(20, 20, 0, 0);
+        if (phone) card.CornerRadius = new CornerRadius(28, 28, 0, 0);
         // A tap on the card itself must not reach the scrim.
         card.PointerPressed += (_, e) => e.Handled = true;
         var scrim = new Grid { Width = size.Width, Height = size.Height, Children = { card }, Focusable = true };

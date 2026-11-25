@@ -386,12 +386,12 @@
         <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
         <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
     </Style>
-    <!-- A sheet or dialog that floats over a page (the date picker): solid, rounded, a thin stroke -->
+    <!-- A sheet or dialog that floats over a page (the date picker): solid, generously rounded (26), a thin stroke -->
     <Style Selector="Border.sheet">
         <Setter Property="Background" Value="{DynamicResource HelmSheetBackground}" />
         <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="CornerRadius" Value="26" />
         <Setter Property="BoxShadow" Value="{DynamicResource HelmHeroShadow}" />
     </Style>
     <!-- A day in a month grid: round; today ringed in the accent; the chosen day filled like the pill -->
