@@ -3,6 +3,15 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.92.0] - 2026-11-25
+
+### Changed
+- **Wide windows use their width.** Home puts its alerts in columns (and Today's cards in more of them), and the settings pages of
+  Helm Keyboard and Quick Capture lay their cards out in columns, instead of one narrow strip in the middle.
+- **One slim scrollbar everywhere:** a thin rounded thumb on a see-through track; it no longer widens into a dark bar under the
+  pointer.
+- The close button on a tab is round, like the tab.
+
 ## [0.91.0] - 2026-11-25
 
 ### Changed
