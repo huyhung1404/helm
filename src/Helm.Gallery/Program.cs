@@ -61,6 +61,16 @@ internal sealed class GalleryWindow : Window
         _pages.SelectedIndex = 0;
         ApplySize();
         Opened += (_, _) => Helm.Ui.Windows.InputLog.Attach(this, "gallery");
+        // SPIKE: does a text box draw in-progress (preedit) text at all, without any input method involved?
+        if (Environment.GetEnvironmentVariable("HELM_PREEDIT_TEST") is { } preedit)
+            Opened += (_, _) => Avalonia.Threading.DispatcherTimer.RunOnce(() =>
+            {
+                var box = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(this).OfType<TextBox>().First();
+                box.Focus();
+                var presenter = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(box).OfType<Avalonia.Controls.Presenters.TextPresenter>().First();
+                presenter.PreeditText = preedit;
+                Helm.Ui.Windows.InputLog.Write($"preedit test: set '{presenter.PreeditText}' on {box.Watermark}");
+            }, TimeSpan.FromSeconds(2));
     }
 
     private void ShowPage()

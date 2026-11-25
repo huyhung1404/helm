@@ -60,6 +60,24 @@ public sealed class AvaloniaHost : WindowsFormsHost
                 InputLog.Write($"wpf PreviewKeyDown {e.Key} handled={e.Handled}")), handledEventsToo: true);
             AddHandler(System.Windows.Input.Keyboard.KeyDownEvent, new System.Windows.Input.KeyEventHandler((_, e) =>
                 InputLog.Write($"wpf KeyDown {e.Key} handled={e.Handled}")), handledEventsToo: true);
+            // Who up the tree marks Backspace handled (WPF then never gives the message to the page)?
+            Loaded += (_, _) =>
+            {
+                for (System.Windows.DependencyObject? up = System.Windows.Media.VisualTreeHelper.GetParent(this); up is System.Windows.UIElement element;
+                     up = System.Windows.Media.VisualTreeHelper.GetParent(up) ?? (up as System.Windows.FrameworkElement)?.Parent)
+                {
+                    var name = $"{element.GetType().Name}{((element as System.Windows.FrameworkElement)?.Name is { Length: > 0 } n ? "#" + n : "")}";
+                    element.AddHandler(System.Windows.Input.Keyboard.KeyDownEvent, new System.Windows.Input.KeyEventHandler((_, e) =>
+                    {
+                        if (e.Key == System.Windows.Input.Key.Back) InputLog.Write($"wpf   up {name} handled={e.Handled}");
+                    }), handledEventsToo: true);
+                }
+                System.Windows.Input.InputManager.Current.PostProcessInput += (_, e) =>
+                {
+                    if (e.StagingItem.Input is System.Windows.Input.KeyEventArgs k && k.Key == System.Windows.Input.Key.Back && k.RoutedEvent == System.Windows.Input.Keyboard.KeyDownEvent)
+                        InputLog.Write($"wpf   post-process handled={k.Handled}");
+                };
+            };
         }
     }
 
