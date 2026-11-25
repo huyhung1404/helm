@@ -1,12 +1,13 @@
-using Helm.Core.Ui;
+using System.Windows.Controls;
 
 namespace Helm.Modules.QuickCapture;
 
-public partial class QuickCapturePage : ModulePageBase
+/// <summary>Quick Capture's settings (Home → Utilities): the Avalonia <see cref="QuickCaptureView"/> inside this WPF page.</summary>
+public partial class QuickCapturePage : Page
 {
     public QuickCapturePage(QuickCaptureViewModel viewModel)
     {
-        DataContext = viewModel;
         InitializeComponent();
+        Host.Show(() => new QuickCaptureView(viewModel));
     }
 }

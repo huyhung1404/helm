@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.QuickCapture"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.QuickCapture.CaptureBoxView"
+             x:DataType="vm:CaptureBoxViewModel">
+
+    <!-- The capture box that floats over any app: the target buttons, the text, what will be saved. The window around it is
+         see-through; this card (with room for its shadow) is all that shows. Enter saves, Shift+Enter adds a line, Tab switches the
+         target, Ctrl+1…9 picks one, Esc closes. -->
+    <Border x:Name="Card" Classes="sheet" Margin="16" Padding="20,16,20,14">
+        <Panel>
+            <StackPanel x:Name="Editor" Spacing="12">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="eyebrow" Text="QUICK CAPTURE" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="muted" FontSize="12" Text="Esc to close" VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- Where it goes -->
+                <ItemsControl ItemsSource="{Binding Targets}" IsVisible="{Binding HasTargets}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:CaptureTargetOption">
+                            <Button Classes="chip" Classes.selected="{Binding IsActive}" Focusable="False" Content="{Binding Name}"
+                                    ToolTip.Tip="{Binding Hint}" AutomationProperties.Name="{Binding Name}"
+                                    Command="{Binding $parent[ItemsControl].((vm:CaptureBoxViewModel)DataContext).PickCommand}" CommandParameter="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- The text: the card is the field -->
+                <TextBox x:Name="Input" Classes="bare" FontSize="17" MinHeight="44" MaxHeight="220" AcceptsReturn="True" TextWrapping="Wrap"
+                         PlaceholderText="{Binding Example}" AutomationProperties.Name="Capture text" Text="{Binding Text}"
+                         IsEnabled="{Binding HasTargets}" IsVisible="{Binding HasTargets}" />
+                <TextBlock Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasNoTargets}"
+                           Text="Turn on Notes or Tracker, and Quick Capture can save into them." />
+
+                <!-- What will be saved, and the keys -->
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <TextBlock FontSize="13" Text="{Binding PreviewText}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                               Classes="muted" Classes.late="{Binding HasProblem}" />
+                    <TextBlock Grid.Column="1" Classes="muted" FontSize="12" Text="Enter save · Shift+Enter new line · Tab switch" VerticalAlignment="Center" />
+                </Grid>
+                <TextBlock Classes="late" FontSize="13" TextWrapping="Wrap" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
+            </StackPanel>
+
+            <!-- Saved: the message shows for a moment; the box keeps its height so it does not jump -->
+            <Grid x:Name="Done" ColumnDefinitions="Auto,*" ColumnSpacing="14" IsVisible="False" VerticalAlignment="Center" Margin="0,8">
+                <ic:SymbolIcon Symbol="CheckmarkCircle" IconVariant="Filled" FontSize="30" Foreground="{DynamicResource HelmSuccess}" VerticalAlignment="Center" />
+                <TextBlock x:Name="DoneText" Grid.Column="1" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </Grid>
+        </Panel>
+    </Border>
+</UserControl>

@@ -5,6 +5,7 @@ using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Ui;
+using Helm.Ui.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui.Controls;
@@ -30,8 +31,8 @@ public sealed class QuickCaptureModule : HelmModuleBase, IDisposable
     private readonly ILogger<QuickCaptureModule> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private HotkeyRegistration? _registration;
-    private FloatingPanelWindow? _window;
-    private CapturePanel? _panel;
+    private AvaloniaFloatingPanel? _window;
+    private CaptureBoxView? _panel;
 
     // IModuleHost is resolved when the box opens: it depends on the module list, which contains this module.
     public QuickCaptureModule(ISettingsStoreFactory settings, IHotkeyManager hotkeys, IUiDispatcher ui, IWindowService windows,
@@ -114,11 +115,14 @@ public sealed class QuickCaptureModule : HelmModuleBase, IDisposable
         try
         {
             if (!IsEnabled) return;
+            // The box is an Avalonia window of its own, built the first time it opens.
+            HelmAvalonia.EnsureStarted();
             if (_window is null)
             {
-                _panel = new CapturePanel(new CaptureBoxViewModel(AvailableTargets, Settings));
-                _window = new FloatingPanelWindow(_windows, _monitors, 640) { Panel = _panel, Title = "Quick Capture" };
+                _panel = new CaptureBoxView(new CaptureBoxViewModel(AvailableTargets, Settings));
+                _window = new AvaloniaFloatingPanel(_windows, _monitors, 640, "Quick Capture") { Panel = _panel };
                 _panel.Finished += (_, _) => _window.Dismiss();
+                _window.Summoned += (_, _) => _panel.FocusInput();
             }
             _panel!.Prepare();
             _window.Summon();
