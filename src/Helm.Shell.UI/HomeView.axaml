@@ -13,18 +13,21 @@
             <Setter Property="TextDecorations" Value="Strikethrough" />
             <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
         </Style>
-        <!-- The whole card says how bad it is: red, yellow, or plain -->
-        <Style Selector="Border.alert.danger">
+        <!-- A straight bar down the left edge says how bad it is: red, yellow, or plain -->
+        <Style Selector="Border.alertbar">
+            <Setter Property="Width" Value="5" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style Selector="Border.alertbar.danger">
             <Setter Property="Background" Value="{DynamicResource HelmAlertDanger}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmAlertDangerStroke}" />
         </Style>
-        <Style Selector="Border.alert.warning">
+        <Style Selector="Border.alertbar.warning">
             <Setter Property="Background" Value="{DynamicResource HelmAlertWarning}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmAlertWarningStroke}" />
         </Style>
-        <Style Selector="Border.alert.info">
+        <Style Selector="Border.alertbar.info">
             <Setter Property="Background" Value="{DynamicResource HelmAlertInfo}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmAlertInfoStroke}" />
         </Style>
         <!-- A card of Today is the way into its tool: the whole card is the button -->
         <Style Selector="Button.card">
@@ -87,7 +90,8 @@
                     <ItemsControl ItemsSource="{Binding Alerts}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:HomeAlert">
-                                <Border Classes="glass alert fade" Classes.danger="{Binding IsDanger}" Classes.warning="{Binding IsWarning}" Classes.info="{Binding IsInfo}" Padding="16,12,10,12" Margin="0,0,0,8">
+                                <Panel Margin="0,0,0,8">
+                                    <Border Classes="glass fade" CornerRadius="0,12,12,0" Padding="21,12,10,12">
                                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
@@ -95,7 +99,9 @@
                                         </StackPanel>
                                         <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center" Content="{Binding ActionText}" Command="{Binding ActCommand}" />
                                     </Grid>
-                                </Border>
+                                    </Border>
+                                    <Border Classes="alertbar" Classes.danger="{Binding IsDanger}" Classes.warning="{Binding IsWarning}" Classes.info="{Binding IsInfo}" />
+                                </Panel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
