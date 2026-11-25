@@ -44,6 +44,10 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - **A scrolling list keeps room for its scrollbar and shadows**: a `ScrollViewer` inside a column has `Padding="0,0,14,14"`,
   so the bar never touches the cards and the last card's shadow is not cut off. (A page-wide scroller needs it only
   when the page margin is under 16.)
+- **One slim scrollbar everywhere** (`HelmTheme` styles every `ScrollBar`): a 10 px lane with a 4 px rounded thumb in
+  `HelmSecondaryText` at 35 % opacity (70 % on hover, 90 % pressed), a see-through track, no auto-hide. Never Fluent's
+  expanding bar (it grows a wide dark track under the pointer, which looks heavy on a glass page) and never a per-page
+  scrollbar style: change the theme, not the page. A page that hides its bar says so (`VerticalScrollBarVisibility="Hidden"`).
 - **A scrolling list never ends in a hard cut through a card.** Where it meets something fixed (the search bar above it, a
   sheet's edge) put `core:ScrollFade.Enabled="True"` on its `ScrollViewer`: the edge fades over ~22 px while there is
   more to scroll to, and nothing fades at the very top or bottom, so the first and last card keep their edges. Sheets

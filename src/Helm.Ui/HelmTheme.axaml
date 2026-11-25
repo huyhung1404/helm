@@ -739,4 +739,80 @@
     <Style Selector="ToggleSwitch">
         <Setter Property="ui:BackdropTint.Enabled" Value="True" />
     </Style>
+
+    <!-- One slim scrollbar everywhere: a thin rounded thumb on a see-through track. It does not widen or grow a dark track under the
+         pointer (Fluent's expanding bar looks heavy on a glass page); the thumb only gets brighter. -->
+    <Style Selector="ScrollBar">
+        <Setter Property="AllowAutoHide" Value="False" />
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ScrollBar:vertical">
+        <Setter Property="Width" Value="10" />
+        <Setter Property="MinWidth" Value="10" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="Transparent">
+                    <Track Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True"
+                           Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value, Mode=TwoWay}"
+                           ViewportSize="{TemplateBinding ViewportSize}">
+                        <Track.DecreaseButton>
+                            <RepeatButton Name="PART_PageUpButton" Focusable="False" Opacity="0" Background="Transparent" BorderThickness="0" />
+                        </Track.DecreaseButton>
+                        <Track.IncreaseButton>
+                            <RepeatButton Name="PART_PageDownButton" Focusable="False" Opacity="0" Background="Transparent" BorderThickness="0" />
+                        </Track.IncreaseButton>
+                        <Thumb Name="PART_Thumb">
+                            <Thumb.Template>
+                                <ControlTemplate>
+                                    <Border Classes="scrollthumb" Margin="2,0" CornerRadius="3" MinHeight="32" />
+                                </ControlTemplate>
+                            </Thumb.Template>
+                        </Thumb>
+                    </Track>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ScrollBar:horizontal">
+        <Setter Property="Height" Value="10" />
+        <Setter Property="MinHeight" Value="10" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="Transparent">
+                    <Track Name="PART_Track" Orientation="Horizontal"
+                           Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value, Mode=TwoWay}"
+                           ViewportSize="{TemplateBinding ViewportSize}">
+                        <Track.DecreaseButton>
+                            <RepeatButton Name="PART_PageLeftButton" Focusable="False" Opacity="0" Background="Transparent" BorderThickness="0" />
+                        </Track.DecreaseButton>
+                        <Track.IncreaseButton>
+                            <RepeatButton Name="PART_PageRightButton" Focusable="False" Opacity="0" Background="Transparent" BorderThickness="0" />
+                        </Track.IncreaseButton>
+                        <Thumb Name="PART_Thumb">
+                            <Thumb.Template>
+                                <ControlTemplate>
+                                    <Border Classes="scrollthumb" Margin="0,2" CornerRadius="3" MinWidth="32" />
+                                </ControlTemplate>
+                            </Thumb.Template>
+                        </Thumb>
+                    </Track>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="Border.scrollthumb">
+        <Setter Property="Background" Value="{DynamicResource HelmSecondaryText}" />
+        <Setter Property="Opacity" Value="0.35" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Thumb:pointerover Border.scrollthumb">
+        <Setter Property="Opacity" Value="0.7" />
+    </Style>
+    <Style Selector="Thumb:pressed Border.scrollthumb">
+        <Setter Property="Opacity" Value="0.9" />
+    </Style>
 </Styles>
