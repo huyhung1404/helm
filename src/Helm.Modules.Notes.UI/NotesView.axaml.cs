@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data.Converters;
@@ -68,7 +67,8 @@ public partial class NotesView : UserControl
         _narrow = e.NewSize.Width < Narrow;
         Classes.Set("narrow", _narrow);
         var side = _narrow ? 16 : 40;
-        TopBar.Padding = new Thickness(side, _narrow ? 14 : 20, side, 12);
+        TopBar.Margin = new Thickness(side, _narrow ? 14 : 20, side, 12);
+        TrashFab.Margin = new Thickness(side, 0, 0, _narrow ? 20 : 28);
         MenuButton.IsVisible = _host?.OpenMenu is not null;
         FitUnderBar();
         // Phone: two narrow columns of cards; wide: as many as fit, each at least 220.
@@ -86,7 +86,9 @@ public partial class NotesView : UserControl
     private void FitUnderBar()
     {
         var side = _narrow ? 16 : 40;
-        Page.Margin = new Thickness(side, TopBar.Bounds.Height + 10, side, 40);
+        // The page starts under the bar, and its top edge fades (core:ScrollFade) instead of cutting a card in half.
+        Scroller.Margin = new Thickness(0, TopBar.Margin.Top + TopBar.Bounds.Height, 0, 0);
+        Page.Margin = new Thickness(side, 14, side, 96);
         Scroller.Padding = new Thickness(0, 0, _narrow ? 0 : 14, 14);
     }
 
@@ -194,6 +196,5 @@ public partial class NotesView : UserControl
         NewButton.IsEnabled = _module.IsEnabled;
         Editor.IsEnabled = _module.IsEnabled;
         OffBar.IsVisible = !_module.IsEnabled;
-        Eyebrow.Text = DateTime.Now.ToString("dddd, d MMMM", CultureInfo.CurrentCulture).ToUpper(CultureInfo.CurrentCulture);
     }
 }

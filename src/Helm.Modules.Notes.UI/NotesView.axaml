@@ -33,7 +33,7 @@
         <!-- THE WALL -->
         <Panel x:Name="WallLayer">
             <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" core:ScrollFade.Enabled="True">
-                <StackPanel x:Name="Page" Margin="40,96,40,40">
+                <StackPanel x:Name="Page" Margin="40,12,40,96">
                     <!-- Shown while the tool is turned off -->
                     <Border x:Name="OffBar" Classes="glass" Margin="0,0,0,16" IsVisible="False">
                         <StackPanel>
@@ -147,51 +147,49 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- The bar stays on top; the cards slide under it -->
-            <Border x:Name="TopBar" VerticalAlignment="Top" Background="{DynamicResource HelmSheetBackground}" Padding="40,20,40,12">
-                <Grid x:Name="TopGrid" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10">
-                    <!-- A phone's page has no app bar: the menu button opens the drawer -->
-                    <Button x:Name="MenuButton" Classes="chip" Click="Menu_Click" IsVisible="False" VerticalAlignment="Center"
-                            ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
-                        <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
-                    </Button>
-                    <TextBlock x:Name="Eyebrow" Grid.Column="1" Classes="eyebrow" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <StackPanel x:Name="Actions" Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                        <Button x:Name="TrashButton" Classes="chip" Classes.selected="{Binding ShowingTrash}" Command="{Binding ToggleTrashCommand}"
-                                ToolTip.Tip="Notes you deleted, kept for 30 days" AutomationProperties.Name="Trash">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ic:SymbolIcon Symbol="Delete" FontSize="16" />
-                                <TextBlock Classes="label" Text="{Binding TrashButtonText}" />
-                            </StackPanel>
-                        </Button>
-                        <Button Classes="chip" Click="Settings_Click" ToolTip.Tip="Notes settings" AutomationProperties.Name="Notes settings">
-                            <ic:SymbolIcon Symbol="Settings" FontSize="16" />
-                        </Button>
-                    </StackPanel>
-                    <!-- Search and the one main action -->
-                    <Grid Grid.Row="1" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,12,0,0">
-                        <Border Classes="glass" Padding="14,0,6,0" BoxShadow="">
-                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                                <ic:SymbolIcon Symbol="Search" FontSize="16" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
-                                <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search notes (Ctrl+F)" Text="{Binding Search}"
-                                         VerticalContentAlignment="Center" MinHeight="40" AutomationProperties.Name="Search notes" />
-                                <Button Grid.Column="2" Classes="flat" Width="32" Height="32" Padding="0" HorizontalContentAlignment="Center"
-                                        Command="{Binding ClearSearchCommand}" IsVisible="{Binding IsSearching}" ToolTip.Tip="Clear the search"
-                                        AutomationProperties.Name="Clear the search">
-                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
-                                </Button>
-                            </Grid>
-                        </Border>
-                        <Button x:Name="NewButton" Grid.Column="1" Classes="pill" Command="{Binding NewNoteCommand}" ToolTip.Tip="New note (Ctrl+N)"
-                                AutomationProperties.Name="New note">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:SymbolIcon Symbol="Add" FontSize="14" Foreground="{DynamicResource HelmPillForeground}" />
-                                <TextBlock Classes="label" Text="New note" Foreground="{DynamicResource HelmPillForeground}" />
-                            </StackPanel>
+            <!-- The bar stays on top over the page's own background; the cards fade out under it -->
+            <Grid x:Name="TopBar" VerticalAlignment="Top" Margin="40,20,40,12" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                <!-- A phone's page has no app bar: the menu button opens the drawer -->
+                <Button x:Name="MenuButton" Classes="chip" Click="Menu_Click" IsVisible="False" VerticalAlignment="Center"
+                        ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                    <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                </Button>
+                <Border Grid.Column="1" Classes="glass" Padding="14,0,6,0" BoxShadow="">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                        <ic:SymbolIcon Symbol="Search" FontSize="16" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                        <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search notes (Ctrl+F)" Text="{Binding Search}"
+                                 VerticalContentAlignment="Center" MinHeight="40" AutomationProperties.Name="Search notes" />
+                        <Button Grid.Column="2" Classes="flat" Width="32" Height="32" Padding="0" HorizontalContentAlignment="Center"
+                                Command="{Binding ClearSearchCommand}" IsVisible="{Binding IsSearching}" ToolTip.Tip="Clear the search"
+                                AutomationProperties.Name="Clear the search">
+                            <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
                         </Button>
                     </Grid>
-                </Grid>
-            </Border>
+                </Border>
+                <Button x:Name="NewButton" Grid.Column="2" Classes="pill" Command="{Binding NewNoteCommand}" ToolTip.Tip="New note (Ctrl+N)"
+                        AutomationProperties.Name="New note">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="Add" FontSize="14" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Classes="label" Text="New note" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="3" Classes="chip" Click="Settings_Click" ToolTip.Tip="Notes settings" AutomationProperties.Name="Notes settings">
+                    <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                </Button>
+            </Grid>
+
+            <!-- The trash: a round button in the bottom left corner, the number of notes in it as a badge -->
+            <Panel x:Name="TrashFab" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="40,0,0,28" Width="56" Height="56">
+                <Button Classes="glass" Classes.selected="{Binding ShowingTrash}" Width="56" Height="56" Padding="0" CornerRadius="28" Background="{DynamicResource HelmSheetBackground}"
+                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding ToggleTrashCommand}"
+                        ToolTip.Tip="Notes you deleted, kept for 30 days" AutomationProperties.Name="Trash">
+                    <ic:SymbolIcon Symbol="Delete" FontSize="22" />
+                </Button>
+                <Border Background="{DynamicResource HelmDanger}" CornerRadius="10" MinWidth="20" Height="20" Padding="5,0" HorizontalAlignment="Right"
+                        VerticalAlignment="Top" Margin="0,-4,-4,0" IsVisible="{Binding HasTrash}" IsHitTestVisible="False">
+                    <TextBlock Text="{Binding TrashCount}" FontSize="11" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+            </Panel>
         </Panel>
 
         <!-- THE OPEN NOTE: over the wall on a wide screen, in its place on a phone -->
