@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Helm's Home page, ONE view for every platform: the day's greeting, the state of Helm (updates, shortcut conflicts,
+       what's new), the tools you use, their shortcuts, and the switches that turn tools on and off. Each platform fills
+       the portable HomeViewModel from its own modules and tells it what a tap does (IHomeHost). -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Home</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+  </ItemGroup>
+
+</Project>
