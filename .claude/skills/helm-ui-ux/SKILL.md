@@ -87,13 +87,54 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   with its standard TransformGroup: code must accept a group. A selector list mixing a control and a
   `/template/` part fails to compile: write two styles.
 
-## 7. Inside the WPF shell (until the shell moves to Avalonia)
+## 7. Reference components (copy these, do not reinvent)
+- **Page frame**: `core:Backdrop` + ScrollViewer + StackPanel. Margin 40,28 on PC, 16,18 on a phone. Spacing scale
+  8 · 12 · 16 · 22 · 28; between a title and what follows 16–22.
+- **Top bar of a tool**: left the eyebrow line (today's date + counts, wraps on a phone); right the segmented tabs
+  (`RadioButton.seg` in a small glass group: the chosen one lighter and bold) and the gear (`chip`). Tab changes use
+  `IsCheckedChanged`, so keyboard and screen readers work too.
+- **List switcher**: a row of `Button.glass` cards (initial tile, name, "n open · n overdue" with overdue in
+  HelmDanger); the open one has the strong stroke; "New list" is a `ghost` at the end; the row scrolls sideways with its
+  scrollbar hidden. Under it the list's `display` title and a `muted` summary.
+- **Quick add**: one glass card, a bare text box ("Add a task — press Enter"), an options `chip` (toggle) and a `pill`
+  "+" button (40 × 40). Options (date, priority, repeat) open under it in the `OptionsGrid` and only show what applies.
+- **Task row**: `Border.glass.lift`; left the round tick (ring 22, fills green with a pop when done); title 15; tags
+  (`Border.tag`: Urgent red, High accent, In progress green, step count) then the details line (overdue in red); notes
+  max 2 lines; a right-pointing chevron that turns down. Tapping the text opens it: "+ Add a step" (bare box), one row
+  of `act` buttons (Start, Split into steps in accent, Edit, Link a note, ↑ ↓, Delete in HelmDanger), and the inline edit
+  form (all fields `glass`, Save `pill`, Cancel `ghost`). Done tasks sit under a folded "Done" header.
+- **Settings sheet** (`TrackerSettingsView`): header = eyebrow (the tool's name) + "Settings" 22 semibold + a close
+  `chip`; then one `Border.glass` card per subject (this list, display, reminders, export), each with a `head` title;
+  a setting is its name and a `secondary` explanation on the left and a switch on the right, or a label above a full-width
+  `glass` field; a dependent setting is disabled while its switch is off; a destructive action is a `ghost` with a
+  red icon and text and a `secondary` line saying what it removes; the bottom is one full-width `pill` "Done". Order:
+  what is about the current thing first, then display, reminders, export. Platform-only settings (the Android widget) show
+  only on that platform.
+- **Date picker** (`DateTimeBox`): the field's name as eyebrow, the chosen value as a sentence (20 semibold), quick-pick
+  chips (Today, Tomorrow, This weekend, Next week; for past things Today, Yesterday, 2 days ago), the month with round
+  days (today ringed in teal, chosen day filled like a pill, other months faded), the time as chips (No time, 09:00 …) plus
+  hour and minute fields, footer: Clear (`ghost`, only when the value may be empty) left, Cancel `ghost` and Done `pill`
+  right.
+- **Confirmation** (`GlassDialogs`): title 18 semibold, a `secondary` sentence saying what will be removed and what stays,
+  Cancel `ghost` + the action `pill` on the right; the action is named by its verb ("Delete"), never "OK".
+- **First run**: eyebrow "START HERE", a title, three step cards (the first outlined, the rest faded), one pill.
+- **Calendar**: month grid of `glass` cells (round only inside the date picker), dots for what is due (red overdue,
+  amber debts, faded done), week view as rows; the chosen day's tasks under it with a quick add.
+- **Insights**: numbers in `stat` (26 semibold) in glass cards, then bars in the accent colour.
+
+## 8. Writing
+- English UI text in sentence case (Settings, Add a task), short. The eyebrow line is upper case via `core:UpperCase`.
+- Placeholders say the action and the key ("Add a task — press Enter"). Empty states say what to do next and point at it.
+- A question names the thing ("Delete this task?"), then one sentence says what is removed and what stays.
+- Vietnamese typing must work in every text field (Helm Keyboard): use the shared `TextBox`, never a custom one.
+
+## 9. Inside the WPF shell (until the shell moves to Avalonia)
 - Show a page with `AvaloniaHost.Show(() => new …View(...))`; it shows a message instead of failing.
 - Popups are drawn inside the page (`OverlayPopups`): a separate popup window opens in the wrong place after the WPF
   window moves.
 - The WPF page sets `ScrollViewer.CanContentScroll="False"`; the Avalonia view scrolls itself.
 
-## 8. Demo and check
+## 10. Demo and check
 - Demo in Helm.Gallery (`scripts/gallery.cmd`): the real view with fake data, never an HTML mock-up or a demo-only
   copy. Check Phone 390, Tablet 800, PC; dark and light; tool off.
 - Then in a test Helm (`Helm.exe --no-elevate --allow-multiple --data-dir <scratch>`) to see it with the whole app.

@@ -70,7 +70,7 @@ public static class Sheet
                 Children =
                 {
                     phone ? new Border { Width = 36, Height = 4, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Center, Background = new SolidColorBrush(Colors.Gray, 0.5) } : new Panel { Height = 0 },
-                    new ScrollViewer { Content = body, MaxHeight = size.Height - 96, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled },
+                    new ScrollViewer { Content = body, Padding = new Thickness(0, 0, 12, 0), MaxHeight = size.Height - 96, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled },
                 },
             },
         };
