@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Keyboard: Vietnamese now types in apps built on the older Windows text input (IMM32)**, such as apps made with
+  Avalonia. Letters vanished and Backspace did nothing there: Windows shows these apps to Helm Keyboard through a
+  stand-in that keeps only a finished word, and Helm typed straight into it. Helm Keyboard now composes the word there
+  (underlined while you type) and hands it over with the space or punctuation that ends it.
+
 ## [0.86.2] - 2026-11-25
 
 ### Fixed
