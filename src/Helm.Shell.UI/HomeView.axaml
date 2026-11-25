@@ -37,7 +37,7 @@
         <core:Backdrop />
         <Grid RowDefinitions="*,Auto">
         <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel x:Name="Page" Margin="40,28,40,40" MaxWidth="1100">
+            <StackPanel x:Name="Page" Margin="40,28,40,40">
 
                 <!-- Today, and how much is left -->
                 <TextBlock Classes="eyebrow" Text="{Binding DateLine, Converter={x:Static core:UpperCase.Instance}}" />
@@ -72,9 +72,12 @@
                 <StackPanel IsVisible="{Binding HasAlerts}" Margin="0,22,0,0">
                     <TextBlock Classes="eyebrow" Text="NEEDS ATTENTION" Margin="0,0,0,10" />
                     <ItemsControl ItemsSource="{Binding Alerts}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><core:MasonryPanel MinColumnWidth="460" Spacing="8" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:HomeAlert">
-                                <Border Classes="glass fade" Padding="16,12,10,12" Margin="0,0,0,8">
+                                <Border Classes="glass fade" Padding="16,12,10,12">
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />

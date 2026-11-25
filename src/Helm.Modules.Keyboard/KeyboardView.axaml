@@ -3,7 +3,7 @@
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.Keyboard"
              xmlns:uiw="using:Helm.Ui.Windows"
-             xmlns:core="using:Helm.Core.Ui"
+             xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Ui"
              x:Class="Helm.Modules.Keyboard.KeyboardView"
              x:DataType="vm:KeyboardViewModel">
 
@@ -12,13 +12,15 @@
     <Panel>
         <core:Backdrop />
         <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" core:ScrollFade.Enabled="True">
-            <StackPanel x:Name="Page" Margin="40,28,40,40" Spacing="14" MaxWidth="820" HorizontalAlignment="Stretch">
+            <StackPanel x:Name="Page" Margin="40,28,40,40" Spacing="14">
                 <StackPanel Margin="0,0,0,6">
                     <TextBlock Classes="eyebrow" Text="WINDOWS KEYBOARD" />
                     <TextBlock Classes="display" Text="Helm Keyboard" />
                     <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" TextWrapping="Wrap"
                                Text="Type Vietnamese with Telex, go round English, Vietnamese and Chinese with one shortcut, and let every app and web site keep the keyboard you last used in it." />
                 </StackPanel>
+
+                <core:MasonryPanel MinColumnWidth="430" Spacing="14">
 
                 <!-- On or off -->
                 <Border Classes="glass">
@@ -164,6 +166,7 @@
                         </ItemsControl>
                     </StackPanel>
                 </Border>
+                </core:MasonryPanel>
             </StackPanel>
         </ScrollViewer>
     </Panel>

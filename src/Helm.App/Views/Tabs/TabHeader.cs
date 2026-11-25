@@ -55,6 +55,7 @@ internal sealed class TabHeader : Border
             Width = 24,
             Height = 24,
             Padding = new Thickness(0),
+            CornerRadius = new CornerRadius(12), // round, like the tab it sits on
             Margin = new Thickness(6, 0, 0, 0),
             BorderThickness = new Thickness(0),
             VerticalAlignment = VerticalAlignment.Center,
