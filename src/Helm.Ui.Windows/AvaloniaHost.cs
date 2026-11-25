@@ -90,6 +90,25 @@ public sealed class AvaloniaHost : ContentControl
                 timer.Start();
             };
             Unloaded += (_, _) => InputManager.Current.PostProcessInput -= ForwardSwallowedKey;
+            LayoutUpdated += (_, _) => SyncCanvas();
+        }
+
+        private System.Windows.Rect _canvas;
+
+        /// <summary>
+        /// Tells the page where it sits in the window, so its Backdrop paints its part of the window-wide background
+        /// (the shell's WindowBackdrop paints the rest) and the two meet without a seam.
+        /// </summary>
+        private void SyncCanvas()
+        {
+            if (Inner.Content is not Avalonia.Controls.Control page || Window.GetWindow(this)?.Content is not FrameworkElement root
+                || !root.IsAncestorOf(this))
+                return;
+            var at = TranslatePoint(new System.Windows.Point(0, 0), root);
+            var canvas = new System.Windows.Rect(-at.X, -at.Y, root.ActualWidth, root.ActualHeight);
+            if (canvas == _canvas) return;
+            _canvas = canvas;
+            Helm.Core.Ui.Backdrop.SetCanvas(page, new Avalonia.Rect(canvas.X, canvas.Y, canvas.Width, canvas.Height));
         }
 
         /// <summary>

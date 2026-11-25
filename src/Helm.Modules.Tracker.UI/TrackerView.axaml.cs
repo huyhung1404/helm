@@ -8,7 +8,7 @@ using Helm.Core.Modules;
 
 namespace Helm.Modules.Tracker.Ui;
 
-/// <summary>What each platform does its own way around the shared Tracker page.</summary>
+/// <summary>What each platform does its own way around the shared Tracker pages.</summary>
 public interface ITrackerPageHost
 {
     /// <summary>Hand the calendar file to the user: a save dialog on desktop, the share sheet on Android.</summary>
@@ -16,13 +16,16 @@ public interface ITrackerPageHost
 
     /// <summary>The page came on screen (Android asks for notifications here and checks today's reminder).</summary>
     void Opened();
+
+    /// <summary>Show Tracker's settings page (the gear at the top of the Tracker).</summary>
+    void OpenSettings();
 }
 
 /// <summary>
-/// The Tracker itself, the same view on Windows, Android, macOS and iOS: a glass page whose first card is the one task
-/// to do next, then the quick add, the list, and the other lists. One layout that narrows for a phone (below 720 px the
-/// "Up next" card goes under the title and the list cards go two by two). While the tool is off the lists stay visible
-/// but read-only, with a note pointing to the settings.
+/// The Tracker itself, the same view on Windows, Android, macOS and iOS: a glass page with the list's name, the quick
+/// add, the tasks, and the other lists; Calendar and Insights replace all of that under the tabs. One layout that
+/// narrows for a phone (below 720 px). While the tool is off the lists stay visible but read-only, with a note
+/// pointing to the settings.
 /// </summary>
 public partial class TrackerView : UserControl
 {
@@ -41,6 +44,8 @@ public partial class TrackerView : UserControl
         _host = host;
         DataContext = viewModel;
         InitializeComponent();
+        AttachedToVisualTree += (_, _) => viewModel.Workspaces.CollectionChanged += OnListsChanged;
+        DetachedFromVisualTree += (_, _) => viewModel.Workspaces.CollectionChanged -= OnListsChanged;
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
@@ -53,32 +58,59 @@ public partial class TrackerView : UserControl
         Grid.SetColumn(Tabs, narrow ? 0 : 1);
         Grid.SetRow(Tabs, narrow ? 1 : 0);
         Tabs.Margin = narrow ? new Thickness(0, 12, 0, 0) : default;
-        // Title beside "Up next" on a wide page, above it on a phone.
-        Head.ColumnDefinitions = ColumnDefinitions.Parse(narrow ? "*" : "*,24,380");
-        Grid.SetColumn(Hero, narrow ? 0 : 2);
-        Grid.SetRow(Hero, narrow ? 1 : 0);
-        Hero.Margin = narrow ? new Thickness(0, 16, 0, 0) : default;
-        if (ListCards.ItemsPanelRoot is UniformGrid cards) cards.Columns = narrow ? 2 : Math.Max(2, (int)((e.NewSize.Width - 80) / 250));
+        // First run: the three steps side by side on a wide page, one under the other on a phone.
+        FirstRunSteps.Columns = narrow ? 1 : 3;
+        FirstRunButton.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Stretch : Avalonia.Layout.HorizontalAlignment.Left;
     }
 
-    private void Tab_Click(object? sender, RoutedEventArgs e)
+    /// <summary>Each tab replaces the whole page under the tabs, from its title down.</summary>
+    private void Tab_Changed(object? sender, RoutedEventArgs e)
     {
-        if (_viewModel is null) return;
+        // Clicked, arrow keys or a screen reader: whatever checked the tab.
+        if (_viewModel is null || sender is not RadioButton { IsChecked: true }) return;
         var insights = ReferenceEquals(sender, InsightsTab);
         if (ReferenceEquals(sender, CalendarTab)) _viewModel.ShowCalendarCommand.Execute(null);
         else _viewModel.ShowListsCommand.Execute(null);
         TasksPanel.IsVisible = !insights;
         InsightsPanel.IsVisible = insights;
+        Scroller.Offset = default;
+        Replay(insights ? InsightsPanel : ReferenceEquals(sender, CalendarTab) ? CalendarPanel : TasksPanel);
     }
+
+    /// <summary>Plays a panel's way in again (HelmTheme's .enter), for a tab or a list just picked.</summary>
+    private static void Replay(Control panel)
+    {
+        panel.Classes.Remove("enter");
+        Dispatcher.UIThread.Post(() => panel.Classes.Add("enter"), DispatcherPriority.Render);
+    }
+
+    private void Settings_Click(object? sender, RoutedEventArgs e) => _host?.OpenSettings();
 
     private void List_Click(object? sender, RoutedEventArgs e)
     {
         if (_viewModel is null || (sender as Control)?.DataContext is not WorkspaceOption list) return;
         _viewModel.SelectedWorkspace = list;
         Scroller.Offset = default;
+        Replay(TasksPanel);
     }
 
-    private void NewList_Click(object? sender, RoutedEventArgs e) => NewListBox.IsVisible = true;
+    private void NewList_Click(object? sender, RoutedEventArgs e)
+    {
+        NewListBox.IsVisible = true;
+        Dispatcher.UIThread.Post(() => NewListName.Focus(), DispatcherPriority.Input);
+    }
+
+    /// <summary>
+    /// The flow goes on by itself: a list just made (the first one, or from New list) opens with the cursor in "Add a
+    /// task", the next step.
+    /// </summary>
+    private void OnListsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add) return;
+        NewListBox.IsVisible = false;
+        Replay(TasksPanel);
+        Dispatcher.UIThread.Post(() => NewTaskBox.Focus(), DispatcherPriority.Input);
+    }
 
     private void ToggleDone_Click(object? sender, RoutedEventArgs e)
     {

@@ -38,6 +38,10 @@
     <ProjectReference Include="..\Helm.Modules.AlwaysOnTop\Helm.Modules.AlwaysOnTop.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vault\Helm.Modules.Vault.csproj" />
     <ProjectReference Include="..\Helm.Modules.Tracker\Helm.Modules.Tracker.csproj" />
+    <!-- The shared Avalonia base comes in with the tools that show Avalonia pages. Its controls share names with the
+         WPF ones in Helm.Core.Windows (ModuleIcon, DateTimeBox...), so it sits behind an alias here: the WPF app's code
+         never sees it unless it says "extern alias avalonia". -->
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" Aliases="avalonia" />
     <ProjectReference Include="..\Helm.Modules.Notes\Helm.Modules.Notes.csproj" />
     <ProjectReference Include="..\Helm.Modules.QuickCapture\Helm.Modules.QuickCapture.csproj" />
     <ProjectReference Include="..\Helm.Modules.Missions\Helm.Modules.Missions.csproj" />

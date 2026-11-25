@@ -69,6 +69,8 @@ public partial class App : Application
             _host = HelmHost.Build(paths, _args);
             await _host.StartAsync().ConfigureAwait(true);
             _logger = Services.GetRequiredService<ILogger<App>>();
+            // Shared Avalonia pages report a page that cannot open to Helm's log.
+            Helm.Ui.Windows.HelmAvalonia.Logger = Services.GetRequiredService<ILoggerFactory>().CreateLogger("Helm.Ui");
             _logger.LogInformation("Helm {Version} starting (elevated: {Elevated})",
                 AppInfo.Version, Services.GetRequiredService<Core.Services.IProcessLauncher>().IsElevated);
 
