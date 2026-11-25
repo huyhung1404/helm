@@ -178,9 +178,9 @@
                 </Button>
             </Grid>
 
-            <!-- The trash: a round button in the bottom left corner, the number of notes in it as a badge -->
-            <Panel x:Name="TrashFab" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="40,0,0,28" Width="56" Height="56">
-                <Button Classes="glass" Classes.selected="{Binding ShowingTrash}" Width="56" Height="56" Padding="0" CornerRadius="28" Background="{DynamicResource HelmSheetBackground}"
+            <!-- The trash: a round button in the bottom right corner, the number of notes in it as a badge -->
+            <Panel x:Name="TrashFab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,40,28" Width="56" Height="56">
+                <Button Classes="glass" Classes.selected="{Binding ShowingTrash}" Width="56" Height="56" Padding="0" CornerRadius="14" Background="{DynamicResource HelmSheetBackground}"
                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding ToggleTrashCommand}"
                         ToolTip.Tip="Notes you deleted, kept for 30 days" AutomationProperties.Name="Trash">
                     <ic:SymbolIcon Symbol="Delete" FontSize="22" />

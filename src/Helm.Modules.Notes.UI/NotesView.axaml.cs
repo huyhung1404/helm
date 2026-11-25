@@ -68,7 +68,7 @@ public partial class NotesView : UserControl
         Classes.Set("narrow", _narrow);
         var side = _narrow ? 16 : 40;
         TopBar.Margin = new Thickness(side, _narrow ? 14 : 20, side, 12);
-        TrashFab.Margin = new Thickness(side, 0, 0, _narrow ? 20 : 28);
+        TrashFab.Margin = new Thickness(0, 0, side, _narrow ? 20 : 28);
         MenuButton.IsVisible = _host?.OpenMenu is not null;
         FitUnderBar();
         // Phone: two narrow columns of cards; wide: as many as fit, each at least 220.
