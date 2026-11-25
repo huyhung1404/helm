@@ -15,6 +15,9 @@ public sealed partial class GeneralSection(string id, string title, Symbol icon)
 
     public Symbol Icon { get; } = icon;
 
+    /// <summary>Its own picture, drawn like a tool icon (<see cref="GeneralIcons"/>).</summary>
+    public Avalonia.Media.IImage? Image { get; } = GeneralIcons.For(id);
+
     /// <summary>"14 of 17 on", "Synced 2 minutes ago": the state, so most visits end at the list.</summary>
     [ObservableProperty] private string _summary = "";
 

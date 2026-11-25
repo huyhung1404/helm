@@ -57,9 +57,7 @@
                             <DataTemplate x:DataType="vm:GeneralSection">
                                 <Button Classes="glass part" Classes.selected="{Binding IsSelected}" Click="Section_Click" AutomationProperties.Name="{Binding Title}">
                                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                                        <Border Classes="tile">
-                                            <ic:SymbolIcon Symbol="{Binding Icon}" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
+                                        <core:ModuleIcon Symbol="{Binding Icon}" Image="{Binding Image}" Size="28" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Classes="muted" Classes.late="{Binding NeedsAttention}" FontSize="12" Text="{Binding Summary}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
