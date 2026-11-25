@@ -51,9 +51,9 @@ internal static class HomeDemo
         void Ticked(TodayItem item) { }
         vm.SetAlerts(
         [
-            new HomeAlert("Ctrl+Alt+N is taken by another app", "Window Zones cannot use it. Pick another shortcut.", AlertLevel.Danger, "Change", Done),
-            new HomeAlert("Helm 0.88.1 is ready", "Restart Helm to install it (about 10 seconds).", AlertLevel.Info, "Restart", Done),
-            new HomeAlert("The vault has not been backed up for 9 days", "Your backup folder could not be reached.", AlertLevel.Warning, "Back up", Done),
+            new HomeAlert("Ctrl+Alt+N is taken by another app", "Window Zones cannot use it. Pick another shortcut.", "Change", Done),
+            new HomeAlert("Helm 0.88.1 is ready", "Restart Helm to install it (about 10 seconds).", "Restart", Done),
+            new HomeAlert("The vault has not been backed up for 9 days", "Your backup folder could not be reached.", "Back up", Done),
         ]);
         vm.SetToday(
         [

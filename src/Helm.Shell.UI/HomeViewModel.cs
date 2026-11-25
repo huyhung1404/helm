@@ -27,31 +27,12 @@ public sealed partial class HomeTool(string id, string name, string group, Symbo
     [ObservableProperty] private bool _isEnabled = isEnabled;
 }
 
-/// <summary>How bad a problem is: something broke, or something wants a decision.</summary>
-public enum AlertLevel
-{
-    /// <summary>Something broke: red.</summary>
-    Danger,
-    /// <summary>Something will break or wants a decision soon: yellow.</summary>
-    Warning,
-    /// <summary>Good to know (an update is ready): white.</summary>
-    Info,
-}
-
-/// <summary>Something about Helm itself that needs the user: an update, a shortcut taken, a vault never backed up, sync stuck.</summary>
-public sealed partial class HomeAlert(string title, string detail, AlertLevel level, string actionText, Func<Task> act) : ObservableObject
+/// <summary>Something about Helm itself that needs the user: an update, a shortcut taken, a vault never backed up, sync stuck. No level: the list is in the order the platform gives, most important first.</summary>
+public sealed partial class HomeAlert(string title, string detail, string actionText, Func<Task> act) : ObservableObject
 {
     public string Title { get; } = title;
 
     public string Detail { get; } = detail;
-
-    public AlertLevel Level { get; } = level;
-
-    public bool IsDanger => Level == AlertLevel.Danger;
-
-    public bool IsWarning => Level == AlertLevel.Warning;
-
-    public bool IsInfo => Level == AlertLevel.Info;
 
     public string ActionText { get; } = actionText;
 
@@ -179,10 +160,11 @@ public sealed partial class HomeViewModel(IHomeHost host, string version, TimePr
 
     partial void OnSyncLineChanged(string value) => OnPropertyChanged(nameof(Footer));
 
+    /// <summary>In the order given: the platform puts the most important first.</summary>
     public void SetAlerts(IEnumerable<HomeAlert> alerts)
     {
         Alerts.Clear();
-        foreach (var alert in alerts.OrderBy(a => a.Level)) Alerts.Add(alert);
+        foreach (var alert in alerts) Alerts.Add(alert);
         Changed();
     }
 

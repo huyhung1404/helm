@@ -24,12 +24,12 @@ public sealed class HomeViewTests
         root.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Text == text && t.IsEffectivelyVisible).ToList();
 
     [AvaloniaFact]
-    public void A_busy_day_puts_problems_first_then_each_tools_part_most_urgent_first()
+    public void A_busy_day_lists_problems_in_the_order_given_then_each_tools_part_most_urgent_first()
     {
         var (window, view) = Show<HomeView>(HomeDemo.Home(HomeStage.Busy));
         var vm = (HomeViewModel)view.DataContext!;
 
-        Assert.Equal(AlertLevel.Danger, vm.Alerts[0].Level);
+        Assert.Equal(["Ctrl+Alt+N is taken by another app", "Helm 0.88.1 is ready", "The vault has not been backed up for 9 days"], vm.Alerts.Select(a => a.Title));
         Assert.Equal("Tracker", vm.Today[0].Tool.Name);
         Assert.Single(Shown(view, "NEEDS ATTENTION"));
         Assert.Single(Shown(view, "Trả tiền điện tháng 11"));
