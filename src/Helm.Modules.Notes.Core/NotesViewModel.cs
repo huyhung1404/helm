@@ -64,7 +64,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     private readonly NotesStore _store;
     private readonly ISettingsStore<NotesSettings> _settings;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly ILogger<NotesViewModel> _logger;
     private readonly LinkHub? _links;
@@ -186,6 +186,18 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     public bool IsEditorClosed => !IsEditorOpen;
     public bool CanEditPin => IsEditorOpen && !EditTrashed;
     public string ListHeader => ShowingTrash ? "Trash" : "Notes";
+
+    /// <summary>Under the list's title: "42 notes · 3 pinned", "5 found for “nginx”", "3 notes in the trash".</summary>
+    [ObservableProperty] private string _listSummary = "";
+
+    /// <summary>Something is typed in the search box (its clear button shows).</summary>
+    public bool IsSearching => Search.Length > 0;
+
+    /// <summary>Confirmations are the view's own (a glass sheet on every platform); the injected one is the fallback.</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
+
+    [RelayCommand]
+    private void ClearSearch() => Search = "";
     public string TrashButtonText => TrashCount == 0 ? "Trash" : $"Trash ({TrashCount})";
     public string EmptyListText => ShowingTrash
         ? $"The trash is empty. Deleted notes stay here for {NotesStore.TrashDays} days."
@@ -203,6 +215,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
 
     partial void OnSearchChanged(string value)
     {
+        OnPropertyChanged(nameof(IsSearching));
         RefreshList();
         OnPropertyChanged(nameof(EmptyListText));
         SearchByMeaning();
@@ -691,9 +704,19 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
             _loading = loading;
         }
         TrashCount = _store.Trash().Count;
+        ListSummary = Summarize(found.Count, found.Count(n => n.Value.Pinned), terms.Count > 0);
         OnPropertyChanged(nameof(HasNotes));
         OnPropertyChanged(nameof(IsListEmpty));
         OnPropertyChanged(nameof(EmptyListText));
+    }
+
+    private string Summarize(int count, int pinned, bool searching)
+    {
+        static string Notes(int n) => n == 1 ? "1 note" : $"{n} notes";
+        if (searching) return count == 0 ? "Nothing found" : $"{count} found for “{Search.Trim()}”";
+        if (ShowingTrash) return count == 0 ? "Empty" : $"{Notes(count)} · deleted for good after {NotesStore.TrashDays} days";
+        if (count == 0) return "";
+        return pinned > 0 ? $"{Notes(count)} · {pinned} pinned" : Notes(count);
     }
 
     /// <summary>

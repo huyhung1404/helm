@@ -1,0 +1,205 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Notes"
+             xmlns:local="using:Helm.Modules.Notes.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Notes.Ui.NotesView"
+             x:DataType="vm:NotesViewModel">
+
+    <!-- Notes, the same view on every platform: a wall of cards, each as tall as its text; a card opens the note in the
+         editor. Wide: the editor floats over the wall (Esc, X or a click beside it closes it). Phone: the editor takes the
+         wall's place and Back returns. The search bar stays on top while the cards slide under it. -->
+    <UserControl.Styles>
+        <!-- One note on the wall: a glass card as tall as its text; it lights up under the pointer -->
+        <Style Selector="Button.note">
+            <Setter Property="Padding" Value="14,12" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+        </Style>
+        <Style Selector="TextBlock.cardtext.mono">
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, monospace" />
+        </Style>
+        <!-- Phone: the actions keep their icons, the words go -->
+        <Style Selector=":is(UserControl).narrow TextBlock.label">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+
+        <!-- THE WALL -->
+        <Panel x:Name="WallLayer">
+            <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" core:ScrollFade.Enabled="True">
+                <StackPanel x:Name="Page" Margin="40,96,40,40">
+                    <!-- Shown while the tool is turned off -->
+                    <Border x:Name="OffBar" Classes="glass" Margin="0,0,0,16" IsVisible="False">
+                        <StackPanel>
+                            <TextBlock Text="Notes is turned off" Classes="head" />
+                            <TextBlock Text="Your notes are kept, read only. Turn Notes on in its settings (the gear) to write." Classes="muted" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- What happened: a conflict copy, a note moved to the trash, a problem -->
+                    <Border Classes="glass" Margin="0,0,0,16" IsVisible="{Binding HasMessage}" core:Motion.EnterOnShow="True">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <ic:SymbolIcon Symbol="Info" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Classes="chip" Command="{Binding DismissMessageCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- Notes or the trash -->
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Classes="display" Text="{Binding ListHeader}" />
+                            <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="{Binding ListSummary}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Bottom" Command="{Binding EmptyTrashCommand}"
+                                IsVisible="{Binding ShowingTrash}" IsEnabled="{Binding HasTrash}" ToolTip.Tip="Delete every note in the trash for good"
+                                AutomationProperties.Name="Empty the trash">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                                <TextBlock Classes="label" Text="Empty trash" Foreground="{DynamicResource HelmDanger}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <StackPanel x:Name="Body">
+                        <!-- The wall: each card shows the title and the text and is as tall as that -->
+                        <ItemsControl ItemsSource="{Binding Notes}" IsVisible="{Binding HasNotes}" Classes="enter">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <core:MasonryPanel MinColumnWidth="220" Spacing="12" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:NoteRowViewModel">
+                                    <Button Classes="glass note fade" AutomationProperties.Name="{Binding Title}"
+                                            Command="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).OpenRowCommand}" CommandParameter="{Binding}">
+                                        <!-- Right-click (or hold): what can be done without opening it -->
+                                        <Button.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{Binding Pinned, Converter={x:Static local:NotesConverters.PinText}}" IsVisible="{Binding IsLive}"
+                                                          Command="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).TogglePinRowCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="Pin" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Copy" Command="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).CopyRowCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="Copy" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Move to the trash" IsVisible="{Binding IsLive}"
+                                                          Command="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).TrashRowCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="Delete" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Restore" IsVisible="{Binding Trashed}"
+                                                          Command="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).RestoreRowCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="ArrowUndo" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Delete for good" IsVisible="{Binding Trashed}"
+                                                          Command="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).DeleteForeverRowCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="Delete" FontSize="16" Foreground="{DynamicResource HelmDanger}" /></MenuItem.Icon>
+                                                </MenuItem>
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                        <StackPanel Spacing="6">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                                                <ic:SymbolIcon Grid.Column="1" Symbol="Pin" IconVariant="Filled" FontSize="13" Margin="8,3,0,0" VerticalAlignment="Top"
+                                                               Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding Pinned}" />
+                                            </Grid>
+                                            <!-- The text, with its lines; a long note is cut (the editor has all of it) -->
+                                            <TextBlock Classes="muted cardtext" Classes.mono="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).Monospace}"
+                                                       Text="{Binding CardText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" MaxLines="14"
+                                                       TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCardText}" />
+                                            <TextBlock Text="{Binding When}" Classes="muted" FontSize="11" Opacity="0.8" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- A page at a time -->
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,16,0,0"
+                                Content="{Binding Pager.MoreText}" Command="{Binding Pager.ShowMoreCommand}" IsVisible="{Binding Pager.HasMore}"
+                                AutomationProperties.Name="Show more notes" />
+
+                        <!-- Empty: what to do next, and where -->
+                        <Border Classes="glass enter" IsVisible="{Binding IsListEmpty}" Padding="22,20">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                                <ic:SymbolIcon Symbol="Notepad" FontSize="28" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                                <StackPanel Grid.Column="1" Spacing="10">
+                                    <TextBlock Text="{Binding EmptyListText}" TextWrapping="Wrap" FontSize="15" />
+                                    <Button Classes="pill" HorizontalAlignment="Left" Command="{Binding NewNoteCommand}" IsVisible="{Binding !ShowingTrash}"
+                                            AutomationProperties.Name="Write a note">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <ic:SymbolIcon Symbol="Add" FontSize="14" Foreground="{DynamicResource HelmPillForeground}" />
+                                            <TextBlock Text="New note" Foreground="{DynamicResource HelmPillForeground}" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- The bar stays on top; the cards slide under it -->
+            <Border x:Name="TopBar" VerticalAlignment="Top" Background="{DynamicResource HelmSheetBackground}" Padding="40,20,40,12">
+                <Grid x:Name="TopGrid" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10">
+                    <!-- A phone's page has no app bar: the menu button opens the drawer -->
+                    <Button x:Name="MenuButton" Classes="chip" Click="Menu_Click" IsVisible="False" VerticalAlignment="Center"
+                            ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                        <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                    </Button>
+                    <TextBlock x:Name="Eyebrow" Grid.Column="1" Classes="eyebrow" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <StackPanel x:Name="Actions" Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button x:Name="TrashButton" Classes="chip" Classes.selected="{Binding ShowingTrash}" Command="{Binding ToggleTrashCommand}"
+                                ToolTip.Tip="Notes you deleted, kept for 30 days" AutomationProperties.Name="Trash">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                                <TextBlock Classes="label" Text="{Binding TrashButtonText}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="chip" Click="Settings_Click" ToolTip.Tip="Notes settings" AutomationProperties.Name="Notes settings">
+                            <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                        </Button>
+                    </StackPanel>
+                    <!-- Search and the one main action -->
+                    <Grid Grid.Row="1" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,12,0,0">
+                        <Border Classes="glass" Padding="14,0,6,0" BoxShadow="">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                <ic:SymbolIcon Symbol="Search" FontSize="16" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search notes (Ctrl+F)" Text="{Binding Search}"
+                                         VerticalContentAlignment="Center" MinHeight="40" AutomationProperties.Name="Search notes" />
+                                <Button Grid.Column="2" Classes="flat" Width="32" Height="32" Padding="0" HorizontalContentAlignment="Center"
+                                        Command="{Binding ClearSearchCommand}" IsVisible="{Binding IsSearching}" ToolTip.Tip="Clear the search"
+                                        AutomationProperties.Name="Clear the search">
+                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
+                                </Button>
+                            </Grid>
+                        </Border>
+                        <Button x:Name="NewButton" Grid.Column="1" Classes="pill" Command="{Binding NewNoteCommand}" ToolTip.Tip="New note (Ctrl+N)"
+                                AutomationProperties.Name="New note">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:SymbolIcon Symbol="Add" FontSize="14" Foreground="{DynamicResource HelmPillForeground}" />
+                                <TextBlock Classes="label" Text="New note" Foreground="{DynamicResource HelmPillForeground}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Panel>
+
+        <!-- THE OPEN NOTE: over the wall on a wide screen, in its place on a phone -->
+        <Panel x:Name="EditorLayer" IsVisible="{Binding IsEditorOpen}">
+            <Border x:Name="Scrim" Background="{DynamicResource HelmScrim}" PointerPressed="Scrim_PointerPressed" />
+            <Border x:Name="EditorCard" Classes="sheet" Margin="32,24" MaxWidth="860" ClipToBounds="True">
+                <local:NoteEditorView x:Name="Editor" />
+            </Border>
+        </Panel>
+    </Panel>
+</UserControl>

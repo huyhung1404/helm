@@ -30,6 +30,9 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Vault", "First run", "Vault", m => VaultDemo.Create(m, VaultStage.Setup), Framed: false),
         new("Vault", "Emergency Kit", "Vault", m => VaultDemo.Create(m, VaultStage.Kit), Framed: false),
         new("Vault", "Empty", "Vault", m => VaultDemo.Create(m, VaultStage.Empty), Framed: false),
+        new("Notes", "Wall", "Notes", m => NotesDemo.Create(m, NotesStage.Wall), Framed: false),
+        new("Notes", "Open note", "Notes", m => NotesDemo.Create(m, NotesStage.Open), Framed: false),
+        new("Notes", "Empty", "Notes", m => NotesDemo.Create(m, NotesStage.Empty), Framed: false),
         new("Base", "Controls", "Controls", _ => new ControlsPage()),
     ];
 

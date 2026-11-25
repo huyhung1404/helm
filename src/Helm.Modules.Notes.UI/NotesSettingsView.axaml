@@ -1,0 +1,109 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Notes"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Notes.Ui.NotesSettingsView"
+             x:DataType="vm:NotesViewModel">
+
+    <!-- Notes' settings as a sheet over Notes (the gear): one card per subject, a switch on the right or a field under its name. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="NOTES" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- On or off: off keeps the notes, read only -->
+        <Border Classes="glass">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Notes is on" Classes="head" />
+                    <TextBlock Text="Off keeps your notes but makes them read only, and stops reading them for search by meaning." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <ToggleSwitch x:Name="EnableSwitch" Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" AutomationProperties.Name="Notes on or off" />
+            </Grid>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Display" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Sort notes by" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding SortOrderNames}" SelectedIndex="{Binding SortOrderIndex}"
+                              AutomationProperties.Name="Sort notes by" />
+                    <TextBlock Text="Pinned notes always come first." Classes="secondary" />
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Notes shown at first" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{x:Static core:ListPager.SizeNames}" SelectedIndex="{Binding ItemsShownIndex}"
+                              AutomationProperties.Name="Notes shown at first" />
+                    <TextBlock Text="Show more adds as many again. Fewer keeps Notes smooth to scroll." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Text size" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding FontSizes}" SelectedItem="{Binding EditorFontSize}"
+                              AutomationProperties.Name="Text size" />
+                    <TextBlock Text="For the note's text; the title stays larger." Classes="secondary" />
+                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Fixed-width font" />
+                        <TextBlock Text="Every letter the same width, so code and columns line up." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding Monospace}" OnContent="" OffContent="" AutomationProperties.Name="Fixed-width font" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Search by meaning: the sentence model, downloaded once per device -->
+        <Border Classes="glass" IsVisible="{Binding SearchModel, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel Spacing="10" DataContext="{Binding SearchModel}" x:DataType="vm:NoteSearchModelViewModel">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Search by meaning" Classes="head" />
+                    <TextBlock Text="{Binding Status}" Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" IsVisible="{Binding IsDownloading}" />
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding Size, StringFormat='Download ({0})'}"
+                        Command="{Binding DownloadCommand}" IsVisible="{Binding CanDownload}" />
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Stop" Command="{Binding CancelCommand}" IsVisible="{Binding IsDownloading}" />
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Remove the model" Command="{Binding RemoveCommand}" IsVisible="{Binding IsInstalled}" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="A small multilingual model that runs in Helm, offline: &quot;lỗi server hôm trước&quot; finds a note about Nginx answering 502. Each device that searches this way needs it; what it reads in your notes syncs, end-to-end encrypted, so here it reads only the notes no other device has read. Download on Wi-Fi." />
+            </StackPanel>
+        </Border>
+
+        <!-- Export (desktop): every note as a Markdown file -->
+        <Border x:Name="ExportCard" Classes="glass" IsVisible="False">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Export" Classes="head" />
+                    <TextBlock Text="Saves every note as a Markdown file in a folder you pick." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button x:Name="ExportButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save as Markdown…" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Trash" Classes="head" />
+                    <TextBlock Text="{Binding TrashSummary}" Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding EmptyTrashCommand}" IsEnabled="{Binding HasTrash}"
+                        AutomationProperties.Name="Empty the trash">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                        <TextBlock Text="Empty the trash" Foreground="{DynamicResource HelmDanger}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" />
+    </StackPanel>
+</UserControl>
