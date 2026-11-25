@@ -10,11 +10,39 @@ public sealed partial class WorkspaceOption(string id, string name, WorkspaceKin
     [ObservableProperty] private string _name = name;
     [ObservableProperty] private WorkspaceKind _kind = kind;
 
+    /// <summary>True for the list the page shows (its card is highlighted).</summary>
+    [ObservableProperty] private bool _isSelected;
+
     public string Id { get; } = id;
 
     partial void OnKindChanged(WorkspaceKind value) => OnPropertyChanged(nameof(KindText));
 
     public string KindText => TrackerFormat.Kind(Kind);
+
+    public int OpenCount { get; private set; }
+
+    public int OverdueCount { get; private set; }
+
+    public bool HasOverdue => OverdueCount > 0;
+
+    /// <summary>The list card's second line: "3 open", "3 open · 1 overdue" or "All done".</summary>
+    public string Summary => OpenCount == 0 ? "All done" : OverdueCount > 0 ? $"{OpenCount} open · {OverdueCount} overdue" : $"{OpenCount} open";
+
+    /// <summary>First letter of the name, for the list card's tile.</summary>
+    public string Initial => Name.Trim() is { Length: > 0 } n ? char.ToUpper(n[0], System.Globalization.CultureInfo.CurrentCulture).ToString() : "#";
+
+    partial void OnNameChanged(string value) => OnPropertyChanged(nameof(Initial));
+
+    internal void SetCounts(int open, int overdue)
+    {
+        if (open == OpenCount && overdue == OverdueCount) return;
+        OpenCount = open;
+        OverdueCount = overdue;
+        OnPropertyChanged(nameof(OpenCount));
+        OnPropertyChanged(nameof(OverdueCount));
+        OnPropertyChanged(nameof(HasOverdue));
+        OnPropertyChanged(nameof(Summary));
+    }
 
     public override string ToString() => Name;
 }

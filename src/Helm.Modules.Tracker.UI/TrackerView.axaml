@@ -1,0 +1,685 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Tracker"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Tracker.Ui.TrackerView"
+             x:DataType="vm:TrackerViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.late">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="TextBlock.done">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="TextBlock.head">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.stat">
+            <Setter Property="FontSize" Value="26" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Border.tag">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="7,1" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.tag > TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- The round tick at the start of a task -->
+        <Style Selector="Button.tick">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Margin" Value="-11,-11,-1,-11" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.tick:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.tick:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.tick Border.ring">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.tick:pointerover Border.ring">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+        <Style Selector="Button.tick.small Border.ring">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="CornerRadius" Value="9" />
+        </Style>
+        <Style Selector="Button.tick.checked Border.ring">
+            <Setter Property="Background" Value="{DynamicResource HelmSuccess}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <!-- Small outlined action under an open task -->
+        <Style Selector=":is(Button).act">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="MinHeight" Value="36" />
+        </Style>
+        <Style Selector=":is(Button).act:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        </Style>
+        <Style Selector="ToggleButton.act:checked /template/ ContentPresenter#PART_ContentPresenter, Button.act.selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+        </Style>
+        <Style Selector="Button.act:disabled">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
+        <Style Selector="Button.act:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <!-- Tasks · Calendar · Insights -->
+        <Style Selector="RadioButton.seg">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="Seg" Background="Transparent" CornerRadius="8" Padding="14,7">
+                        <ContentPresenter Content="{TemplateBinding Content}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="RadioButton.seg:checked">
+            <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="RadioButton.seg:checked /template/ Border#Seg">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <!-- Calendar -->
+        <Style Selector="Button.day">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="MinHeight" Value="56" />
+        </Style>
+        <Style Selector="UserControl.narrow Button.day">
+            <Setter Property="MinHeight" Value="44" />
+        </Style>
+        <Style Selector="Button.day.out">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="TextBlock.today">
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+        <Style Selector="Ellipse.dot">
+            <Setter Property="Fill" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Ellipse.dot.debt">
+            <Setter Property="Fill" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+        <Style Selector="Ellipse.dot.overdue">
+            <Setter Property="Fill" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="Ellipse.dot.done">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="UserControl.narrow TextBlock.display">
+            <Setter Property="FontSize" Value="28" />
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.DataTemplates>
+        <!-- "Split into steps", inline under the task: AI's proposed steps; the ones kept become its checklist -->
+        <DataTemplate DataType="vm:TrackerProposalViewModel">
+            <Border Classes="glass" Margin="0,6,0,6" BoxShadow="">
+                <StackPanel Spacing="6">
+                    <StackPanel IsVisible="{Binding IsBusy}">
+                        <Border Classes="shimmer" Width="240" />
+                        <Border Classes="shimmer" Width="180" />
+                        <Border Classes="shimmer" Width="210" />
+                        <TextBlock Text="{Binding Status}" Classes="muted" />
+                    </StackPanel>
+                    <StackPanel Spacing="6" IsVisible="{Binding IsProposing}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                            <TextBlock Text="Proposed steps" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding TickedText}" Classes="muted" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Choices}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:TaskProposalChoice">
+                                    <Grid ColumnDefinitions="Auto,*" Margin="0,2">
+                                        <CheckBox MinWidth="0" VerticalAlignment="Center" IsChecked="{Binding Keep}" AutomationProperties.Name="Keep this step" />
+                                        <TextBox Grid.Column="1" Text="{Binding Title}" TextWrapping="Wrap" AutomationProperties.Name="Step" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <CheckBox Content="{Binding SpreadText}" IsChecked="{Binding SpreadDates}" IsVisible="{Binding CanSpread}" />
+                        <WrapPanel HorizontalAlignment="Right">
+                            <Button Classes="act" Content="Cancel" Command="{Binding CloseCommand}" />
+                            <Button Classes="act" Content="Try again" Command="{Binding RetryCommand}" />
+                            <Button Classes="pill" Content="{Binding AddText}" Command="{Binding AddCommand}" Margin="0,0,0,6" />
+                        </WrapPanel>
+                    </StackPanel>
+                    <StackPanel Spacing="6" IsVisible="{Binding IsStuck}">
+                        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
+                        <WrapPanel HorizontalAlignment="Right">
+                            <Button Classes="act" Content="Try again" Command="{Binding RetryCommand}" />
+                            <Button Classes="act" Content="Cancel" Command="{Binding CloseCommand}" />
+                        </WrapPanel>
+                    </StackPanel>
+                    <Grid ColumnDefinitions="*,Auto,Auto" IsVisible="{Binding CanUndo}">
+                        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="act" Content="Undo" Command="{Binding UndoCommand}" />
+                        <Button Grid.Column="2" Classes="act" Content="Done" Command="{Binding CloseCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- One task: a glass row; tap it to open its steps and actions -->
+        <DataTemplate DataType="vm:TrackerItemViewModel">
+            <Border Classes="glass" Padding="14,12" Margin="0,0,0,8">
+                <StackPanel>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Button Classes="tick" Classes.checked="{Binding IsCompleted}" VerticalAlignment="Top"
+                                Command="{Binding ToggleCompleteCommand}" AutomationProperties.Name="Done">
+                            <Panel>
+                                <Border Classes="ring" />
+                                <ic:SymbolIcon Symbol="Checkmark" FontSize="13" Foreground="#10170F" IsVisible="{Binding IsCompleted}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Panel>
+                        </Button>
+                        <Button Grid.Column="1" Grid.ColumnSpan="2" Classes="flat" Padding="2,0" Margin="0,-4" Background="Transparent"
+                                Command="{Binding ToggleExpandedCommand}" AutomationProperties.Name="{Binding Title}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Margin="0,4">
+                                    <TextBlock Text="{Binding Title}" FontSize="15" TextWrapping="Wrap" Classes.done="{Binding IsCompleted}" />
+                                    <WrapPanel Margin="0,3,0,0">
+                                        <Border Classes="tag" IsVisible="{Binding IsUrgent}"><TextBlock Text="Urgent" Foreground="{DynamicResource HelmDanger}" /></Border>
+                                        <Border Classes="tag" IsVisible="{Binding IsHigh}"><TextBlock Text="High" Foreground="{DynamicResource HelmEyebrow}" /></Border>
+                                        <Border Classes="tag" IsVisible="{Binding IsStarted}"><TextBlock Text="In progress" Foreground="{DynamicResource HelmSuccess}" /></Border>
+                                        <Border Classes="tag" IsVisible="{Binding HasSubtasks}"><TextBlock Text="{Binding SubtaskProgress}" /></Border>
+                                        <TextBlock Text="{Binding Details}" Classes="muted" Classes.late="{Binding IsOverdue}" VerticalAlignment="Center" />
+                                    </WrapPanel>
+                                    <TextBlock Text="{Binding Item.Notes}" Classes="muted" IsVisible="{Binding HasNotes}" Margin="0,3,0,0" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <ic:SymbolIcon Grid.Column="1" Symbol="ChevronDown" FontSize="14" Margin="8,6,0,0" VerticalAlignment="Top"
+                                               Foreground="{DynamicResource HelmSecondaryText}" />
+                            </Grid>
+                        </Button>
+                    </Grid>
+
+                    <StackPanel Margin="34,8,0,0" IsVisible="{Binding IsExpanded}">
+                        <core:LinksPanel DataContext="{Binding Links}" Margin="0,0,0,4" />
+                        <ItemsControl ItemsSource="{Binding Subtasks}" IsVisible="{Binding HasSubtasks}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:TrackerItemViewModel">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Button Classes="tick small" Classes.checked="{Binding IsCompleted}" Command="{Binding ToggleCompleteCommand}"
+                                                AutomationProperties.Name="{Binding Title}">
+                                            <Panel>
+                                                <Border Classes="ring" />
+                                                <ic:SymbolIcon Symbol="Checkmark" FontSize="11" Foreground="#10170F" IsVisible="{Binding IsCompleted}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Panel>
+                                        </Button>
+                                        <TextBlock Grid.Column="1" Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center" Classes.done="{Binding IsCompleted}" />
+                                        <Button Grid.Column="2" Classes="flat" Width="36" Height="36" Padding="0" HorizontalContentAlignment="Center"
+                                                Command="{Binding DeleteCommand}" AutomationProperties.Name="Delete step">
+                                            <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBox Classes="bare" PlaceholderText="+ Add a step" Text="{Binding NewSubtaskTitle}" IsVisible="{Binding CanHaveSubtasks}"
+                                 Margin="0,0,0,6" AutomationProperties.Name="New step">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding AddSubtaskCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <ContentControl Content="{Binding Proposal}" />
+
+                        <WrapPanel IsVisible="{Binding !IsEditing}">
+                            <Button Classes="act" Command="{Binding StartCommand}" IsVisible="{Binding CanStart}">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Play" FontSize="14" /><TextBlock Text="Start" /></StackPanel>
+                            </Button>
+                            <Button Classes="act" Command="{Binding BreakDownCommand}" IsVisible="{Binding CanBreakDown}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="Sparkle" FontSize="14" Foreground="{DynamicResource HelmEyebrow}" />
+                                    <TextBlock Text="Split into steps" Foreground="{DynamicResource HelmEyebrow}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="act" Command="{Binding BeginEditCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Edit" FontSize="14" /><TextBlock Text="Edit" /></StackPanel>
+                            </Button>
+                            <Button Classes="act" Command="{Binding Links.StartPickingCommand}" IsVisible="{Binding Links, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Link" FontSize="14" /><TextBlock Text="Link a note" /></StackPanel>
+                            </Button>
+                            <Button Classes="act" Command="{Binding MoveUpCommand}" IsVisible="{Binding IsOpen}" IsEnabled="{Binding CanMoveUp}" AutomationProperties.Name="Move up">
+                                <ic:SymbolIcon Symbol="ArrowUp" FontSize="14" />
+                            </Button>
+                            <Button Classes="act" Command="{Binding MoveDownCommand}" IsVisible="{Binding IsOpen}" IsEnabled="{Binding CanMoveDown}" AutomationProperties.Name="Move down">
+                                <ic:SymbolIcon Symbol="ArrowDown" FontSize="14" />
+                            </Button>
+                            <Button Classes="act" Command="{Binding DeleteCommand}">
+                                <TextBlock Text="Delete" Foreground="{DynamicResource HelmDanger}" />
+                            </Button>
+                        </WrapPanel>
+
+                        <StackPanel Spacing="8" IsVisible="{Binding IsEditing}">
+                            <TextBox PlaceholderText="Title" Text="{Binding EditTitle}" />
+                            <TextBox PlaceholderText="Notes" Text="{Binding EditNotes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" />
+                            <ComboBox HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).PriorityNames}"
+                                      SelectedIndex="{Binding EditPriorityIndex}" />
+                            <core:DateTimeBox Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="Due date (optional)" />
+                            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsRepeating}">
+                                <ComboBox HorizontalAlignment="Stretch" SelectedIndex="{Binding EditRepeatIndex}"
+                                          ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).RepeatNames}" />
+                                <TextBox Grid.Column="1" Width="96" Margin="8,0,0,0" PlaceholderText="Days" Text="{Binding EditRepeatDays}" />
+                            </Grid>
+                            <WrapPanel>
+                                <Button Classes="pill" Content="Save" Command="{Binding SaveEditCommand}" Margin="0,0,8,0" />
+                                <Button Classes="ghost" Content="Cancel" Command="{Binding CancelEditCommand}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <Panel>
+        <core:Backdrop />
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="Page" Margin="40,28,40,40">
+
+                <!-- Today, and which view -->
+                <Grid x:Name="TopBar" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                    <TextBlock Classes="eyebrow" Text="{Binding TodayLine, Converter={x:Static core:UpperCase.Instance}}" VerticalAlignment="Center"
+                               TextWrapping="Wrap" Margin="0,0,12,0" />
+                    <Border x:Name="Tabs" Grid.Column="1" Classes="glass" Padding="3" CornerRadius="10" BoxShadow="" IsVisible="{Binding HasWorkspaces}"
+                            HorizontalAlignment="Left">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <RadioButton x:Name="TasksTab" Classes="seg" GroupName="TrackerTab" IsChecked="True" Content="Tasks" Click="Tab_Click" />
+                            <RadioButton x:Name="CalendarTab" Classes="seg" GroupName="TrackerTab" Content="Calendar" Click="Tab_Click" />
+                            <RadioButton x:Name="InsightsTab" Classes="seg" GroupName="TrackerTab" Content="Insights" Click="Tab_Click" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border x:Name="OffBar" Classes="glass" Margin="0,16,0,0" IsVisible="False">
+                    <StackPanel>
+                        <TextBlock Text="Tracker is turned off" Classes="head" />
+                        <TextBlock Text="Your lists are kept. Turn Tracker on in its settings to use them." Classes="muted" />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel x:Name="Body">
+                    <!-- First run -->
+                    <Border Classes="glass hero" IsVisible="{Binding HasNoWorkspaces}" Margin="0,40,0,0" MaxWidth="460" HorizontalAlignment="Left">
+                        <StackPanel Spacing="10">
+                            <TextBlock Classes="eyebrow" Text="START HERE" />
+                            <TextBlock Text="Make your first list" FontSize="22" FontWeight="SemiBold" />
+                            <TextBlock Classes="muted" Text="A list holds your to-dos. Add more lists later. Debts are kept in Wallet." />
+                            <Button Classes="pill" HorizontalAlignment="Stretch" Content="New to-do list" Command="{Binding CreateTasksWorkspaceCommand}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- TASKS -->
+                    <StackPanel x:Name="TasksPanel" IsVisible="{Binding ShowListsView}">
+                        <Grid x:Name="Head" ColumnDefinitions="*,24,380" RowDefinitions="Auto,Auto" Margin="0,26,0,26">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Classes="display" Text="{Binding WorkspaceName}" />
+                                <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="{Binding OpenSummary}" />
+                            </StackPanel>
+
+                            <!-- The one task to do now -->
+                            <Border x:Name="Hero" Grid.Column="2" Classes="glass hero">
+                                <Panel>
+                                    <StackPanel DataContext="{Binding UpNext}" x:DataType="vm:TrackerItemViewModel"
+                                                IsVisible="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).HasUpNext}">
+                                        <Panel>
+                                            <TextBlock Classes="eyebrow" Text="UP NEXT" IsVisible="{Binding !IsStarted}" />
+                                            <TextBlock Classes="eyebrow" Text="IN PROGRESS" IsVisible="{Binding IsStarted}" />
+                                        </Panel>
+                                        <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2"
+                                                   TextTrimming="CharacterEllipsis" Margin="0,8,0,4" />
+                                        <TextBlock Text="{Binding Details}" Classes="muted" Classes.late="{Binding IsOverdue}" MaxLines="1" TextTrimming="CharacterEllipsis" />
+                                        <Grid ColumnDefinitions="*,Auto" Margin="0,16,0,0">
+                                            <Button Classes="pill" HorizontalAlignment="Stretch" Command="{Binding ToggleCompleteCommand}">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                                                    <TextBlock Text="Mark done" Foreground="{DynamicResource HelmPillForeground}" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Grid.Column="1" Classes="ghost" Margin="8,0,0,0" Command="{Binding StartCommand}" IsVisible="{Binding CanStart}">
+                                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Play" FontSize="14" /><TextBlock Text="Start" /></StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </StackPanel>
+                                    <StackPanel IsVisible="{Binding !HasUpNext}">
+                                        <TextBlock Classes="eyebrow" Text="ALL CLEAR" />
+                                        <TextBlock Text="Nothing left here. Add the next thing below." FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0" />
+                                    </StackPanel>
+                                </Panel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Quick add: type and press Enter; due date and priority are optional -->
+                        <Border Classes="glass" Padding="16,4,6,4">
+                            <StackPanel>
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <TextBox Classes="bare" FontSize="15" PlaceholderText="Add a task — press Enter" Text="{Binding NewTitle}"
+                                             VerticalAlignment="Center" AutomationProperties.Name="New task">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                    <ToggleButton x:Name="MoreToggle" Grid.Column="1" Classes="act" Margin="8,0,6,0" VerticalAlignment="Center"
+                                                  IsVisible="{Binding IsTaskWorkspace}" AutomationProperties.Name="Due date and priority">
+                                        <ic:SymbolIcon Symbol="Calendar" FontSize="16" />
+                                    </ToggleButton>
+                                    <Button Grid.Column="2" Classes="pill" Width="40" Height="40" MinHeight="40" Padding="0" VerticalAlignment="Center"
+                                            Command="{Binding AddCommand}" AutomationProperties.Name="Add">
+                                        <ic:SymbolIcon Symbol="Add" FontSize="18" Foreground="{DynamicResource HelmPillForeground}" />
+                                    </Button>
+                                </Grid>
+                                <WrapPanel IsVisible="{Binding #MoreToggle.IsChecked}" Margin="0,6,0,8">
+                                    <core:DateTimeBox Date="{Binding NewDueDate}" Time="{Binding NewDueTime}" Lean="Future" AllowEmpty="True"
+                                                      PlaceholderText="Due date" MinWidth="240" Margin="0,0,8,6" />
+                                    <ComboBox ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}" MinWidth="140" Margin="0,0,8,6"
+                                              AutomationProperties.Name="Priority" />
+                                    <ComboBox ItemsSource="{Binding RepeatNames}" SelectedIndex="{Binding NewRepeatIndex}" Margin="0,0,8,6" AutomationProperties.Name="Repeat" />
+                                    <TextBox Width="80" PlaceholderText="Days" Text="{Binding NewRepeatDays}" IsVisible="{Binding NewRepeatsForDays}" Margin="0,0,0,6" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Classes="glass" Margin="0,8,0,0" IsVisible="{Binding HasMessage}" BorderBrush="{DynamicResource HelmDanger}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Classes="flat" Width="36" Height="36" Padding="0" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <!-- The list -->
+                        <Border Classes="glass" Margin="0,12,0,0" Padding="28" IsVisible="{Binding HasNoOpen}">
+                            <TextBlock Text="No tasks here. Type one above and press Enter." Classes="muted" HorizontalAlignment="Center" />
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding OpenItems}" Margin="0,12,0,0" />
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="{Binding OpenPager.MoreText}" Command="{Binding OpenPager.ShowMoreCommand}"
+                                IsVisible="{Binding OpenPager.HasMore}" />
+
+                        <!-- Done, folded away -->
+                        <Button Classes="flat" HorizontalAlignment="Left" Padding="4,8" Margin="0,8,0,4" Click="ToggleDone_Click" IsVisible="{Binding HasCompleted}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Panel>
+                                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" IsVisible="{Binding !ShowCompleted}" Foreground="{DynamicResource HelmSecondaryText}" />
+                                    <ic:SymbolIcon Symbol="ChevronDown" FontSize="12" IsVisible="{Binding ShowCompleted}" Foreground="{DynamicResource HelmSecondaryText}" />
+                                </Panel>
+                                <TextBlock Text="Done" Classes="muted" FontSize="13" />
+                            </StackPanel>
+                        </Button>
+                        <ItemsControl ItemsSource="{Binding CompletedItems}" IsVisible="{Binding ShowCompleted}" Opacity="0.75" />
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="{Binding CompletedPager.MoreText}" Command="{Binding CompletedPager.ShowMoreCommand}">
+                            <Button.IsVisible>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="ShowCompleted" />
+                                    <Binding Path="CompletedPager.HasMore" />
+                                </MultiBinding>
+                            </Button.IsVisible>
+                        </Button>
+
+                        <!-- The other lists -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="2,28,0,12">
+                            <TextBlock Text="Your lists" Classes="head" />
+                            <TextBlock Text="{Binding Workspaces.Count}" Classes="muted" FontSize="13" VerticalAlignment="Bottom" />
+                        </StackPanel>
+                        <ItemsControl x:Name="ListCards" ItemsSource="{Binding Workspaces}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="4" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:WorkspaceOption">
+                                    <Button Classes="glass" Classes.selected="{Binding IsSelected}" Margin="0,0,10,10" Click="List_Click"
+                                            AutomationProperties.Name="{Binding Name}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Border Width="40" Height="40" CornerRadius="10" Margin="0,0,12,0" Background="{DynamicResource HelmGlassHover}"
+                                                    BorderBrush="{DynamicResource HelmGlassStroke}" BorderThickness="1">
+                                                <TextBlock Text="{Binding Initial}" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource HelmEyebrow}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Summary}" Classes="muted" FontSize="12" Classes.late="{Binding HasOverdue}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <ic:SymbolIcon Grid.Column="2" Symbol="ChevronRight" FontSize="12" Margin="6,0,0,0" Foreground="{DynamicResource HelmSecondaryText}" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="ghost" HorizontalAlignment="Left" Click="NewList_Click" Margin="0,2,0,0">
+                            <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Add" FontSize="14" /><TextBlock Text="New list" /></StackPanel>
+                        </Button>
+                        <Border x:Name="NewListBox" Classes="glass" Margin="0,8,0,0" Padding="16,4,6,4" IsVisible="False" MaxWidth="460" HorizontalAlignment="Left">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Classes="bare" PlaceholderText="Name of the new list — press Enter" Text="{Binding NewWorkspaceName}">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding CreateWorkspaceCommand}" />
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                                <Button Grid.Column="1" Classes="pill" Content="Create" Command="{Binding CreateWorkspaceCommand}" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- CALENDAR -->
+                    <StackPanel Spacing="10" Margin="0,26,0,0" IsVisible="{Binding ShowCalendarView}">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                            <TextBlock Classes="display" Text="{Binding CalendarTitle}" />
+                            <Button Grid.Column="1" Classes="ghost" Width="44" Padding="0" Command="{Binding CalendarPreviousCommand}" AutomationProperties.Name="Previous">
+                                <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+                            </Button>
+                            <Button Grid.Column="2" Classes="ghost" Width="44" Padding="0" Margin="6,0" Command="{Binding CalendarNextCommand}" AutomationProperties.Name="Next">
+                                <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+                            </Button>
+                            <Button Grid.Column="3" Classes="ghost" Content="Today" Command="{Binding CalendarTodayCommand}" />
+                        </Grid>
+                        <WrapPanel>
+                            <Button Classes="act" Content="Month" Command="{Binding SetCalendarMonthCommand}" Classes.selected="{Binding !IsWeekView}" />
+                            <Button Classes="act" Content="Week" Command="{Binding SetCalendarWeekCommand}" Classes.selected="{Binding IsWeekView}" />
+                            <CheckBox Content="All lists" IsChecked="{Binding CalendarAllWorkspaces}" Margin="8,0,12,6" />
+                            <Button Classes="act" Click="ShareIcs_Click" AutomationProperties.Name="Save as a calendar file">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Share" FontSize="14" /><TextBlock Text=".ics" /></StackPanel>
+                            </Button>
+                        </WrapPanel>
+                        <StackPanel IsVisible="{Binding !IsWeekView}">
+                            <ItemsControl ItemsSource="{Binding CalendarWeekdayNames}" Margin="0,0,0,6">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{Binding}" Classes="muted" FontSize="12" HorizontalAlignment="Center" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding CalendarDays}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:CalendarDayViewModel">
+                                        <Button Classes="glass day" Classes.selected="{Binding IsSelected}" Classes.out="{Binding !IsInRange}" Margin="3" Padding="6"
+                                                Command="{Binding SelectCommand}" AutomationProperties.Name="{Binding AutomationName}">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="{Binding DayNumber}" FontWeight="SemiBold" Classes.today="{Binding IsToday}" />
+                                                <ItemsControl ItemsSource="{Binding Entries}">
+                                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="3" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="vm:CalendarEntryViewModel">
+                                                            <Ellipse Width="6" Height="6" Classes="dot" Classes.debt="{Binding IsDebt}" Classes.overdue="{Binding IsOverdue}" Classes.done="{Binding IsDone}" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding CalendarDays}" IsVisible="{Binding IsWeekView}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:CalendarDayViewModel">
+                                    <Button Classes="glass" Classes.selected="{Binding IsSelected}" Margin="0,0,0,6" Command="{Binding SelectCommand}"
+                                            AutomationProperties.Name="{Binding AutomationName}">
+                                        <Grid ColumnDefinitions="80,*">
+                                            <TextBlock Text="{Binding WeekLabel}" FontWeight="SemiBold" Classes.today="{Binding IsToday}" />
+                                            <StackPanel Grid.Column="1" Spacing="2">
+                                                <ItemsControl ItemsSource="{Binding Entries}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="vm:CalendarEntryViewModel">
+                                                            <TextBlock Text="{Binding Line}" TextTrimming="CharacterEllipsis" Classes.late="{Binding IsOverdue}" Classes.done="{Binding IsDone}" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <TextBlock Text="{Binding MoreText}" Classes="muted" IsVisible="{Binding HasMore}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Spacing="8" IsVisible="{Binding HasCalendarDaySelection}">
+                            <TextBlock Text="{Binding CalendarSelectedTitle}" Classes="head" Margin="2,12,0,0" />
+                            <Border Classes="glass" Padding="16,4,6,4" IsVisible="{Binding CanAddOnCalendarDay}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBox Classes="bare" PlaceholderText="A task due this day — press Enter" Text="{Binding CalendarNewTitle}">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding AddOnCalendarDayCommand}" />
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                    <Button Grid.Column="1" Classes="pill" Width="40" Height="40" MinHeight="40" Padding="0" Command="{Binding AddOnCalendarDayCommand}" AutomationProperties.Name="Add">
+                                        <ic:SymbolIcon Symbol="Add" FontSize="18" Foreground="{DynamicResource HelmPillForeground}" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+                            <TextBlock Text="Nothing is due this day." Classes="muted" IsVisible="{Binding IsCalendarDayEmpty}" />
+                            <ItemsControl ItemsSource="{Binding CalendarDayItems}" />
+                            <ItemsControl ItemsSource="{Binding CalendarDayOthers}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:CalendarEntryViewModel">
+                                        <Button Classes="glass" Margin="0,0,0,8" Command="{Binding OpenCommand}" IsEnabled="{Binding IsDebt}" AutomationProperties.Name="{Binding Title}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Panel Margin="0,0,10,0" VerticalAlignment="Center">
+                                                    <ic:SymbolIcon Symbol="Person" FontSize="16" IsVisible="{Binding IsDebt}" Foreground="{DynamicResource HelmEyebrow}" />
+                                                    <ic:SymbolIcon Symbol="ArrowRepeatAll" FontSize="16" IsVisible="{Binding IsProjected}" />
+                                                </Panel>
+                                                <TextBlock Grid.Column="1" Text="{Binding Line}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Detail}" Classes="muted" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- INSIGHTS -->
+                    <StackPanel x:Name="InsightsPanel" IsVisible="False" Margin="0,26,0,0" Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="display" Text="Insights" />
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding ReportRangeNames}" SelectedIndex="{Binding ReportRangeIndex}" VerticalAlignment="Center"
+                                      AutomationProperties.Name="Report period" />
+                        </Grid>
+                        <DockPanel>
+                            <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ReportAllWorkspaces}" OnContent="" OffContent="" />
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="All lists" />
+                                <TextBlock Text="{Binding ReportRangeText}" Classes="muted" />
+                            </StackPanel>
+                        </DockPanel>
+                        <UniformGrid Columns="3">
+                            <Border Classes="glass" Margin="0,0,10,10"><StackPanel><TextBlock Text="{Binding ReportCompleted}" Classes="stat" /><TextBlock Text="Completed" Classes="muted" /></StackPanel></Border>
+                            <Border Classes="glass" Margin="0,0,10,10"><StackPanel><TextBlock Text="{Binding ReportCreated}" Classes="stat" /><TextBlock Text="Added" Classes="muted" /></StackPanel></Border>
+                            <Border Classes="glass" Margin="0,0,10,10"><StackPanel><TextBlock Text="{Binding ReportOnTime}" Classes="stat" /><TextBlock Text="Done by the due date" Classes="muted" /></StackPanel></Border>
+                            <Border Classes="glass" Margin="0,0,10,10"><StackPanel><TextBlock Text="{Binding ReportAverageLead}" Classes="stat" /><TextBlock Text="Average, added to done" Classes="muted" /></StackPanel></Border>
+                            <Border Classes="glass" Margin="0,0,10,10"><StackPanel><TextBlock Text="{Binding ReportMedianLead}" Classes="stat" /><TextBlock Text="Median, added to done" Classes="muted" /></StackPanel></Border>
+                            <Border Classes="glass" Margin="0,0,10,10"><StackPanel><TextBlock Text="{Binding ReportAverageWork}" Classes="stat" /><TextBlock Text="Average, started to done" Classes="muted" /></StackPanel></Border>
+                        </UniformGrid>
+                        <Border Classes="glass">
+                            <StackPanel>
+                                <TextBlock Text="Completed per day" Classes="head" Margin="0,0,0,12" />
+                                <ItemsControl ItemsSource="{Binding ReportDays}">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:ReportBar">
+                                            <Grid RowDefinitions="64,18" Background="Transparent" ToolTip.Tip="{Binding ToolTip}">
+                                                <Border VerticalAlignment="Bottom" Height="{Binding BarHeight}" CornerRadius="4,4,2,2" Margin="2,0"
+                                                        Background="{DynamicResource HelmEyebrow}" />
+                                                <TextBlock Grid.Row="1" Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center" Classes="muted" Margin="-20,2,-20,0" TextAlignment="Center" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Repeating tasks: days done" Classes="head" Margin="0,16,0,6" IsVisible="{Binding HasReportRepeats}" />
+                                <ItemsControl ItemsSource="{Binding ReportRepeats}" IsVisible="{Binding HasReportRepeats}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:ReportCount">
+                                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Count}" FontWeight="SemiBold" Margin="12,0,0,0" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="Recent changes" Classes="head" Margin="2,8,0,0" />
+                        <Border Classes="glass">
+                            <StackPanel>
+                                <TextBlock Text="No history yet." Classes="muted" IsVisible="{Binding !HasHistory}" />
+                                <ItemsControl ItemsSource="{Binding History}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:HistoryRow">
+                                            <StackPanel Margin="0,4">
+                                                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                                <TextBlock Classes="muted"><Run Text="{Binding When}" /><Run Text=" · " /><Run Text="{Binding Workspace}" /></TextBlock>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="{Binding HistoryPager.MoreText}" Command="{Binding HistoryPager.ShowMoreCommand}"
+                                        IsVisible="{Binding HistoryPager.HasMore}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

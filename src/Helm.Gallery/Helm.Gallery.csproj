@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Tracker.UI\Helm.Modules.Tracker.UI.csproj" />
   </ItemGroup>
 
 </Project>

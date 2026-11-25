@@ -21,6 +21,20 @@
                     <SolidColorBrush x:Key="HelmInfoBackground" Color="#F2F2F2" />
                     <SolidColorBrush x:Key="HelmDanger" Color="#C42B1C" />
                     <SolidColorBrush x:Key="HelmScrim" Color="#66000000" />
+                    <!-- Glass pages (Backdrop + Border.glass): warm full-bleed surface, frosted cards -->
+                    <Color x:Key="HelmBackdropTop">#FBF6F0</Color>
+                    <Color x:Key="HelmBackdropBottom">#EFE5D9</Color>
+                    <Color x:Key="HelmGlowWarm">#99FFD29A</Color>
+                    <Color x:Key="HelmGlowSoft">#66F2BFA8</Color>
+                    <SolidColorBrush x:Key="HelmGlass" Color="#A6FFFFFF" />
+                    <SolidColorBrush x:Key="HelmGlassHover" Color="#D9FFFFFF" />
+                    <SolidColorBrush x:Key="HelmGlassStroke" Color="#26946A3E" />
+                    <SolidColorBrush x:Key="HelmGlassStrokeStrong" Color="#B3C9822E" />
+                    <SolidColorBrush x:Key="HelmEyebrow" Color="#A6610F" />
+                    <SolidColorBrush x:Key="HelmPillBackground" Color="#2B2019" />
+                    <SolidColorBrush x:Key="HelmPillForeground" Color="#FFF7EF" />
+                    <BoxShadows x:Key="HelmGlassShadow">0 6 18 0 #14563A1E</BoxShadows>
+                    <BoxShadows x:Key="HelmHeroShadow">0 16 40 0 #26563A1E</BoxShadows>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="HelmPageBackground" Color="#202020" />
@@ -34,6 +48,19 @@
                     <SolidColorBrush x:Key="HelmInfoBackground" Color="#2E2E2E" />
                     <SolidColorBrush x:Key="HelmDanger" Color="#FF99A4" />
                     <SolidColorBrush x:Key="HelmScrim" Color="#99000000" />
+                    <Color x:Key="HelmBackdropTop">#211913</Color>
+                    <Color x:Key="HelmBackdropBottom">#0E0C0B</Color>
+                    <Color x:Key="HelmGlowWarm">#8C5C3A1C</Color>
+                    <Color x:Key="HelmGlowSoft">#663E2A22</Color>
+                    <SolidColorBrush x:Key="HelmGlass" Color="#0FFFFFFF" />
+                    <SolidColorBrush x:Key="HelmGlassHover" Color="#1CFFFFFF" />
+                    <SolidColorBrush x:Key="HelmGlassStroke" Color="#1FFFDDB5" />
+                    <SolidColorBrush x:Key="HelmGlassStrokeStrong" Color="#99E0A458" />
+                    <SolidColorBrush x:Key="HelmEyebrow" Color="#E9A23B" />
+                    <SolidColorBrush x:Key="HelmPillBackground" Color="#FFF6EE" />
+                    <SolidColorBrush x:Key="HelmPillForeground" Color="#1B1410" />
+                    <BoxShadows x:Key="HelmGlassShadow">0 8 24 0 #40000000</BoxShadows>
+                    <BoxShadows x:Key="HelmHeroShadow">0 20 48 0 #66000000</BoxShadows>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
@@ -186,6 +213,104 @@
     <Style Selector="Button.danger">
         <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
     </Style>
+    <!-- Glass pages: a Backdrop behind, frosted cards (Border.glass), an amber small-caps line above the title -->
+    <Style Selector="Border.glass">
+        <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="16,14" />
+        <Setter Property="BoxShadow" Value="{DynamicResource HelmGlassShadow}" />
+    </Style>
+    <Style Selector="Border.glass.hero">
+        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="Padding" Value="20,18" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        <Setter Property="BoxShadow" Value="{DynamicResource HelmHeroShadow}" />
+    </Style>
+    <Style Selector="TextBlock.eyebrow">
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="LetterSpacing" Value="1.2" />
+    </Style>
+    <Style Selector="TextBlock.display">
+        <Setter Property="FontSize" Value="34" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <!-- A glass card that is a button: lifts a little on hover; .selected gets the warm stroke -->
+    <Style Selector="Button.glass">
+        <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14,12" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15" />
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.glass:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+    </Style>
+    <Style Selector="Button.glass.selected">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+    </Style>
+    <Style Selector="Button.glass.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+    </Style>
+    <!-- The one main action on a glass page: a bright pill -->
+    <Style Selector="Button.pill">
+        <Setter Property="Background" Value="{DynamicResource HelmPillBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="18,10" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.pill:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmPillBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
+        <Setter Property="Opacity" Value="0.9" />
+    </Style>
+    <Style Selector="Button.pill:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmPillBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
+        <Setter Property="Opacity" Value="0.8" />
+    </Style>
+    <!-- A quiet secondary action next to a pill -->
+    <Style Selector="Button.ghost">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+    </Style>
+    <!-- A text box sitting in a glass card: no box of its own -->
+    <Style Selector="TextBox.bare">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0,6" />
+    </Style>
+    <Style Selector="TextBox.bare:pointerover /template/ Border#PART_BorderElement, TextBox.bare:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
     <Style Selector="Border.shimmer">
         <Setter Property="Height" Value="12" />
         <Setter Property="CornerRadius" Value="4" />

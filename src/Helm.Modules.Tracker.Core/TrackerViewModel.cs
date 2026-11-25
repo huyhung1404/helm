@@ -279,6 +279,20 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// <summary>Index = days before the due date.</summary>
     public IReadOnlyList<string> RemindDaysNames { get; } = ["On the due date", "1 day before", "2 days before", "3 days before"];
 
+    /// <summary>
+    /// The one task to do now (the page's "Up next" card): one in progress, else one past its due date, else the first
+    /// open one (the list is in priority order).
+    /// </summary>
+    public TrackerItemViewModel? UpNext =>
+        OpenItems.FirstOrDefault(r => r.IsStarted) ?? OpenItems.FirstOrDefault(r => r.IsOverdue) ?? OpenItems.FirstOrDefault();
+
+    public bool HasUpNext => UpNext is not null;
+
+    /// <summary>The line above the page title: today's date and what is open, e.g. "Wednesday, 25 November · 4 open".</summary>
+    public string TodayLine =>
+        $"{TimeZoneInfo.ConvertTime(_store.Now, TimeZoneInfo.Local).ToString("dddd, d MMMM", System.Globalization.CultureInfo.CurrentCulture)}"
+        + (SelectedWorkspace is null ? "" : $" · {OpenSummary}");
+
     public bool HasWorkspaces => Workspaces.Count > 0;
     public bool HasNoWorkspaces => Workspaces.Count == 0;
 
@@ -328,6 +342,12 @@ public sealed partial class TrackerViewModel : ObservableObject
             "Delete").ConfigureAwait(true);
         if (!ok) return;
         Try(() => _store.DeleteWorkspace(ws.Id));
+    }
+
+    partial void OnSelectedWorkspaceChanged(WorkspaceOption? oldValue, WorkspaceOption? newValue)
+    {
+        if (oldValue is not null) oldValue.IsSelected = false;
+        if (newValue is not null) newValue.IsSelected = true;
     }
 
     partial void OnSelectedWorkspaceChanged(WorkspaceOption? value)
@@ -597,6 +617,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         var workspaces = _store.Workspaces();
         var byId = Workspaces.ToDictionary(w => w.Id, StringComparer.Ordinal);
         var wanted = new List<WorkspaceOption>();
+        var now = _store.Now;
         foreach (var (id, ws, _) in workspaces)
         {
             if (byId.TryGetValue(id, out var option))
@@ -608,6 +629,8 @@ public sealed partial class TrackerViewModel : ObservableObject
             {
                 option = new WorkspaceOption(id, ws.Name, ws.Kind);
             }
+            var open = TrackerOrdering.Open(_store.Items(id));
+            option.SetCounts(open.Count, open.Count(i => i.Value.DueMoment(TimeZoneInfo.Local) is { } due && due < now));
             wanted.Add(option);
         }
 
@@ -680,6 +703,9 @@ public sealed partial class TrackerViewModel : ObservableObject
             OpenSummary = started > 0 ? $"{open.Count} open · {started} in progress" : $"{open.Count} open";
 
         }
+        OnPropertyChanged(nameof(UpNext));
+        OnPropertyChanged(nameof(HasUpNext));
+        OnPropertyChanged(nameof(TodayLine));
         OnPropertyChanged(nameof(HasOpen));
         OnPropertyChanged(nameof(HasNoOpen));
         OnPropertyChanged(nameof(HasCompleted));

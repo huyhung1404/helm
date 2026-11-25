@@ -23,9 +23,11 @@ internal sealed class GalleryWindow : Window
 {
     private readonly ListBox _pages = new() { ItemsSource = GalleryPage.All, DisplayMemberBinding = new Avalonia.Data.Binding(nameof(GalleryPage.Label)) };
     private readonly ComboBox _size = new() { ItemsSource = new[] { "Phone 390", "Tablet 800", "PC (fill)" }, SelectedIndex = 2 };
-    private readonly ToggleSwitch _dark = new() { OnContent = "Dark", OffContent = "Light" };
+    private readonly ToggleSwitch _dark = new() { OnContent = "Dark", OffContent = "Light", IsChecked = true };
+    private readonly ToggleSwitch _on = new() { OnContent = "Tool on", OffContent = "Tool off", IsChecked = true };
+    private readonly FakeModule _module = new("tool", "Tool");
     private readonly Border _frame = new() { ClipToBounds = true, CornerRadius = new CornerRadius(8) };
-    private readonly ThemeVariantScope _scope = new() { RequestedThemeVariant = ThemeVariant.Light };
+    private readonly ThemeVariantScope _scope = new() { RequestedThemeVariant = ThemeVariant.Dark };
 
     public GalleryWindow()
     {
@@ -36,6 +38,7 @@ internal sealed class GalleryWindow : Window
         var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Margin = new Thickness(12, 8) };
         bar.Children.Add(_size);
         bar.Children.Add(_dark);
+        bar.Children.Add(_on);
 
         _frame.Child = _scope;
         var stage = new Border { Padding = new Thickness(16), Background = Avalonia.Media.Brushes.Gainsboro, Child = _frame };
@@ -52,6 +55,7 @@ internal sealed class GalleryWindow : Window
         _pages.SelectionChanged += (_, _) => ShowPage();
         _size.SelectionChanged += (_, _) => ApplySize();
         _dark.IsCheckedChanged += (_, _) => _scope.RequestedThemeVariant = _dark.IsChecked == true ? ThemeVariant.Dark : ThemeVariant.Light;
+        _on.IsCheckedChanged += (_, _) => _module.IsEnabled = _on.IsChecked == true;
         _pages.SelectedIndex = 0;
         ApplySize();
     }
@@ -61,7 +65,8 @@ internal sealed class GalleryWindow : Window
         if (_pages.SelectedItem is not GalleryPage page) return;
         try
         {
-            _scope.Child = new PageFrame(page.Title, page.Create());
+            var view = page.Create(_module);
+            _scope.Child = page.Framed ? new PageFrame(page.Title, view) : view;
         }
         catch (Exception ex)
         {
