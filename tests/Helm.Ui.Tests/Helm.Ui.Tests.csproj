@@ -62,6 +62,7 @@
     <Compile Include="..\..\src\Helm.Gallery\VocabDemo.cs" Link="VocabDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\WalletDemo.cs" Link="WalletDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\AlwaysOnTopDemo.cs" Link="AlwaysOnTopDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\ShellPagesDemo.cs" Link="ShellPagesDemo.cs" />
   </ItemGroup>
 
 </Project>
