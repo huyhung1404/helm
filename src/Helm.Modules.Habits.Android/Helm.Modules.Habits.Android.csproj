@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Habits on Android: the module, its Avalonia pages and the reminder alarm. The logic and the view model come from
+  <!-- Habits on Android: the module, the page around the shared HabitsView (Helm.Modules.Habits.UI) and the reminder alarm. The logic and the view model come from
        Helm.Modules.Habits.Core (shared with Windows). Not in Helm.sln; CI builds it with the app. -->
   <PropertyGroup>
     <TargetFramework>net10.0-android</TargetFramework>
@@ -28,6 +28,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Habits.Core\Helm.Modules.Habits.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Habits.UI\Helm.Modules.Habits.UI.csproj" />
   </ItemGroup>
 
 </Project>

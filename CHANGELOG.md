@@ -18,6 +18,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **Opening a tool no longer shows black edges.** The page comes into focus over its background (a short blur, no zoom)
   instead of growing from smaller.
 - **An AI feature with no model says so at once**, in plain words, instead of pointing to a settings page that is gone.
+- **Habits has the new look on the PC and the phone**, one page for both: each habit a glass card with its whole year,
+  the ring to mark today, the ones done today folded under them, and the Report tab. Marking a day, the celebration and
+  the reason for skipped days open as one sheet (the reason still cannot be skipped). The settings are a sheet behind
+  the gear; Home → Utilities opens Habits itself.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the

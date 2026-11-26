@@ -9,17 +9,15 @@ namespace Helm.Modules.Habits;
 
 /// <summary>
 /// Habits on Android. The data lives in Helm Sync; the module sets the hourly alarm behind the skipped-habit reminder
-/// while the tool is on. Back closes the pop-up before leaving the page, and never leaves while a reason for
-/// skipped days is being asked for.
+/// while the tool is on. Back closes the page's sheet (a day being marked, the settings) before leaving the page, and
+/// never leaves while a reason for skipped days is being asked for.
 /// </summary>
 public sealed class HabitsModule : AndroidModuleBase, IModuleContent, IBackHandler
 {
-    private readonly HabitsViewModel _viewModel;
     private readonly ILogger<HabitsModule> _logger;
 
-    public HabitsModule(HabitsViewModel viewModel, HabitReminderService reminders, ILogger<HabitsModule> logger)
+    public HabitsModule(HabitReminderService reminders, ILogger<HabitsModule> logger)
     {
-        _viewModel = viewModel;
         _logger = logger;
         // "Remind me now" on the settings page.
         reminders.Requested += (_, reminder) => HabitReminders.Post(AndroidApp.Context, reminder);
@@ -32,9 +30,9 @@ public sealed class HabitsModule : AndroidModuleBase, IModuleContent, IBackHandl
     public override Symbol Icon => Symbol.CalendarCheckmark;
 
     /// <summary>The same vector icon as on Windows (<see cref="HabitsIconShape"/>).</summary>
-    public override IImage? IconImage => HabitsIcon.Image;
+    public override IImage? IconImage => Ui.HabitsIcon.Image;
 
-    public override Type PageType => typeof(HabitsPage);
+    public override Type PageType => typeof(HabitsContentPage);
     public Type ContentPageType => typeof(HabitsContentPage);
 
     public override Task EnableAsync(CancellationToken ct)
@@ -66,24 +64,19 @@ public sealed class HabitsModule : AndroidModuleBase, IModuleContent, IBackHandl
     }
 
     /// <summary>
-    /// The content page is on screen (opened, or the app came back to it): the moment to ask for the reasons of
-    /// skipped days, to ask for notifications (Android 13+, once) and to catch today's reminder.
+    /// The content page is on screen (opened, or the app came back to it; the page asks for the reasons of skipped
+    /// days itself): the moment to ask for notifications (Android 13+, once) and to catch today's reminder.
     /// </summary>
     public void PageShown()
     {
-        _viewModel.Refresh();
-        _viewModel.CheckLapses();
         var context = AndroidApp.Context;
         HabitReminders.AskPermissionOnce(context);
         HabitReminders.CheckNow(context);
     }
 
-    /// <summary>Android back: the pop-up closes first; a reason still to write for skipped days keeps it (and the page).</summary>
-    public bool HandleBack()
-    {
-        if (!_viewModel.HasPopup) return false;
-        if (!_viewModel.CanDismissPopup) return IsEnabled;
-        _viewModel.DismissPopupCommand.Execute(null);
-        return true;
-    }
+    /// <summary>
+    /// Android back: the sheet on top closes first (closing a day being marked dismisses it); a reason still to write
+    /// for skipped days keeps its sheet, and the page.
+    /// </summary>
+    public bool HandleBack() => Helm.Core.Ui.Sheet.CloseTopmost();
 }

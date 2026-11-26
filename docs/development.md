@@ -64,8 +64,9 @@ src/
   Helm.Modules.Missions/     Windows: Missions pages
   Helm.Modules.Missions.Android/ Android: Missions pages, reminders and home-screen widget (not in Helm.sln)
   Helm.Modules.Habits.Core/  net8.0: habits and their days (on Helm Sync), streaks, the year grid, reasons, MCP tools, shared view model
-  Helm.Modules.Habits/       Windows: Habits pages and the year grid
-  Helm.Modules.Habits.Android/ Android: Habits pages, the year grid and the skipped-habit reminder (not in Helm.sln)
+  Helm.Modules.Habits.UI/    Avalonia: the Habits page, its sheets and the year grid (every platform)
+  Helm.Modules.Habits/       Windows: the module, the tray reminders, the WPF page that hosts the shared view
+  Helm.Modules.Habits.Android/ Android: the module, the page that hosts the shared view, the reminder alarm (not in Helm.sln)
   Helm.Modules.Wallet.Core/  net8.0: transactions (on Helm Sync), bank notification parser, statistics, shared view model
   Helm.Modules.Wallet/       Windows: Wallet pages
   Helm.Modules.Wallet.Android/ Android: Wallet pages, bank notification listener, "what was it?" notification, widget (not in Helm.sln)

@@ -11,7 +11,7 @@ namespace Helm.Modules.Habits;
 /// <summary>
 /// Habits on Windows. The data lives in Helm Sync and the pages work on <see cref="HabitsStore"/>; the only background
 /// work is the daily reminders (skipped habits, streaks at risk in the evening) as tray notifications while the tool is on. The menu and Quick
-/// access open <see cref="HabitsContentPage"/>; Home → Utilities opens the settings (<see cref="HabitsPage"/>).
+/// access and Home → Utilities open <see cref="HabitsContentPage"/>; its settings are a sheet inside it.
 /// </summary>
 public sealed class HabitsModule : HelmModuleBase, IModuleContent, IDisposable
 {
@@ -41,7 +41,7 @@ public sealed class HabitsModule : HelmModuleBase, IModuleContent, IDisposable
     public override ModuleGroup Group => ModuleGroup.Planning;
     public override SymbolRegular Icon => SymbolRegular.CalendarCheckmark24;
     public override ImageSource IconImage => HabitsLogo.Image;
-    public override Type SettingsPageType => typeof(HabitsPage);
+    public override Type SettingsPageType => typeof(HabitsContentPage);
     public Type ContentPageType => typeof(HabitsContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 

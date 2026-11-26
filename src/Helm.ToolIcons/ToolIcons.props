@@ -3,7 +3,6 @@
   <!-- Every tool's own icon, drawn from the same shapes as in Helm (the Avalonia builders of the phone app, and the
        Windows-only tools' shapes drawn by ToolIcons.cs), so pages that list tools look as they do in Helm. -->
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Habits.Core\HabitsIconShape.cs" Link="ToolIcons\HabitsIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Missions.Core\MissionsIconShape.cs" Link="ToolIcons\MissionsIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Notes.Core\NotesIconShape.cs" Link="ToolIcons\NotesIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.NovelReader.Core\NovelReaderIconShape.cs" Link="ToolIcons\NovelReaderIconShape.cs" />
@@ -15,7 +14,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Keyboard\KeyboardIconShape.cs" Link="ToolIcons\KeyboardIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.WindowZones\WindowZonesIconShape.cs" Link="ToolIcons\WindowZonesIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.SlackBot\SlackBotIconShape.cs" Link="ToolIcons\SlackBotIconShape.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Habits.Android\HabitsIcon.cs" Link="ToolIcons\HabitsIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Missions.Android\MissionsIcon.cs" Link="ToolIcons\MissionsIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Notes.Android\NotesIcon.cs" Link="ToolIcons\NotesIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.NovelReader.Android\NovelReaderIcon.cs" Link="ToolIcons\NovelReaderIcon.cs" />

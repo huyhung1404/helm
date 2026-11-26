@@ -8,6 +8,6 @@ public static class HabitsServices
     public static IServiceCollection AddHabitsModule(this IServiceCollection services) =>
         services
             .AddHabitsCore()
-            .AddHelmModule<HabitsModule, HabitsPage, HabitsViewModel>()
+            .AddHelmModule<HabitsModule, HabitsContentPage, HabitsViewModel>()
             .AddSingleton<HabitsContentPage>();
 }

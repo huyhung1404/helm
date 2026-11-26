@@ -14,7 +14,7 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
 {
     public static IImage? Of(string id) => id switch
     {
-        "habits" => Helm.Modules.Habits.HabitsIcon.Image,
+        "habits" => Helm.Modules.Habits.Ui.HabitsIcon.Image,
         "missions" => Helm.Modules.Missions.MissionsIcon.Image,
         "notes" => Helm.Modules.Notes.NotesIcon.Image,
         "novel-reader" => Helm.Modules.NovelReader.NovelReaderIcon.Image,

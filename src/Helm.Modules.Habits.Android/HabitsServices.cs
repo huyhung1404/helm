@@ -8,6 +8,6 @@ public static class HabitsServices
     public static IServiceCollection AddHabitsModule(this IServiceCollection services) =>
         services
             .AddHabitsCore()
-            .AddAndroidModule<HabitsModule, HabitsPage>()
+            .AddAndroidModule<HabitsModule, HabitsContentPage>()
             .AddTransient<HabitsContentPage>();
 }
