@@ -20,6 +20,8 @@ internal class HelmWindow : Window
         Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://Helm/Assets/helm.ico")));
         MinWidth = 400;
         MinHeight = 500;
+        // Windows keeps the border (resize, snap, shadow) and draws no title bar of its own: Helm's is the shell's.
+        WindowDecorations = WindowDecorations.BorderOnly;
         ExtendClientAreaToDecorationsHint = true;
         ExtendClientAreaTitleBarHeightHint = 48;
         Background = Brushes.Transparent;
