@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelPlayerBar"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- The player, like an audiobook app's, always under the text: the sentence being read (tap: back to it), the chapter
+         by paragraph (the faint bar behind is the sound ready ahead), and the buttons. On a wide screen the buttons, the
+         bar and the place share one row; on a phone they stack, the play button in the middle. -->
+    <UserControl.Styles>
+        <Style Selector="Button.play">
+            <Setter Property="Width" Value="52" />
+            <Setter Property="Height" Value="52" />
+            <Setter Property="CornerRadius" Value="26" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.skip">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Classes="glass" Padding="14,10">
+        <Grid x:Name="Layout" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+            <!-- The buttons -->
+            <StackPanel x:Name="Buttons" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                <Button Classes="flat skip" Command="{Binding PreviousParagraphCommand}" ToolTip.Tip="Previous paragraph (Alt+↑)" AutomationProperties.Name="Previous paragraph">
+                    <ic:SymbolIcon Symbol="Previous" FontSize="18" />
+                </Button>
+                <Button Classes="flat skip" Command="{Binding PreviousSentenceCommand}" ToolTip.Tip="Previous sentence (Alt+←)" AutomationProperties.Name="Previous sentence">
+                    <ic:SymbolIcon Symbol="Rewind" FontSize="18" />
+                </Button>
+                <Button Classes="pill play" Margin="6,0" Command="{Binding PlayPauseCommand}" ToolTip.Tip="Read aloud or pause (Space)" AutomationProperties.Name="Read aloud or pause">
+                    <Panel>
+                        <ic:SymbolIcon Symbol="Play" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource HelmPillForeground}" IsVisible="{Binding !IsPlaying}" />
+                        <ic:SymbolIcon Symbol="Pause" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource HelmPillForeground}" IsVisible="{Binding IsPlaying}" />
+                    </Panel>
+                </Button>
+                <Button Classes="flat skip" Command="{Binding NextSentenceCommand}" ToolTip.Tip="Next sentence (Alt+→)" AutomationProperties.Name="Next sentence">
+                    <ic:SymbolIcon Symbol="FastForward" FontSize="18" />
+                </Button>
+                <Button Classes="flat skip" Command="{Binding NextParagraphCommand}" ToolTip.Tip="Next paragraph (Alt+↓)" AutomationProperties.Name="Next paragraph">
+                    <ic:SymbolIcon Symbol="Next" FontSize="18" />
+                </Button>
+                <Button Classes="flat skip" Command="{Binding StopReadingCommand}" IsVisible="{Binding IsSpeaking}" ToolTip.Tip="Stop reading aloud"
+                        AutomationProperties.Name="Stop reading aloud">
+                    <ic:SymbolIcon Symbol="Stop" FontSize="18" />
+                </Button>
+            </StackPanel>
+
+            <!-- Seek by paragraph; the faint bar behind it is the sound already made -->
+            <Panel x:Name="SeekArea" Grid.Column="1" Margin="16,0" VerticalAlignment="Center">
+                <ProgressBar Height="4" MinHeight="4" CornerRadius="2" Margin="10,0" VerticalAlignment="Center" Opacity="0.45" IsHitTestVisible="False"
+                             Minimum="0" Maximum="{Binding PlayerParagraphMax}" Value="{Binding PlayerReady}" />
+                <Slider x:Name="SeekBar" Minimum="0" Maximum="{Binding PlayerParagraphMax}" Value="{Binding PlayerParagraph}"
+                        SmallChange="1" LargeChange="5" TickFrequency="1" IsSnapToTickEnabled="True" AutomationProperties.Name="Position in the chapter" />
+            </Panel>
+
+            <!-- Where, and the speed (opens the reading options) -->
+            <StackPanel x:Name="PlaceArea" Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="{Binding PlayerPosition}" Classes="muted" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <Button Classes="chip" Height="32" Padding="10,0" Click="Speed_Click" ToolTip.Tip="Speed, voice and sleep timer" AutomationProperties.Name="Speed and voice">
+                    <TextBlock Text="{Binding SpeechRateLabel}" />
+                </Button>
+            </StackPanel>
+
+            <!-- The sentence being read (tap: back to it), the voice loading, what is ready, the sleep timer -->
+            <Grid x:Name="StatusRow" Grid.Row="1" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                <TextBlock x:Name="CurrentSentence" Text="{Binding CurrentSentenceText}" Classes="muted" MaxLines="2" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                           IsVisible="{Binding IsSpeaking}" Cursor="Hand" ToolTip.Tip="Back to the sentence being read" Tapped="CurrentSentence_Tapped" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SleepTimerLabel}" Foreground="{DynamicResource HelmEyebrow}" FontSize="12" IsVisible="{Binding HasSleepTimer}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding ReadyLabel}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+            <ProgressBar x:Name="LoadingBar" Grid.Row="2" Grid.ColumnSpan="3" IsIndeterminate="True" Height="2" MinHeight="2" Margin="0,6,0,0" IsVisible="{Binding IsLoadingVoice}" />
+        </Grid>
+    </Border>
+</UserControl>

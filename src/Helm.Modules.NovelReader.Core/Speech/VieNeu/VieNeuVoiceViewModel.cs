@@ -15,7 +15,7 @@ public sealed partial class VieNeuVoiceViewModel : ObservableObject
 {
     private readonly VieNeuInstaller _installer;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
 
     [ObservableProperty] private bool _isInstalled;
     [ObservableProperty] private bool _isDownloading;
@@ -31,6 +31,9 @@ public sealed partial class VieNeuVoiceViewModel : ObservableObject
         installer.InstalledChanged += (_, _) => _ui.Post(() => InstalledChanged?.Invoke(this, EventArgs.Empty));
         Update();
     }
+
+    /// <summary>The question before removing the voice, in the page's own dialogs.</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
 
     /// <summary>The size to download, for the button ("Download (270 MB)").</summary>
     public string Size => Megabytes(_installer.Files.TotalSize);

@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:ui="using:Helm.Modules.NovelReader.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelBookSheet"
+             x:DataType="vm:BookCardViewModel">
+
+    <!-- One novel of the library: its title, its cover (change, remove), its web source (where new chapters come from,
+         whether Helm looks by itself and saves them by itself, logging in to the site, getting the new chapters now), and
+         deleting it. Save keeps the title and the source; Cancel or a tap outside drops the changes. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            <Panel Width="56" Height="80" Margin="0,0,14,0">
+                <Border CornerRadius="8" ClipToBounds="True" Background="{Binding Id, Converter={x:Static ui:CoverGradient.Instance}}" IsVisible="{Binding HasNoCover}">
+                    <TextBlock Text="{Binding Initials}" FontSize="20" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <Border CornerRadius="8" ClipToBounds="True" Background="{Binding Cover, Converter={x:Static ui:CoverImage.Instance}}" IsVisible="{Binding HasCover}" />
+            </Panel>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                <TextBlock Classes="eyebrow" Text="NOVEL" />
+                <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Subtitle}" Classes="muted" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="2" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Title and cover" Classes="head" />
+                <TextBox x:Name="TitleBox" Classes="glass" Text="{Binding TitleDraft}" PlaceholderText="The novel's title" AutomationProperties.Name="Title" />
+                <Grid x:Name="CoverButtons" ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button x:Name="ChangeCoverButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            ToolTip.Tip="A picture for the cover (on the PC you can also drop one on the novel's card)">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Image" FontSize="15" />
+                            <TextBlock Text="Change cover" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="RemoveCoverButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Remove cover"
+                            IsVisible="{Binding HasCover}" ToolTip.Tip="Back to the cover drawn from the title" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Web source" Classes="head" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="The novel's chapter list on the web: where its new chapters come from." />
+                </StackPanel>
+                <TextBox Classes="glass" Text="{Binding SourceDraft}" PlaceholderText="https://… (the chapter list)" AutomationProperties.Name="Web source" />
+                <TextBlock Text="{Binding SourceStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasSource}" />
+                <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding HasSource}">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Check for new chapters by itself" />
+                        <TextBlock Text="Helm on your PC looks now and then." Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="AutoCheckSwitch" Grid.Column="1" OnContent="" OffContent="" AutomationProperties.Name="Check for new chapters by itself" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding HasSource}">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Save new chapters by itself" />
+                        <TextBlock Text="Off: they are shown before they are saved." Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="AutoSaveSwitch" Grid.Column="1" OnContent="" OffContent="" AutomationProperties.Name="Save new chapters by itself" />
+                </Grid>
+                <Grid x:Name="SourceButtons" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" IsVisible="{Binding HasSource}">
+                    <Button x:Name="NewChaptersButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="{Binding !IsUpdateRequested}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ArrowDownload" FontSize="15" />
+                            <TextBlock x:Name="NewChaptersText" Text="Get new chapters" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="LogInButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            ToolTip.Tip="Log in to the site in a browser window (paid chapters); later scrapes keep the login">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Person" FontSize="15" />
+                            <TextBlock Text="Log in to the site" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Button x:Name="DeleteButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <ic:SymbolIcon Symbol="Delete" FontSize="15" Foreground="{DynamicResource HelmDanger}" />
+                <TextBlock Text="Delete this novel" Foreground="{DynamicResource HelmDanger}" />
+            </StackPanel>
+        </Button>
+        <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="0,-8,0,0"
+                   Text="Its text, its names and where you stopped are deleted on every device. Names for all novels stay." />
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button x:Name="CancelButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" />
+            <Button x:Name="SaveButton" Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save" />
+        </Grid>
+    </StackPanel>
+</UserControl>

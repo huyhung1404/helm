@@ -1,0 +1,290 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:scr="using:Helm.Modules.NovelReader.Scraping"
+             xmlns:ui="using:Helm.Modules.NovelReader.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelLibraryView"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- The library, top to bottom: the first run (or the novels' title), adding a novel (a .txt file; on the PC also an
+         address or a name to scrape from the web), the preview of what is about to be added, and one card per novel
+         (tap the cover or Read; Edit opens the novel's sheet; a picture dropped on a card becomes its cover). -->
+    <UserControl.Styles>
+        <Style Selector="Border.cover">
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+        <!-- Chosen rows in the accent colour, not a blue fill -->
+        <Style Selector="ListBox.glass">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.glass ListBoxItem">
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,7" />
+        </Style>
+        <Style Selector="ListBox.glass ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <Style Selector="ListBox.glass ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+        <Style Selector="TextBlock.badge">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel>
+        <!-- First run: the way in, step by step (1 is the only thing to do now) -->
+        <Border x:Name="FirstRun" Classes="glass hero enter" Margin="0,16,0,0" Padding="28,26" IsVisible="False">
+            <StackPanel Spacing="18">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="START HERE" />
+                    <TextBlock Text="Read Chinese novels in Vietnamese" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                </StackPanel>
+                <UniformGrid x:Name="FirstRunSteps" Columns="3">
+                    <Border Classes="glass" Margin="0,0,10,10" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="1" />
+                            <TextBlock x:Name="FirstStepTitle" Text="Add a novel" FontWeight="SemiBold" />
+                            <TextBlock x:Name="FirstStepText" Classes="muted" TextWrapping="Wrap" Text="A Chinese .txt file in any encoding. It syncs to your other devices." />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="2" />
+                            <TextBlock Text="Tap a word to fix it" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="Save a name or a meaning; hold a word to have its sentence explained." />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="3" />
+                            <TextBlock Text="Read or listen" FontWeight="SemiBold" />
+                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="Like an audiobook, chapter after chapter. Your place follows you to every device." />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="FirstStep_Click" AutomationProperties.Name="Add my first novel">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <TextBlock x:Name="FirstStepButton" Text="Add my first novel" Foreground="{DynamicResource HelmPillForeground}" />
+                        <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- The novels' title -->
+        <StackPanel x:Name="Heading" Margin="0,10,0,16" IsVisible="False">
+            <TextBlock Classes="display" Text="Library" />
+            <TextBlock x:Name="Summary" Classes="muted" FontSize="14" Margin="0,4,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- ADD: a .txt file; on the PC also an address or a name, scraped from the web -->
+        <StackPanel x:Name="AddArea" Spacing="10" IsVisible="{Binding !IsAdding}">
+            <Border x:Name="FileCard" Classes="glass">
+                <Grid x:Name="FileGrid" ColumnDefinitions="Auto,*,Auto">
+                    <Border Width="40" Height="40" CornerRadius="10" Margin="0,0,12,0" VerticalAlignment="Center" Background="{DynamicResource HelmGlassHover}"
+                            BorderBrush="{DynamicResource HelmGlassStroke}" BorderThickness="1">
+                        <ic:SymbolIcon Symbol="DocumentAdd" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" />
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Add a novel" Classes="head" />
+                        <TextBlock x:Name="FileHint" Classes="muted" TextWrapping="Wrap" Text="A Chinese .txt file in any encoding. It is kept privately and syncs to your other devices." />
+                    </StackPanel>
+                    <Button x:Name="AddFileButton" Grid.Column="2" Classes="pill" Margin="12,0,0,0" VerticalAlignment="Center" Click="AddFile_Click"
+                            ToolTip.Tip="Add a novel (.txt)" AutomationProperties.Name="Add a novel">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Add" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                            <TextBlock Classes="label" Text="Add a .txt file" Foreground="{DynamicResource HelmPillForeground}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Scrape from web (the PC) -->
+            <Border x:Name="WebCard" Classes="glass" Padding="16,8,8,8" IsVisible="False" x:DataType="ui:INovelWebScraper">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                        <ic:SymbolIcon Symbol="Globe" FontSize="18" VerticalAlignment="Center" Foreground="{DynamicResource HelmSecondaryText}" />
+                        <TextBox Grid.Column="1" Classes="bare" VerticalAlignment="Center" Text="{Binding Url}" PlaceholderText="Scrape from the web: a chapter-list address or a novel's name — press Enter"
+                                 AutomationProperties.Name="Chapter list address or novel name">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding AutoCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <Button Grid.Column="2" Classes="chip" Command="{Binding LogInCommand}" ToolTip.Tip="Log in to the site in a browser window (paid chapters, or sites that show only the first ones); later scrapes keep the login"
+                                AutomationProperties.Name="Log in to the site">
+                            <ic:SymbolIcon Symbol="Person" FontSize="16" />
+                        </Button>
+                        <Button Grid.Column="3" Classes="pill" Width="40" Padding="0" HorizontalContentAlignment="Center" Command="{Binding AutoCommand}"
+                                IsEnabled="{Binding !IsRunning}" ToolTip.Tip="Scrape it (or look for the name)" AutomationProperties.Name="Scrape from the web">
+                            <ic:SymbolIcon Symbol="ArrowDownload" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                        </Button>
+                    </Grid>
+                    <!-- Novels found by name: pick one to scrape it -->
+                    <ItemsControl ItemsSource="{Binding Results}" IsVisible="{Binding HasResults}" Margin="26,0,0,4">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="scr:SearchHit">
+                                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
+                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Url}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Site}" Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="10,0" />
+                                    <Button Grid.Column="2" Classes="ghost" Height="36" Content="Scrape" CommandParameter="{Binding}"
+                                            Command="{Binding $parent[ui:NovelLibraryView].Scraper.PickCommand}" AutomationProperties.Name="{Binding Title, StringFormat='Scrape {0}'}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- Status / progress; the first chapters are in: read them while the rest come -->
+                    <StackPanel Spacing="6" Margin="26,0,0,6" IsVisible="{Binding HasStatus}">
+                        <TextBlock Text="{Binding StatusText}" Classes="muted" TextWrapping="Wrap" />
+                        <ProgressBar Height="4" MinHeight="4" CornerRadius="2" Minimum="0" Maximum="1" Value="{Binding Progress}"
+                                     IsIndeterminate="{Binding IsIndeterminate}" IsVisible="{Binding IsRunning}" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding IsRunning}">
+                            <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ReadNowCommand}" IsVisible="{Binding CanReadNow}"
+                                    ToolTip.Tip="Add the novel with the chapters in so far and open it; the rest go into it when they are in" Content="Read now" />
+                            <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CancelCommand}" Content="Cancel" />
+                        </Grid>
+                    </StackPanel>
+                    <TextBlock Text="{Binding BrowserStatus}" Classes="muted" FontSize="12" Margin="26,0,0,6" TextWrapping="Wrap"
+                               IsVisible="{Binding BrowserStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- PREVIEW: what is about to be stored, chapter by chapter, before it is saved -->
+        <StackPanel x:Name="PreviewArea" Spacing="12" Margin="0,16,0,0" IsVisible="{Binding IsAdding}" core:Motion.EnterOnShow="True">
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                <StackPanel Spacing="12">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="eyebrow" Text="ADD A NOVEL" IsVisible="{Binding !IsUpdating}" />
+                        <TextBlock Classes="eyebrow" Text="NEW CHAPTERS" IsVisible="{Binding IsUpdating}" />
+                        <TextBlock Text="{Binding AddSummary}" Classes="muted" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="eyebrow" Text="TITLE" />
+                        <TextBox Classes="glass" Text="{Binding AddTitle}" PlaceholderText="The novel's title" AutomationProperties.Name="Title" />
+                    </StackPanel>
+                    <Grid x:Name="PreviewButtons" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button x:Name="ConfirmAddButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding AddButtonText}"
+                                Command="{Binding ConfirmAddCommand}" />
+                        <Button x:Name="RetryButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Retry failed"
+                                ToolTip.Tip="Download the failed chapters again (the others are kept)" Click="Retry_Click" />
+                        <Button x:Name="CancelAddButton" Grid.Column="2" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel"
+                                Command="{Binding CancelAddCommand}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Show the Chinese" />
+                            <TextBlock Text="Under each line of the preview." Classes="muted" FontSize="12" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding PreviewShowChinese}" OnContent="" OffContent="" AutomationProperties.Name="Show the Chinese" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Grid x:Name="PreviewGrid" ColumnDefinitions="300,*" RowDefinitions="Auto,Auto">
+                <!-- The chapters (failed, locked and new ones marked): a list on a wide screen, a picker on a phone -->
+                <Border x:Name="PreviewList" Classes="glass" Padding="6" Margin="0,0,12,0" Height="540">
+                    <ListBox Classes="glass" ItemsSource="{Binding PreviewChapters}" SelectedItem="{Binding SelectedPreviewChapter}" AutomationProperties.Name="Chapters to add">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="vm:PreviewChapterItem">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+                                    <TextBlock Grid.Column="1" Classes="badge" Classes.late="{Binding IsFailed}" Margin="8,0,0,0" Text="{Binding Badge}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+                <ComboBox x:Name="PreviewPicker" Classes="glass" HorizontalAlignment="Stretch" IsVisible="False" Margin="0,0,0,10"
+                          ItemsSource="{Binding PreviewChapters}" SelectedItem="{Binding SelectedPreviewChapter}" AutomationProperties.Name="Chapter">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate DataType="vm:PreviewChapterItem">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Classes="badge" Classes.late="{Binding IsFailed}" Margin="8,0,0,0" Text="{Binding Badge}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <!-- The chosen chapter as the reader shows it -->
+                <Border x:Name="PreviewText" Grid.Column="1" Classes="glass" Padding="22,16" Height="540">
+                    <ScrollViewer x:Name="PreviewScroll" Padding="0,0,14,0" core:ScrollFade.Enabled="True">
+                        <ItemsControl ItemsSource="{Binding PreviewLines}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:PreviewLine">
+                                    <StackPanel Margin="0,0,0,12">
+                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="16" LineHeight="26" Classes.head="{Binding IsHeading}" />
+                                        <TextBlock Text="{Binding Chinese}" TextWrapping="Wrap" Classes="muted" Margin="0,2,0,0" IsVisible="{Binding HasChinese}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </StackPanel>
+
+        <!-- BOOKS: one card per novel -->
+        <ItemsControl x:Name="BookList" ItemsSource="{Binding Books}" IsVisible="{Binding !IsAdding}" Margin="0,18,-12,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><UniformGrid x:Name="BookGrid" Columns="2" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:BookCardViewModel">
+                    <Border Classes="glass lift fade" Margin="0,0,12,12" Padding="14" DragDrop.AllowDrop="True">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <!-- The cover: a picture, or drawn from the title. Tap to read. -->
+                            <Button Classes="rowhit" Padding="0" Width="88" Height="124" VerticalAlignment="Top" ToolTip.Tip="Read"
+                                    AutomationProperties.Name="{Binding Title, StringFormat='Read {0}'}"
+                                    Command="{Binding $parent[UserControl].((vm:NovelReaderViewModel)DataContext).OpenBookCommand}" CommandParameter="{Binding}">
+                                <Panel>
+                                    <Border Classes="cover" Background="{Binding Id, Converter={x:Static ui:CoverGradient.Instance}}" IsVisible="{Binding HasNoCover}">
+                                        <TextBlock Text="{Binding Initials}" FontSize="28" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border Classes="cover" Background="{Binding Cover, Converter={x:Static ui:CoverImage.Instance}}" IsVisible="{Binding HasCover}"
+                                            BorderBrush="{DynamicResource HelmGlassStroke}" BorderThickness="1" />
+                                </Panel>
+                            </Button>
+                            <Grid Grid.Column="1" Margin="14,0,0,0" RowDefinitions="*,Auto">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Subtitle}" Classes="muted" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Names}" Classes="muted" FontSize="12" IsVisible="{Binding HasNames}" />
+                                    <TextBlock Text="{Binding Status}" Foreground="{DynamicResource HelmEyebrow}" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasStatus}" />
+                                    <!-- A web novel: new chapters found, when it was looked at -->
+                                    <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasSource}" Margin="0,2,0,0">
+                                        <ic:SymbolIcon Symbol="Globe" FontSize="12" Margin="0,2,6,0" VerticalAlignment="Top" Foreground="{DynamicResource HelmSecondaryText}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding SourceStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                    </Grid>
+                                </StackPanel>
+                                <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,12,0,0">
+                                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="36"
+                                            Command="{Binding $parent[UserControl].((vm:NovelReaderViewModel)DataContext).OpenBookCommand}" CommandParameter="{Binding}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ic:SymbolIcon Symbol="BookOpen" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                                            <TextBlock Text="Read" Foreground="{DynamicResource HelmPillForeground}" />
+                                        </StackPanel>
+                                    </Button>
+                                    <!-- New chapters: the PC downloads them; the phone asks the PC to -->
+                                    <Button Grid.Column="1" Classes="chip" Height="36" Width="36" Padding="0" IsVisible="{Binding HasSource}" IsEnabled="{Binding !IsUpdateRequested}"
+                                            Click="NewChapters_Click" ToolTip.Tip="{Binding $parent[ui:NovelLibraryView].NewChaptersTip}" AutomationProperties.Name="New chapters">
+                                        <ic:SymbolIcon Symbol="ArrowDownload" FontSize="15" />
+                                    </Button>
+                                    <Button Grid.Column="2" Classes="chip" Height="36" Width="36" Padding="0" Click="Edit_Click"
+                                            ToolTip.Tip="Title, cover, web source" AutomationProperties.Name="{Binding Title, StringFormat='Edit {0}'}">
+                                        <ic:SymbolIcon Symbol="Edit" FontSize="15" />
+                                    </Button>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

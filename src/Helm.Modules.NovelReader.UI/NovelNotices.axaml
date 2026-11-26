@@ -1,0 +1,79 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelNotices"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- What the page has to say, over the library and over an open novel: the tool is off, what just happened, another
+         device read further, the work going on, and no dictionaries yet. -->
+    <StackPanel Spacing="10">
+        <Border x:Name="OffBar" Classes="glass" IsVisible="False">
+            <StackPanel>
+                <TextBlock Text="Novel Reader is turned off" Classes="head" />
+                <TextBlock Text="Your novels and names are kept. Turn Novel Reader on in its settings (the gear) to read." Classes="muted" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- What happened: a problem, an import -->
+        <Border Classes="glass" core:Motion.EnterOnShow="True" IsVisible="{Binding HasMessage}">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="flat" Width="36" Height="36" Padding="0" Margin="8,0,0,0" Command="{Binding DismissMessageCommand}"
+                        ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Another device read further -->
+        <Border Classes="glass" core:Motion.EnterOnShow="True" IsVisible="{Binding HasRemoteProgressOffer}" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="Auto,*">
+                    <ic:SymbolIcon Symbol="ArrowSync" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Top" Foreground="{DynamicResource HelmEyebrow}" />
+                    <TextBlock Grid.Column="1" Text="{Binding RemoteProgressOffer}" TextWrapping="Wrap" />
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Continue there" Command="{Binding AcceptRemoteProgressCommand}" />
+                    <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Stay here"
+                            Command="{Binding DismissRemoteProgressCommand}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Busy: opening, downloading, adding -->
+        <StackPanel Spacing="6" IsVisible="{Binding IsBusy}" core:Motion.EnterOnShow="True">
+            <TextBlock Text="{Binding BusyText}" Classes="muted" TextWrapping="Wrap" />
+            <ProgressBar Height="4" MinHeight="4" CornerRadius="2" Minimum="0" Maximum="1" Value="{Binding BusyProgress}" />
+        </StackPanel>
+
+        <!-- No dictionaries: the library offers the download; over a novel, a short note -->
+        <Border x:Name="DictionaryCard" Classes="glass" IsVisible="False" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="eyebrow" Text="FIRST, THE DICTIONARIES" />
+                    <TextBlock Text="Novel Reader converts with the QuickTranslator dictionaries" Classes="head" TextWrapping="Wrap" />
+                    <TextBlock x:Name="DictionaryHint" Classes="muted" TextWrapping="Wrap"
+                               Text="Download them once (about 30 MB); they sync to your other devices, and dictionaries added on another device arrive here too." />
+                </StackPanel>
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding DownloadDictionariesCommand}"
+                        IsEnabled="{Binding !IsDownloading}" AutomationProperties.Name="Download dictionaries">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <ic:SymbolIcon Symbol="ArrowDownload" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Text="Download dictionaries" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="{Binding DownloadStatus}" Classes="muted" TextWrapping="Wrap"
+                           IsVisible="{Binding DownloadStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </Border>
+        <Border x:Name="DictionaryNote" Classes="glass" IsVisible="False" Padding="14,10">
+            <Grid ColumnDefinitions="Auto,*">
+                <ic:SymbolIcon Symbol="Warning" FontSize="16" Margin="0,0,10,0" Foreground="{DynamicResource HelmDanger}" VerticalAlignment="Top" />
+                <TextBlock Grid.Column="1" Classes="muted" TextWrapping="Wrap"
+                           Text="No dictionaries yet: the text is shown in Chinese. Download them in the library or in the settings." />
+            </Grid>
+        </Border>
+    </StackPanel>
+</UserControl>

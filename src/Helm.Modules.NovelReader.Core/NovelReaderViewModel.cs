@@ -37,7 +37,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private readonly DictionaryLibrary _dictionaries;
     private readonly ISettingsStore<NovelReaderSettings> _settings;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
     private readonly IDeviceInfo _device;
     private readonly SpeechCatalog _catalog;
     private readonly ReadAloudController _reader;
@@ -247,6 +247,16 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     }
 
     public WordEditorViewModel Editor { get; }
+
+    /// <summary>
+    /// The questions (delete a novel, remove the found names, remove the VieNeu voice) in the page's own dialogs: the shared
+    /// Avalonia page asks in a glass sheet on every platform.
+    /// </summary>
+    public void UseDialogs(IDialogService dialogs)
+    {
+        _dialogs = dialogs;
+        VieNeu?.UseDialogs(dialogs);
+    }
 
     /// <summary>Reports of wrong translations (null when the host has no report store, as in some tests).</summary>
     public TranslationReportsViewModel? Reports { get; }

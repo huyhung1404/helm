@@ -477,6 +477,14 @@
         <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
         <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
     </Style>
+    <!-- A chip that cannot be used now (no chapter before the first) fades instead of filling grey -->
+    <Style Selector="Button.chip:disabled">
+        <Setter Property="Opacity" Value="0.4" />
+    </Style>
+    <Style Selector="Button.chip:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+    </Style>
 
     <!-- Motion. .enter: grows into place (a popup scale) when it appears; a view puts it back on to replay it (a tab, a list).
          .lift: lights up under the pointer. Short and eased, never in the way. -->

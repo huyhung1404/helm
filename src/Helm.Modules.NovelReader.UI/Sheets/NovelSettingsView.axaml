@@ -1,0 +1,393 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:speech="using:Helm.Modules.NovelReader.Speech"
+             xmlns:vieneu="using:Helm.Modules.NovelReader.Speech.VieNeu"
+             xmlns:dict="using:Helm.Modules.NovelReader.Dictionaries"
+             xmlns:ui="using:Helm.Modules.NovelReader.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelSettingsView"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- Novel Reader's settings as a sheet over the page (the gear): on/off, the dictionaries, the text, finding names,
+         reading aloud, adding novels, the names for all novels, and what only the phone has (reading with the screen off,
+         Novel Lens). One card per subject; a setting is its name and a line on the left and a switch or a field. -->
+    <UserControl.Styles>
+        <Style Selector="Border.filerow">
+            <Setter Property="Padding" Value="0,8" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="NOVEL READER" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- On or off: off keeps the novels and names, and frees the dictionaries' memory -->
+        <Border Classes="glass">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Novel Reader is on" Classes="head" />
+                    <TextBlock Text="Off keeps your novels, names and places, stops reading aloud and frees the dictionaries' memory." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <ToggleSwitch x:Name="EnableSwitch" Grid.Column="1" OnContent="" OffContent="" AutomationProperties.Name="Novel Reader on or off" />
+            </Grid>
+        </Border>
+
+        <!-- Dictionaries -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Dictionaries" Classes="head" />
+                    <TextBlock Text="{Binding DictionaryStatus}" Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="The QuickTranslator files: ChinesePhienAmWords, VietPhrase, Names, LuatNhan, Pronouns (and Pinyin for study mode). They sync with Helm Sync, so your other devices and a reinstall get them too." />
+                <Grid x:Name="DictionaryButtons" ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding DownloadDictionariesCommand}" IsEnabled="{Binding !IsDownloading}"
+                            IsVisible="{Binding !IsDownloading}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ArrowDownload" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                            <TextBlock Text="Download" Foreground="{DynamicResource HelmPillForeground}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelDownloadCommand}"
+                            IsVisible="{Binding IsDownloading}" />
+                    <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Import files" Click="ImportDictionaries_Click"
+                            ToolTip.Tip="QuickTranslator dictionary files (.txt) you already have" />
+                </Grid>
+                <TextBlock Text="{Binding DownloadStatus}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding DownloadStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <ItemsControl ItemsSource="{Binding DictionaryFiles}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="dict:DictionaryFile">
+                            <Border Classes="filerow">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Kind}" Classes="secondary" FontSize="12" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding Size, Converter={x:Static ui:NovelText.Size}}" Classes="secondary" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button x:Name="OpenFolderButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding OpenDictionaryFolderCommand}" IsVisible="False">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="FolderOpen" FontSize="15" />
+                        <TextBlock Text="Open the dictionary folder" />
+                    </StackPanel>
+                </Button>
+                <!-- Where Download gets each file -->
+                <Button Classes="flat" HorizontalAlignment="Left" Padding="4,6" Click="Sources_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Panel x:Name="SourcesChevron" Width="12" Height="12" Classes="turn" core:Motion.Turn="False">
+                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" />
+                        </Panel>
+                        <TextBlock Text="Download sources" Classes="secondary" />
+                    </StackPanel>
+                </Button>
+                <StackPanel x:Name="SourcesPanel" Spacing="8" IsVisible="False" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="One “file = address” per line. Change them if a source moves; saved when you leave the box." />
+                    <TextBox x:Name="SourcesBox" Classes="glass mono" Text="{Binding DictionarySourcesText, Mode=OneWay}" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="110"
+                             LostFocus="Sources_LostFocus" AutomationProperties.Name="Download sources" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Back to the default sources"
+                            Command="{Binding ResetDictionarySourcesCommand}" ToolTip.Tip="The QuickTranslator set from GitHub" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- The text -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="The text" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="SHOW" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding ModeNames}" SelectedIndex="{Binding ModeIndex}" AutomationProperties.Name="What the page shows" />
+                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Names first" />
+                        <TextBlock Text="A phrase is not used when a name starts inside it, as in QuickTranslator." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding PrioritizeNames}" OnContent="" OffContent="" AutomationProperties.Name="Names first" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Show the Chinese text" />
+                        <TextBlock Text="Each paragraph also shows the original under the translation." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowChinese}" OnContent="" OffContent="" AutomationProperties.Name="Show the Chinese text" />
+                </Grid>
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Text size" />
+                        <TextBlock Grid.Column="1" Text="{Binding FontSize, Converter={x:Static ui:NovelText.Whole}}" Classes="secondary" />
+                    </Grid>
+                    <Slider Minimum="12" Maximum="40" SmallChange="1" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FontSize}" AutomationProperties.Name="Text size" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Line spacing" />
+                        <TextBlock Grid.Column="1" Text="{Binding LineSpacing, Converter={x:Static ui:NovelText.OneDecimal}}" Classes="secondary" />
+                    </Grid>
+                    <Slider Minimum="1" Maximum="3" SmallChange="0.1" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding LineSpacing}" AutomationProperties.Name="Line spacing" />
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Study mode shows above each word" />
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <ToggleButton Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="中文" IsChecked="{Binding StudyShowChinese}"
+                                      AutomationProperties.Name="Show the Chinese" />
+                        <ToggleButton Grid.Column="1" Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Pinyin"
+                                      IsChecked="{Binding StudyShowPinyin}" AutomationProperties.Name="Show the pinyin" />
+                        <ToggleButton Grid.Column="2" Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Hán Việt"
+                                      IsChecked="{Binding StudyShowHanViet}" AutomationProperties.Name="Show the Hán Việt" />
+                    </Grid>
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Choose Study under Show. Reading aloud reads the Vietnamese only. The pinyin (about 2 MB) is downloaded the first time." />
+                </StackPanel>
+                <StackPanel x:Name="PointerSettings" Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Mark the paragraph under the mouse" />
+                            <TextBlock Text="Its sentences show apart in two shades, and what is said in quotation marks in violet, for reading by eye." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding HoverHighlight}" OnContent="" OffContent="" AutomationProperties.Name="Mark the paragraph under the mouse" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto" IsEnabled="{Binding HoverHighlight}">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Colour subjects, verbs and objects" />
+                            <TextBlock Text="In each clause the subject is bold blue, the verb orange and the object green, found from the Chinese words (not always right)." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding GrammarColors}" OnContent="" OffContent="" AutomationProperties.Name="Colour subjects, verbs and objects" />
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Finding names -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Finding names" Classes="head" />
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Find names when a novel is opened" />
+                        <TextBlock Text="The first time, its character names are looked for and the sure ones added, marked as found. Undo them in Names; a name you delete is not added again." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoScanNames}" OnContent="" OffContent="" AutomationProperties.Name="Find names when a novel is opened" />
+                </Grid>
+                <StackPanel Spacing="10" IsVisible="{Binding CanScanWithAi}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="eyebrow" Text="HOW NAMES ARE FOUND" />
+                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding NameScanModeNames}" SelectedIndex="{Binding NameScanModeIndex}"
+                                  AutomationProperties.Name="How names are found" />
+                    </StackPanel>
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Logic: from how words are used in the novel, free and offline. AI: Claude Code on this PC reads each possible name in a couple of its sentences through Helm's MCP tools, with your own Claude plan (no API key); the novel itself is not sent." />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Claude Code" />
+                            <TextBlock Text="{Binding NameAgentStatus}" Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="ghost" Content="Check again" Command="{Binding RefreshNameAgentStatusCommand}" />
+                    </Grid>
+                </StackPanel>
+                <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !CanScanWithAi}"
+                           Text="Found from how words are used in the novel (free, offline). Finding names with AI runs in Helm on your PC, with Claude Code; the names it finds sync here." />
+            </StackPanel>
+        </Border>
+
+        <!-- Reading aloud -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Reading aloud" Classes="head" />
+                <!-- VieNeu: natural Vietnamese voices that run in Helm, downloaded once -->
+                <Border Classes="glass" BoxShadow="" DataContext="{Binding VieNeu}" x:DataType="vieneu:VieNeuVoiceViewModel"
+                        IsVisible="{Binding $parent[UserControl].((vm:NovelReaderViewModel)DataContext).VieNeu, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <StackPanel Spacing="10">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="VieNeu voices (Vietnamese)" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Status}" Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ProgressBar Height="4" MinHeight="4" CornerRadius="2" Minimum="0" Maximum="1" Value="{Binding Progress}" IsVisible="{Binding IsDownloading}"
+                                     AutomationProperties.Name="Download progress" />
+                        <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding DownloadCommand}" IsVisible="{Binding CanDownload}"
+                                Content="{Binding Size, StringFormat='Download ({0})'}" />
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Stop" Command="{Binding CancelCommand}" IsVisible="{Binding IsDownloading}" />
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding RemoveCommand}" IsVisible="{Binding IsInstalled}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="15" Foreground="{DynamicResource HelmDanger}" />
+                                <TextBlock Text="Remove the voices" Foreground="{DynamicResource HelmDanger}" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                   Text="Eleven women's voices of VieNeu-TTS v3 Turbo (Ngọc Huyền first). They run in Helm, offline; the text never leaves this device. The voice is loaded when you read and let go after five minutes without reading." />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="VOICE" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}" AutomationProperties.Name="Voice">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate DataType="speech:SpeechVoice">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Description}" Classes="secondary" FontSize="12" IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock x:Name="VoiceHint" Classes="secondary" TextWrapping="Wrap"
+                               Text="VieNeu's voices once they are downloaded, and this device's own voices. Sound is held in memory while you listen, never saved." />
+                </StackPanel>
+                <!-- The system's voices: Windows' speech settings, or the phone's text-to-speech -->
+                <Grid x:Name="SystemVoiceButtons" ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="False">
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add voices" Command="{Binding AddVoicesCommand}"
+                            ToolTip.Tip="Opens Windows speech settings to add offline voices; they show up after Refresh" />
+                    <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding RefreshVoicesCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ArrowSync" FontSize="15" />
+                            <TextBlock Text="Refresh" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <StackPanel x:Name="PhoneVoiceButtons" Spacing="8" IsVisible="False">
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Listen" Click="Listen_Click" />
+                        <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Get Vietnamese voices" Click="InstallVoices_Click" />
+                    </Grid>
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Text-to-speech settings" Click="VoiceSettings_Click" />
+                    <TextBlock x:Name="ListenNote" Classes="secondary" TextWrapping="Wrap" IsVisible="False" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Speed" />
+                        <TextBlock Grid.Column="1" Text="{Binding SpeechRateLabel}" Classes="secondary" />
+                    </Grid>
+                    <Slider Minimum="0.5" Maximum="3" SmallChange="0.1" LargeChange="0.25" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding SpeechRate}" AutomationProperties.Name="Speed" />
+                </StackPanel>
+                <StackPanel Spacing="4" IsEnabled="{Binding SupportsPitch}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel>
+                            <TextBlock Text="Pitch" />
+                            <TextBlock Text="Lower or higher than the voice's own (not for VieNeu's voices)." Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding SpeechPitch, Converter={x:Static ui:NovelText.OneDecimal}}" Classes="secondary" />
+                    </Grid>
+                    <Slider Minimum="0" Maximum="2" SmallChange="0.1" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding SpeechPitch}" AutomationProperties.Name="Pitch" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Volume" />
+                        <TextBlock Grid.Column="1" Text="{Binding SpeechVolume, Converter={x:Static ui:NovelText.Percent}}" Classes="secondary" />
+                    </Grid>
+                    <Slider Minimum="0" Maximum="1" SmallChange="0.05" TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding SpeechVolume}" AutomationProperties.Name="Volume" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel>
+                            <TextBlock Text="Pause between paragraphs" />
+                            <TextBlock Text="Sentences follow each other without one." Classes="secondary" FontSize="12" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding ParagraphPause, Converter={x:Static ui:NovelText.Seconds}}" Classes="secondary" />
+                    </Grid>
+                    <Slider Minimum="0" Maximum="2" SmallChange="0.05" TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding ParagraphPause}" AutomationProperties.Name="Pause between paragraphs" />
+                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Go on to the next chapter" />
+                        <TextBlock x:Name="NextChapterHint" Text="At the end of a chapter, reading aloud opens the next one and goes on." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding ContinueToNextChapter}" OnContent="" OffContent="" AutomationProperties.Name="Go on to the next chapter" />
+                </Grid>
+                <StackPanel Spacing="4" IsEnabled="{Binding ContinueToNextChapter}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel>
+                            <TextBlock Text="Chapters made ahead" />
+                            <TextBlock Text="The sentences ahead are made up to this many chapters past the one being read, no further." Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding PrefetchChapters}" Classes="secondary" />
+                    </Grid>
+                    <Slider Minimum="1" Maximum="10" SmallChange="1" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding PrefetchChapters}" AutomationProperties.Name="Chapters made ahead" />
+                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Use an offline voice when offline" />
+                        <TextBlock Text="When an online voice cannot be reached, an offline Vietnamese voice reads on." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding FallbackToOfflineVoice}" OnContent="" OffContent="" AutomationProperties.Name="Use an offline voice when offline" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- With the screen off (the phone) -->
+        <Border x:Name="BackgroundCard" Classes="glass" IsVisible="False">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="With the screen off" Classes="head" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Novel Reader keeps reading with Helm in the background or the screen off, and goes on to the next chapter. Pause, skip and stop from the notification, the lock screen or your headphones. Unplugging headphones or a call pauses it." />
+                </StackPanel>
+                <TextBlock x:Name="BatteryNote" Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Battery settings" Click="Battery_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Novel Lens (the phone) -->
+        <ContentControl x:Name="LensArea" />
+
+        <!-- Adding novels -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Adding novels" Classes="head" />
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Store Traditional Chinese as Simplified" />
+                        <TextBlock Text="A novel in Traditional characters (added or scraped) is kept in Simplified: the dictionaries are written in Simplified and read it far better." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding ConvertTraditional}" OnContent="" OffContent="" AutomationProperties.Name="Store Traditional Chinese as Simplified" />
+                </Grid>
+                <StackPanel x:Name="ScrapeSettings" Spacing="4" IsVisible="False">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel>
+                            <TextBlock Text="Chapters downloaded at once" />
+                            <TextBlock Text="Scrape from the web reads this many chapter pages at the same time. More is faster; a site may refuse too many, and then Helm goes on one at a time." Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding ScrapeTabs}" Classes="secondary" />
+                    </Grid>
+                    <Slider Minimum="1" Maximum="5" SmallChange="1" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ScrapeTabs}" AutomationProperties.Name="Chapters downloaded at once" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Names for all novels -->
+        <Border x:Name="NamesCard" Classes="glass" IsVisible="False">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Names for all novels" Classes="head" />
+                    <TextBlock Text="Export or import them as a QuickTranslator Names.txt. A novel's own names are in its Names." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Export" Click="ExportNames_Click" />
+                    <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Import" Click="ImportNames_Click" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" />
+    </StackPanel>
+</UserControl>
