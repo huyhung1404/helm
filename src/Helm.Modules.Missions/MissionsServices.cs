@@ -9,6 +9,6 @@ public static class MissionsServices
         services
             .AddMissionsCore()
             .AddMissionLinks(typeof(MissionsContentPage))
-            .AddHelmModule<MissionsModule, MissionsPage, MissionsViewModel>()
+            .AddHelmModule<MissionsModule, MissionsContentPage, MissionsViewModel>()
             .AddSingleton<MissionsContentPage>();
 }

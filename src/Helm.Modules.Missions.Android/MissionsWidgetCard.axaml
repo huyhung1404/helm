@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Helm.Modules.Missions.MissionsWidgetCard">
+
+    <!-- Android only, a card in the shared settings sheet: the home-screen widget. -->
+    <Border Classes="glass">
+        <StackPanel Spacing="12">
+            <StackPanel Spacing="2">
+                <TextBlock Classes="head" Text="Missions widget" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="The missions in progress and the step each one is on, on your home screen. Tap it to open Missions. You can also add it from the launcher's widget list." />
+            </StackPanel>
+            <Button x:Name="AddWidgetButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add to home screen" Click="AddWidget_Click" />
+        </StackPanel>
+    </Border>
+</UserControl>
