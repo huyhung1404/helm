@@ -7,8 +7,7 @@ namespace Helm.Modules.Ssh;
 
 /// <summary>
 /// SSH on Windows. Sessions live in <see cref="SshViewModel"/>; turning the tool off (or Helm exiting or updating)
-/// closes them. The menu and Quick access open <see cref="SshContentPage"/>; Home → Utilities opens the settings
-/// (<see cref="SshPage"/>).
+/// closes them. The menu, Quick access and Home → Utilities open <see cref="SshContentPage"/>; its settings are a sheet inside it.
 /// </summary>
 public sealed class SshModule(SshViewModel viewModel) : HelmModuleBase, IModuleContent
 {
@@ -18,7 +17,7 @@ public sealed class SshModule(SshViewModel viewModel) : HelmModuleBase, IModuleC
     public override ModuleGroup Group => ModuleGroup.SecurityAndServers;
     public override SymbolRegular Icon => SymbolRegular.WindowConsole20;
     public override ImageSource IconImage => SshLogo.Image;
-    public override Type SettingsPageType => typeof(SshPage);
+    public override Type SettingsPageType => typeof(SshContentPage);
     public Type ContentPageType => typeof(SshContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 

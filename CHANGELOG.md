@@ -26,6 +26,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
   reader with its player, and the word, sentence, chapters, names and wrong-translation sheets. The settings are a sheet
   behind the gear; Home → Utilities opens Novel Reader itself. Reading, the dictionaries, scraping from the web (PC) and
   Novel Lens (phone) work as before.
+- **SSH has the new look on the PC and the phone**, one page for both: the servers as a row of cards, the connect bar, the
+  shell and the AI agent tab, the key bar on the phone, the server's menu as a sheet and the settings as a sheet behind the
+  gear (the servers, this device's key, trusted keys, the terminal). The terminal is still xterm.js in a web view
+  (WebView2 on the PC), now inside the page; it steps aside while a sheet is open. Home → Utilities opens SSH itself.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the

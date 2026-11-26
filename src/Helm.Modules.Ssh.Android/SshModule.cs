@@ -1,14 +1,16 @@
 using Avalonia.Media;
 using FluentIcons.Common;
 using Helm.Core.Modules;
+using Helm.Core.Platform;
 
 namespace Helm.Modules.Ssh;
 
 /// <summary>
 /// SSH on Android. Sessions live in <see cref="SshViewModel"/> and keep running while another page is shown; turning
-/// the tool off closes them. Key files are a Windows choice: on the phone a key comes from Vault or is this device's.
+/// the tool off closes them. The drawer, Quick access and Home → Utilities open <see cref="SshContentPage"/> (its settings are a
+/// sheet inside it). Key files are a Windows choice: on the phone a key comes from Vault or is this device's.
 /// </summary>
-public sealed class SshModule : AndroidModuleBase, IModuleContent
+public sealed class SshModule : AndroidModuleBase, IModuleContent, IBackHandler
 {
     private readonly SshViewModel _viewModel;
 
@@ -25,9 +27,9 @@ public sealed class SshModule : AndroidModuleBase, IModuleContent
     public override Symbol Icon => Symbol.WindowConsole;
 
     /// <summary>The same vector icon as on Windows (<see cref="SshIconShape"/>).</summary>
-    public override IImage? IconImage => SshIcon.Image;
+    public override IImage? IconImage => Ui.SshIcon.Image;
 
-    public override Type PageType => typeof(SshPage);
+    public override Type PageType => typeof(SshContentPage);
     public Type ContentPageType => typeof(SshContentPage);
 
     public override Task EnableAsync(CancellationToken ct)
@@ -36,6 +38,9 @@ public sealed class SshModule : AndroidModuleBase, IModuleContent
         _viewModel.SetEnabled(true);
         return Task.CompletedTask;
     }
+
+    /// <summary>Android back: the sheet on top (the server's menu, the settings, a question) closes first.</summary>
+    public bool HandleBack() => Helm.Core.Ui.Sheet.CloseTopmost();
 
     public override Task DisableAsync()
     {

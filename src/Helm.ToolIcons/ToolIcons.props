@@ -6,7 +6,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Missions.Core\MissionsIconShape.cs" Link="ToolIcons\MissionsIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Notes.Core\NotesIconShape.cs" Link="ToolIcons\NotesIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Scratch.Core\ScratchIconShape.cs" Link="ToolIcons\ScratchIconShape.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Ssh.Core\SshIconShape.cs" Link="ToolIcons\SshIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Vocab.Core\VocabIconShape.cs" Link="ToolIcons\VocabIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.QuickCapture\QuickCaptureIconShape.cs" Link="ToolIcons\QuickCaptureIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Keyboard\KeyboardIconShape.cs" Link="ToolIcons\KeyboardIconShape.cs" />
@@ -16,7 +15,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Notes.Android\NotesIcon.cs" Link="ToolIcons\NotesIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.QuickCapture.Android\QuickCaptureIcon.cs" Link="ToolIcons\QuickCaptureIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Scratch.Android\ScratchIcon.cs" Link="ToolIcons\ScratchIcon.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Ssh.Android\SshIcon.cs" Link="ToolIcons\SshIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Tracker.Android\TrackerIcon.cs" Link="ToolIcons\TrackerIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Vocab.Android\VocabIcon.cs" Link="ToolIcons\VocabIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Wallet.Android\WalletIcon.cs" Link="ToolIcons\WalletIcon.cs" />

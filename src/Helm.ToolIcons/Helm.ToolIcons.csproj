@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Helm.Modules.Vault.UI\Helm.Modules.Vault.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Habits.UI\Helm.Modules.Habits.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.NovelReader.UI\Helm.Modules.NovelReader.UI.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Ssh.UI\Helm.Modules.Ssh.UI.csproj" />
   </ItemGroup>
 
   <Import Project="ToolIcons.props" />

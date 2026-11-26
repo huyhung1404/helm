@@ -11,6 +11,7 @@ using Avalonia.Controls;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using Helm.Core.Platform;
+using Helm.Modules.Ssh.Ui;
 using Helm.Shell.Services;
 using AndroidColor = Android.Graphics.Color;
 
@@ -21,9 +22,9 @@ namespace Helm.Modules.Ssh.Terminal;
 /// WebView. The page's files are served from this assembly (never written to disk, nothing loaded from the network),
 /// every other request is refused, no navigation leaves the page, and the page and Helm talk through a MessagePort
 /// that Helm hands to the page's own origin (no JavaScript interface is exposed). A WebView lives only while the page
-/// is shown; switching servers or coming back redraws from the session's buffer. UI thread only.
+/// is shown; switching servers (or the AI agent tab) or coming back redraws from the buffer. UI thread only.
 /// </summary>
-internal sealed class TerminalHost : NativeControlHost
+internal sealed class TerminalHost : NativeControlHost, ISshTerminal
 {
     private const string Origin = "https://helm-ssh.local/";
     private const string PageUrl = Origin + "terminal.html";
@@ -43,7 +44,7 @@ internal sealed class TerminalHost : NativeControlHost
     private WebView? _web;
     private WebMessagePort? _port;
     private bool _ready;
-    private SshSession? _attached;
+    private ITerminalSource? _attached;
     private Action<byte[]>? _sink;
     private int _generation;
     private int _flushQueued;
@@ -55,6 +56,13 @@ internal sealed class TerminalHost : NativeControlHost
         _viewModel = viewModel;
         _clipboard = clipboard;
     }
+
+    /// <summary>The terminal is the page's native control itself.</summary>
+    public Control View => this;
+
+    void ISshTerminal.Focus() => FocusTerminal();
+
+    Task ISshTerminal.PasteAsync() => PasteAsync();
 
     /// <summary>A key from the key bar (esc, tab, up, down, left, right, home, end); the page sends it as the terminal would.</summary>
     public void SendKey(string key) => Post(new { t = "key", k = key });
@@ -81,7 +89,7 @@ internal sealed class TerminalHost : NativeControlHost
         {
             return;
         }
-        if (text.Length == 0 || _viewModel.ActiveSession?.IsConnected != true) return;
+        if (text.Length == 0 || !_viewModel.CanType || _viewModel.ActiveSession?.IsConnected != true) return;
         if (TerminalPaste.NeedsConfirmation(text, bracketed)
             && !await _viewModel.AskAsync("Paste text with line breaks?", TerminalPaste.Warning(text), "Paste").ConfigureAwait(true)) return;
         Post(new { t = "paste", d = TerminalPaste.ForTerminal(text) });
@@ -135,7 +143,7 @@ internal sealed class TerminalHost : NativeControlHost
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SshViewModel.ActiveSession)) Rebind();
+        if (e.PropertyName == nameof(SshViewModel.ActiveTerminal)) Rebind();
         else if (e.PropertyName == nameof(SshViewModel.FontSize)) Post(new { t = "font", s = _viewModel.FontSize });
     }
 
@@ -168,7 +176,7 @@ internal sealed class TerminalHost : NativeControlHost
                     _viewModel.Send(root.GetProperty("d").GetString() ?? "");
                     break;
                 case "bin":
-                    _viewModel.ActiveSession?.Send(Encoding.Latin1.GetBytes(root.GetProperty("d").GetString() ?? ""));
+                    _viewModel.Send(Encoding.Latin1.GetBytes(root.GetProperty("d").GetString() ?? ""));
                     break;
                 case "size":
                     _viewModel.ReportTerminalSize(root.GetProperty("c").GetInt32(), root.GetProperty("r").GetInt32());
@@ -187,13 +195,18 @@ internal sealed class TerminalHost : NativeControlHost
         }
     }
 
-    /// <summary>Shows the selected server's session: redraws from its buffer and takes its output from now on.</summary>
+    /// <summary>
+    /// Shows the selected server's shell, or what agents run there (its AI agent tab, read-only): redraws from its buffer and
+    /// takes its output from now on.
+    /// </summary>
     private void Rebind()
     {
         Detach();
         var generation = Interlocked.Increment(ref _generation);
         if (!_ready) return;
-        if (_viewModel.ActiveSession is not { } session)
+        var session = _viewModel.ActiveTerminal;
+        Post(new { t = "ro", v = session is AgentConsole });
+        if (session is null)
         {
             Post(new { t = "reset", d = "" });
             return;

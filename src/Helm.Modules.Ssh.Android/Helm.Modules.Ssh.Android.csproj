@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- SSH on Android: the module, its Avalonia pages and the terminal (xterm.js in Android's WebView, the same page as
+  <!-- SSH on Android: the module, the page around the shared SshView (Helm.Modules.Ssh.UI) and the terminal (xterm.js in Android's WebView, the same page as
        on Windows). The logic and the view model come from Helm.Modules.Ssh.Core. Not in Helm.sln; CI builds it with
        the app. -->
   <PropertyGroup>
@@ -30,6 +30,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Ssh.Core\Helm.Modules.Ssh.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Ssh.UI\Helm.Modules.Ssh.UI.csproj" />
   </ItemGroup>
 
   <ItemGroup>
