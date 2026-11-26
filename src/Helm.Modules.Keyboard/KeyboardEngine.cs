@@ -96,7 +96,8 @@ internal sealed class KeyboardEngine : IAsyncDisposable
             engine._foregroundHook = await WinEventHook.InstallAsync(engine._thread,
                 [(WinEvents.SystemForeground, WinEvents.SystemForeground)], engine.OnWinEvent, logger).ConfigureAwait(false);
             keyboard.Intercept += engine.OnKey;
-            engine._watchdog = engine._thread.StartTimer(Watching, engine.Watch);
+            // The awaits above resume on a pool thread; the timer belongs to the keyboard thread.
+            await engine._thread.InvokeAsync(() => engine._watchdog = engine._thread.StartTimer(Watching, engine.Watch)).ConfigureAwait(false);
             engine.WatchShortcut(options.Shortcut);
             engine._thread.Post(() => engine.OnForeground(windows.GetForegroundWindow()));
         }

@@ -80,6 +80,39 @@ public sealed class HomeComposerTests
     }
 
     [Fact]
+    public void A_change_that_shows_nothing_new_keeps_the_cards()
+    {
+        // Sync says it changed every few seconds; rebuilding each time made the cards blink.
+        var habits = new Source("habits", 50, "a", "b");
+        var home = new HomeViewModel(new Host(), "v1");
+        using var composer = Make(home, [habits]);
+        var card = home.Today[0];
+
+        habits.Raise();
+        Assert.Same(card, home.Today[0]);
+
+        habits.Items = ["a"];
+        habits.Raise();
+        Assert.NotSame(card, home.Today[0]);
+        Assert.Single(home.Today[0].Items);
+    }
+
+    [Fact]
+    public void Undoing_a_tick_elsewhere_rebuilds_the_ticked_card()
+    {
+        var tracker = new Source("tracker", 90, "a");
+        var home = new HomeViewModel(new Host(), "v1");
+        using var composer = Make(home, [tracker]);
+        home.Today[0].Items[0].TickCommand.Execute(null);
+        Assert.True(home.Today[0].Items[0].IsDone);
+
+        // The source still reports "a" not done (another device unticked it): the card must show that again.
+        tracker.Raise();
+
+        Assert.False(home.Today[0].Items[0].IsDone);
+    }
+
+    [Fact]
     public void A_card_button_opens_its_tool()
     {
         var home = new HomeViewModel(new Host(), "v1");
@@ -103,8 +136,10 @@ public sealed class HomeComposerTests
 
         public void Raise() => Changed?.Invoke(this, EventArgs.Empty);
 
+        public string[] Items { get; set; } = items;
+
         public TodayList? Build() =>
-            new(moduleId, $"{items.Length} open", [.. items.Select(i => new TodayEntry(i, i, CanTick: true))], "Open", urgency);
+            new(moduleId, $"{Items.Length} open", [.. Items.Select(i => new TodayEntry(i, i, CanTick: true))], "Open", urgency);
 
         public void Tick(string entryId, bool done)
         {

@@ -9,14 +9,25 @@ public sealed class SyncAlertSource : IHomeAlertSource
     private readonly SyncEngine _engine;
     private readonly IHomeLinks _links;
 
+    private string _shown;
+
     public SyncAlertSource(SyncEngine engine, IHomeLinks links)
     {
         _engine = engine;
         _links = links;
-        engine.StatusChanged += (_, _) => Changed?.Invoke(this, EventArgs.Empty);
+        _shown = Key();
+        // Sync reports its status on every run (every few seconds while Workspace is busy): tell Home only when the
+        // alerts themselves change, or Home rebuilds its cards on every run.
+        engine.StatusChanged += (_, _) =>
+        {
+            var key = Key();
+            if (Interlocked.Exchange(ref _shown, key) != key) Changed?.Invoke(this, EventArgs.Empty);
+        };
     }
 
     public event EventHandler? Changed;
+
+    private string Key() => string.Join(",", Current().Select(a => a.Id + ":" + a.Title));
 
     public IReadOnlyList<HomeAlertData> Current()
     {
