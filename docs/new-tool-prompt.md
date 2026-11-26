@@ -51,7 +51,7 @@ Print a short plan before you start, then continue without waiting:
 - **Settings and sections**: list them.
 - **Win32 needs**: which hooks, hotkeys, overlays or new P/Invoke the tool requires.
 
-### 2. Files to create (same shape as `src/Helm.Modules.AlwaysOnTop`, the reference module)
+### 2. Files to create (same shape as `src/Helm.Modules.WindowZones` with its `.Core` and `.UI`, the reference module)
 
 > **UI is moving to one shared Avalonia codebase.** Read "UI: one Avalonia codebase" in the root `CLAUDE.md` first;
 > where it conflicts with the WPF / separate-Android layout below, `CLAUDE.md` wins.

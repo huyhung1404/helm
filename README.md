@@ -48,7 +48,7 @@ Notes, tasks, a password vault and tools for Claude Code in one Fluent app, sync
 | Vocabulary | PC + Android | Learn English and Chinese words by their parts: add the words you meet, an AI agent (Claude Code, through Helm's tools) breaks each one into meaningful pieces (relative → relate + -ive → re- + lat; 补救 → 补 + 救 → 求 sound + 攵 meaning), and every piece opens into smaller ones, with the other words of yours that share it; spaced repetition (words come back when due, "N due today") with five kinds of card (word → meaning, meaning → word, listen, fill the gap, type the word with a letter-by-letter check); "I know it" and Hide; words you keep forgetting get a new mnemonic from Claude Code; word family, synonyms and antonyms; example sentences, collocations, a mnemonic, words easy to mix up, level (CEFR/HSK), part of speech, topic and your own tags, sorted and filtered; a Roots tab with word families, root practice and "suggest more words"; Claude Code analyses new words by itself on the PC (or **Analyze now**); long-press a word in Novel Reader → Add word; pinyin coloured by tone; listen with a neural voice or on YouGlish; edit any meaning by hand; add words in a second (`/v` in Quick Capture, or select a word in any app on the phone → Add word); a word that pops up now and then over your apps (PC and phone), and on the phone an optional floating bubble, both kept out of the apps you choose and away while the phone is sideways |
 | Vault | PC + Android | Passwords, secure notes, cards, identities and documents, end-to-end encrypted, synced, and backed up to a folder you choose; two-factor codes (TOTP); autofill on Android and auto-type (Ctrl+Alt+A) on PC ([guide](docs/vault-guide.md), [design](docs/vault-design.md), [format](docs/vault-format.md)) |
 
-More tools are planned (see [Roadmap](#roadmap)). Always On Top is built but not registered; it comes back with one line in `src/Helm.App/Hosting/HelmModules.cs`. Window Zones grew out of the previous Zones module (git history, tag `v0.3.0`).
+More tools are planned (see [Roadmap](#roadmap)). Window Zones grew out of the previous Zones module (git history, tag `v0.3.0`).
 
 ## Install
 
@@ -112,7 +112,6 @@ dotnet run --project src/Helm.App
 
 Planned tools, each added as its own module (`src/Helm.Modules.<Name>`):
 
-- **Always On Top**: already built; re-enable after a review.
 - **System Tools**: Color Picker, Screen Ruler, Text Extractor (OCR), Awake.
 - **Input & Output**: Keyboard Manager (remaps), Find My Mouse.
 - **File Management**: File Locksmith, bulk rename, Hosts file editor, Environment Variables.

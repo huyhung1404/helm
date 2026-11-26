@@ -38,8 +38,5 @@ internal static class HelmModules
         services.AddKeyboardModule();
         services.AddVocabModule();
         services.AddSlackBotModule();
-
-        // Built but hidden; re-enable with (using Helm.Modules.AlwaysOnTop;):
-        // services.AddAlwaysOnTopModule();
     }
 }

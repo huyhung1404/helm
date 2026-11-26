@@ -33,7 +33,7 @@ A few command-line flags are handy while developing:
 | Path | Content |
 |---|---|
 | `%LOCALAPPDATA%\Helm\settings\general.json` | Theme, window placement, enabled modules, last update check |
-| `%LOCALAPPDATA%\Helm\settings\<moduleId>.json` | One file per module (`zones.json`, `always-on-top.json`, `tracker.json`) |
+| `%LOCALAPPDATA%\Helm\settings\<moduleId>.json` | One file per module (`window-zones.json`, `keyboard.json`, `tracker.json`) |
 | `%LOCALAPPDATA%\Helm\sync\helm-sync.db` | Synced data (encrypted local replica), e.g. Tracker workspaces, items and history |
 | `%LOCALAPPDATA%\Helm\settings\zones\` | `layouts.json`, `applied.json` (monitor id → layout), `app-zone-history.json` |
 | `%LOCALAPPDATA%\Helm\logs\helm-YYYYMMDD.log` | Serilog rolling log, 14 days (`velopack-hooks.log` for install/update/uninstall hooks) |
@@ -54,9 +54,6 @@ src/
   Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, the WPF pages that host Welcome and Diagnostics
   Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
-  Helm.Modules.AlwaysOnTop.Core/ net8.0: settings, the tool as the page sees it (IAlwaysOnTop), shared view model
-  Helm.Modules.AlwaysOnTop.UI/ Avalonia: the Always On Top page (on/off, shortcut, border, windows on top, excluded apps)
-  Helm.Modules.AlwaysOnTop/  Windows only: the module, the engine and border overlays, the WPF page that hosts the shared view
   Helm.Keyboard.Engine/      net8.0: Telex (namespace Helm.Typing), the ids Helm and the input method share
   Helm.Keyboard.Tip/         HelmKeyboard.dll: the Vietnamese input method (TSF, NativeAOT, 64- and 32-bit);
                              built by scripts/build-keyboard.ps1, needs the C++ build tools
