@@ -53,6 +53,12 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Slack Report", "Settings", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.Settings), Framed: false),
         new("Slack Report", "Settings (lower part)", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.SettingsEnd), Framed: false),
         new("Slack Report", "Settings (connect)", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.SettingsConnect), Framed: false),
+        new("Window Zones", "Zones", "Window Zones", m => WindowZonesDemo.Create(m, WindowZonesStage.Zones), Framed: false),
+        new("Window Zones", "Edit zones", "Window Zones", m => WindowZonesDemo.Create(m, WindowZonesStage.Editor), Framed: false),
+        new("Window Zones", "Shortcut taken", "Window Zones", m => WindowZonesDemo.Create(m, WindowZonesStage.ShortcutTaken), Framed: false),
+        new("Window Zones", "First run", "Window Zones", m => WindowZonesDemo.Create(m, WindowZonesStage.FirstRun), Framed: false),
+        new("Window Zones", "Settings", "Window Zones", m => WindowZonesDemo.Create(m, WindowZonesStage.Settings), Framed: false),
+        new("Window Zones", "Settings (lower part)", "Window Zones", m => WindowZonesDemo.Create(m, WindowZonesStage.SettingsEnd), Framed: false),
         new("Base", "Controls", "Controls", _ => new ControlsPage()),
     ];
 

@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+    <ProjectReference Include="..\Helm.Modules.WindowZones.Core\Helm.Modules.WindowZones.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

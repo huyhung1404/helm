@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Window Zones' logic with no WPF, Avalonia or Win32: the zones and their files, the geometry and editing model, the
+       settings, and the view models of the page and its settings. The Windows app adds the engine (hooks, hotkeys,
+       moving windows), the overlay shown while dragging, the tab strip and the full-screen editor; the shared page is
+       Helm.Modules.WindowZones.UI. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.WindowZones</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Modules.WindowZones" />
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,252 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.WindowZones"
+             xmlns:ui="using:Helm.Modules.WindowZones.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.WindowZones.Ui.WindowZonesView"
+             x:DataType="vm:WindowZonesViewModel">
+
+    <!-- Window Zones itself, one view on every screen: your screens to scale with their zones, then one card per zone
+         (its shortcut, name, state and the windows in it: open or close it, show where it is, bring a window to the
+         front or take it out). Drawing zones opens the editor as a sheet (ZonesEditorView); the options are in the
+         settings sheet behind the gear. -->
+    <UserControl.Styles>
+        <Style Selector="Border.tile">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.tile > TextBlock">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.key">
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1,1,1,2" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="7,2" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+        </Style>
+        <Style Selector="Border.key > TextBlock">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- The window last in front in its zone -->
+        <Style Selector="TextBlock.top">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- A window in a zone: a thin line above each -->
+        <Style Selector="Border.win">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Padding" Value="0,8" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="Page" Margin="40,28,40,40">
+
+                <!-- Today and the counts; the gear -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="TodayLine" Classes="eyebrow" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                    <Button Grid.Column="1" Classes="chip" Click="Settings_Click" ToolTip.Tip="Window Zones settings" AutomationProperties.Name="Window Zones settings">
+                        <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                    </Button>
+                </Grid>
+
+                <TextBlock Classes="display" Text="Window Zones" Margin="0,22,0,0" />
+                <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="{Binding Summary}" TextWrapping="Wrap" />
+
+                <Border x:Name="OffBar" Classes="glass" Margin="0,16,0,0" IsVisible="False">
+                    <StackPanel>
+                        <TextBlock Text="Window Zones is turned off" Classes="head" />
+                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                   Text="Your zones are kept, and closed zones keep their windows minimized. Turn Window Zones on in its settings (the gear) to use them." />
+                    </StackPanel>
+                </Border>
+
+                <!-- Shortcuts that could not be registered (another app took them) -->
+                <Border x:Name="ProblemBar" Classes="glass" Margin="0,16,0,0" Background="{DynamicResource HelmWarningBackground}" IsVisible="False">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <ic:SymbolIcon Symbol="Warning" FontSize="18" Margin="0,1,10,0" VerticalAlignment="Top" />
+                        <TextBlock x:Name="ProblemText" Grid.Column="1" TextWrapping="Wrap" />
+                    </Grid>
+                </Border>
+
+                <StackPanel x:Name="Body">
+
+                    <!-- First run: no zones yet. Step 1 is the only thing to do now. -->
+                    <Border Classes="glass hero enter" Margin="0,28,0,0" Padding="28,26" IsVisible="{Binding !HasZones}">
+                        <StackPanel Spacing="18">
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="eyebrow" Text="START HERE" />
+                                <TextBlock Text="Give every window a place" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <UniformGrid x:Name="FirstRunSteps" Columns="3">
+                                <Border Classes="glass" Margin="0,0,10,10" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="eyebrow" Text="1" />
+                                        <TextBlock Text="Draw zones on your screens" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="A tall one for the editor, two for chat and music: any shape." />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="eyebrow" Text="2" />
+                                        <TextBlock x:Name="StepDrop" Text="Hold Shift while dragging a window" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="The zones show; drop it in one and it fits it." />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="eyebrow" Text="3" />
+                                        <TextBlock Text="Open or close a zone with its number" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="Its windows come back together, or go out of the way together." />
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
+                            <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="Edit_Click"
+                                    AutomationProperties.Name="Draw my first zones">
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                    <TextBlock Text="Draw my first zones" Foreground="{DynamicResource HelmPillForeground}" />
+                                    <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel IsVisible="{Binding HasZones}" Spacing="0" Margin="0,22,0,0">
+                        <!-- Your screens, to scale, with their zones -->
+                        <Border Classes="glass" Margin="0,0,0,22">
+                            <StackPanel Spacing="12">
+                                <ui:ZoneLayoutView x:Name="Overview" MaxLayoutHeight="260" />
+                                <Grid x:Name="EditRow" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+                                    <Button x:Name="EditButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="Edit_Click"
+                                            ToolTip.Tip="Draw, move and resize zones here" AutomationProperties.Name="Edit zones">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <ic:SymbolIcon Symbol="Edit" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                                            <TextBlock Text="Edit zones" Foreground="{DynamicResource HelmPillForeground}" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="ScreensButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                            Command="{Binding OpenEditorCommand}" ToolTip.Tip="Draw them over every monitor, at full size"
+                                            AutomationProperties.Name="Edit on the screens">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <ic:SymbolIcon Symbol="WindowNew" FontSize="15" />
+                                            <TextBlock Text="Edit on the screens" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- One card per zone -->
+                        <ItemsControl ItemsSource="{Binding Zones}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ZoneCardViewModel">
+                                    <Border Classes="glass lift fade" Padding="16,14" Margin="0,0,0,10">
+                                        <StackPanel Spacing="10">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Border Classes="tile" Margin="0,0,14,0" VerticalAlignment="Top">
+                                                    <TextBlock Text="{Binding NumberText}" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                                    <TextBox Classes="bare" FontSize="16" FontWeight="SemiBold" Padding="0" MinHeight="0" Text="{Binding Name, UpdateSourceTrigger=LostFocus}"
+                                                             PlaceholderText="{Binding Label}" KeyDown="Name_KeyDown"
+                                                             ToolTip.Tip="A name for the zone, shown with its number" AutomationProperties.Name="Zone name" />
+                                                    <TextBlock Text="{Binding StateText}" Classes="muted" FontSize="13" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding MonitorName}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top" Margin="10,0,0,0">
+                                                    <Button Classes="act" Margin="0" Command="{Binding ShowWhereCommand}" IsEnabled="{Binding IsConnected}"
+                                                            ToolTip.Tip="Light up the zone on its screen for a moment" AutomationProperties.Name="Where">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <ic:SymbolIcon Symbol="Eye" FontSize="15" />
+                                                            <TextBlock Classes="label" Text="Where" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Classes="act" Margin="0" Command="{Binding OpenCommand}" IsEnabled="{Binding CanOpen}" IsVisible="{Binding IsClosed}"
+                                                            ToolTip.Tip="Bring its windows back" AutomationProperties.Name="Open">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <ic:SymbolIcon Symbol="Play" FontSize="15" Foreground="{DynamicResource HelmEyebrow}" />
+                                                            <TextBlock Classes="label" Text="Open" Foreground="{DynamicResource HelmEyebrow}" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Classes="act" Margin="0" Command="{Binding CloseCommand}" IsEnabled="{Binding CanOpen}" IsVisible="{Binding !IsClosed}"
+                                                            ToolTip.Tip="Minimize its windows" AutomationProperties.Name="Close">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <ic:SymbolIcon Symbol="ArrowCircleDown" FontSize="15" />
+                                                            <TextBlock Classes="label" Text="Close" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- Its shortcut: the keys, and which number -->
+                                            <Grid ColumnDefinitions="*,Auto" Margin="54,0,0,0">
+                                                <ItemsControl ItemsSource="{Binding ShortcutCaps}" VerticalAlignment="Center">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="x:String">
+                                                            <Border Classes="key"><TextBlock Text="{Binding}" /></Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <ComboBox Grid.Column="1" Classes="glass" MinWidth="150" ItemsSource="{Binding NumberOptions}" SelectedIndex="{Binding NumberIndex}"
+                                                          ToolTip.Tip="The shortcut that opens and closes this zone" AutomationProperties.Name="Zone shortcut" />
+                                            </Grid>
+
+                                            <!-- The windows in it -->
+                                            <ItemsControl ItemsSource="{Binding Windows}" Margin="54,0,0,0" IsVisible="{Binding HasWindows}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:ZoneWindowRowViewModel">
+                                                        <Border Classes="win">
+                                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                                <Panel Width="20" Height="20" Margin="0,0,12,0" VerticalAlignment="Center">
+                                                                    <Image x:Name="Icon" Source="{Binding ProcessPath, Converter={x:Static ui:ZoneWindowIcons.Converter}}"
+                                                                           RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                                    <ic:SymbolIcon Symbol="Apps" FontSize="17" Foreground="{DynamicResource HelmSecondaryText}"
+                                                                                   IsVisible="{Binding #Icon.Source, Converter={x:Static ObjectConverters.IsNull}}" />
+                                                                </Panel>
+                                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" Classes.top="{Binding IsTop}" />
+                                                                    <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                                </StackPanel>
+                                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                                    <Button Classes="chip" Command="{Binding ShowCommand}" ToolTip.Tip="Bring this window to the front, in its zone"
+                                                                            AutomationProperties.Name="Show window">
+                                                                        <ic:SymbolIcon Symbol="Open" FontSize="14" />
+                                                                    </Button>
+                                                                    <Button Classes="chip" Command="{Binding ReleaseCommand}" ToolTip.Tip="Take it out of the zone (the window stays where it is)"
+                                                                            AutomationProperties.Name="Take out of the zone">
+                                                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                                                                    </Button>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

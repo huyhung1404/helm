@@ -1,0 +1,167 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.WindowZones"
+             x:Class="Helm.Modules.WindowZones.Ui.WindowZonesSettingsView"
+             x:DataType="vm:WindowZonesViewModel">
+
+    <!-- Window Zones' settings as a sheet over the page (the gear): on/off, the shortcuts, dragging, how the zones look,
+         and the apps that never go into a zone. One card per subject; a switch on the right, or a label above a
+         full-width field. -->
+    <UserControl.Styles>
+        <!-- A switch keeps clear of the text beside it -->
+        <Style Selector="DockPanel > ToggleSwitch">
+            <Setter Property="Margin" Value="12,0,0,0" />
+        </Style>
+        <Style Selector="Border.key">
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1,1,1,2" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+        </Style>
+        <Style Selector="Border.key > TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="WINDOW ZONES" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- On or off: off keeps the zones, and closed zones keep their windows minimized -->
+        <Border Classes="glass">
+            <DockPanel>
+                <ToggleSwitch x:Name="EnableSwitch" DockPanel.Dock="Right" OnContent="" OffContent="" AutomationProperties.Name="Window Zones on or off" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Window Zones is on" Classes="head" />
+                    <TextBlock Text="Off stops the shortcuts and dragging into zones. Your zones are kept; closed zones keep their windows minimized."
+                               Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- A shortcut that could not be registered -->
+        <Border x:Name="ProblemCard" Classes="glass" Background="{DynamicResource HelmWarningBackground}" IsVisible="False">
+            <Grid ColumnDefinitions="Auto,*">
+                <ic:SymbolIcon Symbol="Warning" FontSize="18" Margin="0,1,10,0" VerticalAlignment="Top" />
+                <TextBlock x:Name="ProblemText" Grid.Column="1" TextWrapping="Wrap" />
+            </Grid>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="14">
+                <TextBlock Text="Shortcuts" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Open or close a zone" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding ZoneModifierNames}" SelectedIndex="{Binding ZoneModifiersIndex}"
+                              AutomationProperties.Name="Open or close a zone" />
+                    <TextBlock Classes="secondary"
+                               Text="With the zone's number. Closed: its windows come back. Behind other apps: it comes to the front. In front: its windows are minimized." />
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Switch windows in a zone" />
+                    <TextBlock Classes="secondary" Text="Only while the window in front shares its zone with others; otherwise the keys go to the app." />
+                    <Grid x:Name="SwitchGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="10">
+                        <StackPanel x:Name="NextField" Spacing="6">
+                            <TextBlock Text="Next window" Classes="secondary" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                <ContentControl x:Name="NextPicker" />
+                                <Button x:Name="NextReset" Grid.Column="1" Classes="chip" ToolTip.Tip="Back to the default shortcut" AutomationProperties.Name="Next window: default">
+                                    <ic:SymbolIcon Symbol="ArrowUndo" FontSize="14" />
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel x:Name="PreviousField" Grid.Column="1" Spacing="6">
+                            <TextBlock Text="Previous window" Classes="secondary" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                <ContentControl x:Name="PreviousPicker" />
+                                <Button x:Name="PreviousReset" Grid.Column="1" Classes="chip" ToolTip.Tip="Back to the default shortcut" AutomationProperties.Name="Previous window: default">
+                                    <ic:SymbolIcon Symbol="ArrowUndo" FontSize="14" />
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Zone editor" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <ContentControl x:Name="EditorPicker" />
+                        <Button x:Name="EditorReset" Grid.Column="1" Classes="chip" ToolTip.Tip="Back to the default shortcut" AutomationProperties.Name="Zone editor: default">
+                            <ic:SymbolIcon Symbol="ArrowUndo" FontSize="14" />
+                        </Button>
+                    </Grid>
+                    <TextBlock Classes="secondary" Text="Opens the editor on every monitor to draw, move and resize zones." />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="14">
+                <TextBlock Text="Dragging" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Key to hold while dragging" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding DragKeyNames}" SelectedIndex="{Binding DragKeyIndex}"
+                              AutomationProperties.Name="Key to hold while dragging" />
+                    <TextBlock Classes="secondary" Text="Hold it while you drag a window by its title bar: the zones show, drop the window in one and it fits it." />
+                </StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RestoreSizeOnLeave}" OnContent="" OffContent="" AutomationProperties.Name="Own size back when dragged out" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Own size back when dragged out" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="A window dragged out of its zone gets back the size it had before it went in." />
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ShowTabStrip}" OnContent="" OffContent="" AutomationProperties.Name="Show the zone's windows as tabs" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Show the zone's windows as tabs" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="For a moment at the top of the zone, when you switch windows or open it." />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="14">
+                <TextBlock Text="Appearance" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Zone opacity" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <Slider Minimum="{Binding MinOpacity}" Maximum="{Binding MaxOpacity}" TickFrequency="5" IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10"
+                                VerticalAlignment="Center" Value="{Binding ZoneOpacity}" AutomationProperties.Name="Zone opacity" />
+                        <TextBlock Grid.Column="1" MinWidth="44" TextAlignment="Right" VerticalAlignment="Center" Text="{Binding ZoneOpacityText}" />
+                    </Grid>
+                    <TextBlock Classes="secondary" Text="How solid the zones look while you drag a window. Lower shows more of the desktop." />
+                </StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ShowZoneNumbers}" OnContent="" OffContent="" AutomationProperties.Name="Show zone numbers" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Show zone numbers" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="The number (and name) of each zone while you drag a window." />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Excluded apps" Classes="head" />
+                <TextBlock Classes="secondary" Text="Process names whose windows never go into a zone, one per line (a game, a video call)." />
+                <TextBox Classes="glass" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxHeight="220" VerticalContentAlignment="Top" Padding="12,10"
+                         PlaceholderText="game.exe" Text="{Binding ExcludedAppsText, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Excluded apps" />
+            </StackPanel>
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" />
+    </StackPanel>
+</UserControl>
