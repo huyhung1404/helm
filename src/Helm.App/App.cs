@@ -29,7 +29,7 @@ public sealed class App : Application
 
     internal static string[] Args { get; set; } = [];
 
-    internal static App Current => (App)Application.Current!;
+    internal static new App Current => (App)Application.Current!;
 
     internal IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started.");
 

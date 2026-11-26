@@ -120,7 +120,7 @@ internal sealed class GalleryWindow : Window
                     using var bitmap = new Avalonia.Media.Imaging.RenderTargetBitmap(pixels);
                     bitmap.Render(this);
                     var name = string.Concat($"{page.Group}-{page.Name}-{sizeName}-{(dark ? "dark" : "light")}".Select(c => char.IsLetterOrDigit(c) || c == '-' ? c : '_'));
-                    bitmap.Save(Path.Combine(folder, name + ".png"));
+                    bitmap.Save(Path.Combine(folder, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
                 }
             }
         }

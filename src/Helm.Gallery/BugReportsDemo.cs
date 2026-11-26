@@ -328,7 +328,7 @@ internal static class BugReportsDemo
             }
         }
         using var stream = new MemoryStream();
-        bitmap.Save(stream);
+        bitmap.Save(stream, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         return stream.ToArray();
     }
 

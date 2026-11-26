@@ -5,4 +5,11 @@
     <Using Include="System.IO" />
     <Using Include="System.Net.Http" />
   </ItemGroup>
+  <!-- Microsoft.Web.WebView2 always adds its WPF and WinForms wrappers; Helm uses only WebView2.Core (no WPF anywhere),
+       and the WPF wrapper pulls in WindowsBase (MSB3277). -->
+  <Target Name="HelmDropWebView2Wrappers" AfterTargets="ResolvePackageAssets" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Filename)' == 'Microsoft.Web.WebView2.Wpf' or '%(Filename)' == 'Microsoft.Web.WebView2.WinForms'" />
+    </ItemGroup>
+  </Target>
 </Project>

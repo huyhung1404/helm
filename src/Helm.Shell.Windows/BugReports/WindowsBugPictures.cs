@@ -74,7 +74,7 @@ internal static class WindowsBugPictures
             using var input = new MemoryStream(image);
             using var bitmap = new Avalonia.Media.Imaging.Bitmap(input);
             using var output = new MemoryStream();
-            bitmap.Save(output);
+            bitmap.Save(output, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
             return output.ToArray();
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or NotSupportedException)

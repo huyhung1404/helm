@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.93.0] - 2026-11-26
 
 Helm becomes a passive app: it shows and keeps your things, and Fairy does the automating through Helm's MCP tools.
 The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
@@ -67,8 +67,19 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **Vault: the auto-type picker has the new look.** The likely logins come first (marked Match), typing searches them
   all, Up and Down choose, Enter or a click types into the window that was in front, Esc closes; "Offer it in … next time"
   is a switch.
+- **The whole PC app is new underneath: one Avalonia app, no WPF left.** The window, the title bar, the menu, the tabs,
+  Home, General, Bug reports, the tray menu and every tool are drawn by the same code as on the phone. Helm no longer
+  needs the .NET Windows Desktop runtime. Your tabs, the window's place and every setting are kept.
+- **The menu starts as a row of icons** and opens on hover; the page you are on is no longer framed or highlighted (the
+  tab bar already shows it), only the row under the pointer lights up. The "+" menu on the tab bar has the glass look.
+- **Notifications on the PC are a small card in the corner** (8 seconds, a click opens what it is about).
+- **An AI agent's MCP question opens at once**, also while Helm starts.
+- **Vault's Emergency Kit is saved as a text file** instead of printed; the picture pickers for goals and covers no longer
+  offer TIFF.
 
 ### Removed
+- **What's new** and **Give feedback** in the menu (the release notes stay on GitHub), the **Welcome** page and the hidden
+  **Diagnostics** page.
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the
   phone. What was set there is kept and still used: the keys, the agents, the proxy and VPS, each feature's choice.
 - **Ask Helm** on the phone: the card, its Quick Settings tile, widget, edge handle and launcher icon, the text-selection

@@ -260,7 +260,7 @@ internal static class NovelDemo
             dc.DrawRectangle(new SolidColorBrush(Color.Parse("#E8D9B0")), null, new Rect(112, 270, 3, 60));
         }
         using var stream = new MemoryStream();
-        bitmap.Save(stream);
+        bitmap.Save(stream, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         return stream.ToArray();
     }
 

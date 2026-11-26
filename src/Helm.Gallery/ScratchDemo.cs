@@ -105,7 +105,7 @@ internal static class ScratchDemo
             context.DrawGeometry(new SolidColorBrush(Colors.Black, 0.35), null, Geometry.Parse(FormattableString.Invariant($"M{width * 0.4},{height} L{width * 0.75},{height * 0.45} L{width},{height} Z")));
         }
         using var stream = new MemoryStream();
-        bitmap.Save(stream);
+        bitmap.Save(stream, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         return stream.ToArray();
     }
 
