@@ -11,7 +11,7 @@
     <Panel>
         <core:Backdrop />
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" core:ScrollFade.Enabled="True">
-            <StackPanel Margin="40,28,40,40" Spacing="14">
+            <StackPanel x:Name="Page" Margin="40,28,40,40" Spacing="14">
                 <StackPanel Margin="0,0,0,6">
                     <TextBlock Classes="eyebrow" Text="ANY APP" />
                     <TextBlock Classes="display" Text="Quick Capture" />

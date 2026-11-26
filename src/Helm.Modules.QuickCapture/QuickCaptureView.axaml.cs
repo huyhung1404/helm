@@ -37,6 +37,15 @@ public partial class QuickCaptureView : UserControl
         };
     }
 
+    protected override void OnSizeChanged(SizeChangedEventArgs e)
+    {
+        base.OnSizeChanged(e);
+        // A narrow window: the phone margins and the narrow class, as on every shared page.
+        var narrow = e.NewSize.Width < 720;
+        Classes.Set("narrow", narrow);
+        Page.Margin = narrow ? new Avalonia.Thickness(16, 18, 16, 28) : new Avalonia.Thickness(40, 28, 40, 40);
+    }
+
     private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(IModule.IsEnabled) || _module is null) return;
