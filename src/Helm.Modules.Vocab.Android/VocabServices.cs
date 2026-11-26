@@ -13,6 +13,6 @@ public static class VocabServices
             // The pop-up card and the bubble over the other apps, and the settings page's part for them.
             .AddSingleton<VocabOverlay>()
             .AddSingleton<VocabOverlaySettingsViewModel>()
-            .AddAndroidModule<VocabModule, VocabPage>()
+            .AddAndroidModule<VocabModule, VocabContentPage>()
             .AddTransient<VocabContentPage>();
 }

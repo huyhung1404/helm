@@ -22,6 +22,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
   the ring to mark today, the ones done today folded under them, and the Report tab. Marking a day, the celebration and
   the reason for skipped days open as one sheet (the reason still cannot be skipped). The settings are a sheet behind
   the gear; Home → Utilities opens Habits itself.
+- **Vocabulary has the new look on the PC and the phone**, one page for both: Learn with its answer bar, Words with a
+  word's page and tree, Roots, and the sheets for adding words or a text, an analysis, editing and the settings. The
+  settings are a sheet behind the gear (with the on/off switch), and Home → Utilities opens Vocabulary itself. The corner
+  card on the PC and the card and bubble over other apps on the phone work as before.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the

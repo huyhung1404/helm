@@ -25,10 +25,10 @@ public sealed class VocabModule : AndroidModuleBase, IModuleContent, IBackHandle
     public override ModuleGroup Group => ModuleGroup.Learning;
     public override Symbol Icon => Symbol.BookLetter;
 
-    /// <summary>The same vector icon as on Windows (<see cref="VocabIconShape"/>).</summary>
-    public override IImage? IconImage => VocabIcon.Image;
+    /// <summary>The same vector icon as on Windows (<see cref="VocabIconShape"/>, drawn in Helm.Modules.Vocab.UI).</summary>
+    public override IImage? IconImage => Ui.VocabIcon.Image;
 
-    public override Type PageType => typeof(VocabPage);
+    public override Type PageType => typeof(VocabContentPage);
     public Type ContentPageType => typeof(VocabContentPage);
 
     public override Task EnableAsync(CancellationToken ct)
@@ -43,9 +43,6 @@ public sealed class VocabModule : AndroidModuleBase, IModuleContent, IBackHandle
         _overlay.Stop();
         return Task.CompletedTask;
     }
-
-    /// <summary>A Vocabulary page is on screen: the permissions may have changed in the phone's settings meanwhile.</summary>
-    public void PageShown() => _overlay.Refresh();
 
     /// <summary>The shown Vocabulary page's own back (its sheets, a word's page); set while the page is on screen.</summary>
     internal Func<bool>? PageBack { get; set; }

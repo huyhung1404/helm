@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Vocabulary on Android: the module, its Avalonia pages, and the pop-up card and bubble that show a word to guess over the other apps. The
+  <!-- Vocabulary on Android: the module, the page around the shared VocabView (Helm.Modules.Vocab.UI), and the pop-up card and bubble that show a word to guess over the other apps. The
        logic and the view models come from Helm.Modules.Vocab.Core (shared with Windows). Not in Helm.sln; CI builds it
        with the app. -->
   <PropertyGroup>
@@ -29,6 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vocab.Core\Helm.Modules.Vocab.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Vocab.UI\Helm.Modules.Vocab.UI.csproj" />
   </ItemGroup>
 
 </Project>

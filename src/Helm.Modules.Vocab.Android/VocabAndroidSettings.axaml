@@ -1,0 +1,107 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             x:Class="Helm.Modules.Vocab.VocabAndroidSettings"
+             x:DataType="vm:VocabOverlaySettingsViewModel">
+
+    <!-- What only the phone has, as more cards in the shared settings sheet: the permissions the pop-up card needs, the
+         floating bubble, and the apps the card and the bubble stay out of. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Vocab.UI/VocabStyles.axaml" />
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <!-- "Show a word now" with nothing to show, or without the permission -->
+        <Border Classes="glass" IsVisible="{Binding HasMessage}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="chip" VerticalAlignment="Top" Margin="10,0,0,0" Command="{Binding DismissMessageCommand}"
+                        ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                </Button>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
+        <!-- Only while the permission is missing -->
+        <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}" IsVisible="{Binding NeedsDraw}">
+            <StackPanel Spacing="10">
+                <TextBlock TextWrapping="Wrap"
+                           Text="To show words over your other apps, Helm needs “Display over other apps”. Turn it on for Helm, then come back." />
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Allow display over other apps"
+                        Command="{Binding OpenDrawSettingsCommand}" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <DockPanel>
+                <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.BubbleEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Floating bubble" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Floating bubble" Classes="head" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Tap it for a word to guess; drag it to move it. Drag it onto the ✕ at the bottom to put it away until you next unlock the phone." />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Don't show in these apps" Classes="head" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Neither the card nor the bubble shows over these apps, over Helm, or while the phone is sideways (games, videos)." />
+                </StackPanel>
+                <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}" IsVisible="{Binding NeedsUsageAccess}">
+                    <StackPanel Spacing="10">
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="To stay out of the apps below, Helm needs to see which app is open: turn on “Usage access” for Helm, then come back." />
+                        <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Allow usage access"
+                                Command="{Binding OpenUsageSettingsCommand}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Hidden while picking: a tick would add a row here and push the list under the finger -->
+                <ItemsControl ItemsSource="{Binding Blocked}" IsVisible="{Binding !IsPicking}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:VocabAppRow">
+                            <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="48" Margin="0,2">
+                                <Image Source="{Binding Icon}" Width="32" Height="32" Margin="0,0,12,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                <Button Grid.Column="2" Classes="ghost" Height="36" Margin="12,0,0,0" Content="Remove"
+                                        AutomationProperties.Name="{Binding Label, StringFormat='Remove {0}'}" Click="Unblock_Click" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ChooseAppsCommand}"
+                        IsVisible="{Binding !IsPicking}" AutomationProperties.Name="Choose apps">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="Add" FontSize="14" />
+                        <TextBlock Text="Choose apps…" />
+                    </StackPanel>
+                </Button>
+
+                <!-- The picker: every app in the launcher, ticked when blocked -->
+                <StackPanel Spacing="8" IsVisible="{Binding IsPicking}">
+                    <Grid ColumnDefinitions="*,8,Auto">
+                        <TextBox Classes="glass" Text="{Binding Search}" PlaceholderText="Search apps" AutomationProperties.Name="Search apps" />
+                        <Button Grid.Column="2" Classes="pill" Content="Done" Command="{Binding DonePickingCommand}" />
+                    </Grid>
+                    <TextBlock Text="Loading your apps…" Classes="secondary" IsVisible="{Binding IsLoadingApps}" />
+                    <ItemsControl ItemsSource="{Binding Apps}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:VocabAppRow">
+                                <CheckBox IsChecked="{Binding IsBlocked}" HorizontalAlignment="Stretch" MinHeight="48" Margin="0,2">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Image Source="{Binding Icon}" Width="32" Height="32" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
