@@ -90,8 +90,8 @@ src/
   Helm.Modules.Ssh/          Windows: the module, the terminal (xterm.js in WebView2, in a NativeControlHost), the WPF page that hosts the shared view
   Helm.Modules.Ssh.Android/  Android: the module, the page that hosts the shared view, the terminal (xterm.js in WebView) (not in Helm.sln)
   Helm.Modules.SlackBot.Core/ net8.0: Slack Report engine (reads Slack, sorts it with Claude), inbox, MCP tools, shared view models
-  Helm.Modules.SlackBot.UI/  Avalonia: the Slack Report page, its reply sheet and settings sheet
-  Helm.Modules.SlackBot/     Windows only: the module, the always-on-top list window, the WPF page that hosts the shared view
+  Helm.Modules.SlackBot.UI/  Avalonia: the Slack Report page, its reply sheet and settings sheet, the PC's always-on-top list
+  Helm.Modules.SlackBot/     Windows only: the module, the always-on-top list's window, the WPF page that hosts the shared view
   Helm.Modules.WindowZones.Core/ net8.0: zone layouts, rules, engine contracts, shared view model
   Helm.Modules.WindowZones.UI/ Avalonia: the Window Zones page, its settings sheet and the zone layout view
   Helm.Modules.WindowZones/  Windows only: the module, the snapping engine and drag overlay, the full-screen editor, the WPF page that hosts the shared view

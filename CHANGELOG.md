@@ -50,7 +50,8 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **Slack Report has the new look on the PC**: the to-do list as glass cards, what you handled today folded under it, the
   Worth knowing tab, the reply as a sheet and, until Slack is connected, a first-run card with the steps. The settings
   (connection, channels, how it sorts, when it reports, the on/off switch) are a sheet behind the gear; Home → Utilities opens
-  Slack Report itself. The list that stays on screen is unchanged.
+  Slack Report itself. The list that stays on screen has the new look too (glass cards, the reply box inside it, the
+  folded badge) and works as before: on top, never taking the keyboard except while you write a reply.
 - **Window Zones has the new look on the PC**: your screens drawn to scale with their zones, a card per zone with its
   windows (show one, take it out), first-run steps while there are no zones, and the zone editor as a sheet over the page.
   The settings (drag key, shortcuts, the on/off switch) are a sheet behind the gear; Home → Utilities opens Window Zones

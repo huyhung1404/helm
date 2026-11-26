@@ -1,0 +1,155 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.SlackBot"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.SlackBot.Ui.SlackBotListView"
+             x:DataType="vm:SlackBotInboxViewModel">
+
+    <!-- What needs the user, on top of every app until they answer it (the PC's always-on-top list; its window is
+         SlackBotOverlayWindow). It never takes the keyboard, except while a reply is written here. Folded, it is a small
+         badge with the count; a click opens it. -->
+    <UserControl.Styles>
+        <Style Selector="Button.act.reply">
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel x:Name="Root">
+        <!-- Folded: the icon, the count, and "Report" when one waits -->
+        <Border x:Name="Folded" Classes="sheet" CornerRadius="20" Padding="12,8" HorizontalAlignment="Left" Cursor="Hand"
+                ToolTip.Tip="Click to open; drag to move it; double-click to put it back in the corner" ToolTip.ShowDelay="1500"
+                AutomationProperties.Name="Open Slack Report's list">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Image x:Name="FoldedLogo" Width="18" Height="18" VerticalAlignment="Center" />
+                <Border MinWidth="22" Height="22" CornerRadius="11" Padding="6,0" Background="{DynamicResource HelmDanger}" IsVisible="{Binding HasToDo}">
+                    <TextBlock Text="{Binding ToDoCount}" Foreground="White" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Classes="muted" FontSize="13" Text="Report" VerticalAlignment="Center" IsVisible="{Binding HasReport}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Open: the to-do list -->
+        <Border x:Name="Open" Classes="sheet" CornerRadius="16" Width="360" ClipToBounds="True"
+                ToolTip.Tip="Drag to move it; double-click to put it back in the corner" ToolTip.ShowDelay="1500">
+            <DockPanel>
+                <!-- The icon, "Slack Report · n to do", open the page, fold -->
+                <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6" Margin="14,8,8,6" MinHeight="40">
+                    <Image x:Name="OpenLogo" Width="18" Height="18" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Margin="2,0,0,0" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap">
+                        <Run Text="Slack Report" />
+                        <Run Text="·" Foreground="{DynamicResource HelmSecondaryText}" />
+                        <Run Text="{Binding ToDoCount, Mode=OneWay}" />
+                        <Run Text="to do" />
+                    </TextBlock>
+                    <Button Grid.Column="2" Classes="chip" Width="32" Height="32" Padding="0" Command="{Binding ShowPageCommand}"
+                            ToolTip.Tip="Open Slack Report" AutomationProperties.Name="Open Slack Report">
+                        <ic:SymbolIcon Symbol="Open" FontSize="15" />
+                    </Button>
+                    <Button x:Name="FoldButton" Grid.Column="3" Classes="chip" Width="32" Height="32" Padding="0" ToolTip.Tip="Fold" AutomationProperties.Name="Fold">
+                        <ic:SymbolIcon Symbol="ChevronDown" FontSize="15" />
+                    </Button>
+                </Grid>
+
+                <!-- The report (worth knowing), at the report times -->
+                <Button DockPanel.Dock="Bottom" Classes="glass" Margin="10,0,10,10" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,8"
+                        Command="{Binding ShowPageCommand}" IsVisible="{Binding HasReport}" AutomationProperties.Name="{Binding ReportTitle}">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Ellipse Width="8" Height="8" Fill="{DynamicResource HelmCaution}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Margin="10,0,8,0" Text="{Binding ReportTitle}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <ic:SymbolIcon Grid.Column="2" Symbol="ChevronRight" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                    </Grid>
+                </Button>
+
+                <!-- The reply being written: as the user, to the message chosen with Reply -->
+                <Border x:Name="ReplyPanel" DockPanel.Dock="Bottom" Classes="glass" Margin="10,0,10,10" Padding="12,10" BorderBrush="{DynamicResource HelmGlassStrokeStrong}"
+                        IsVisible="{Binding ReplyTo, Converter={x:Static ObjectConverters.IsNotNull}}" core:Motion.EnterOnShow="True">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="muted" FontSize="13" TextTrimming="CharacterEllipsis">
+                            <Run Text="Reply to" />
+                            <Run Text="{Binding ReplyTo.From, Mode=OneWay, FallbackValue=''}" FontWeight="SemiBold" />
+                            <Run Text="·" />
+                            <Run Text="{Binding ReplyTo.Where, Mode=OneWay, FallbackValue=''}" />
+                        </TextBlock>
+                        <TextBox x:Name="ReplyBox" Classes="glass" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="40" MaxHeight="120"
+                                 PlaceholderText="Your answer — Enter sends, Shift+Enter a new line, Esc closes" Text="{Binding ReplyText}"
+                                 AutomationProperties.Name="Your answer" />
+                        <TextBlock Classes="late" FontSize="13" Text="{Binding ReplyProblem}" TextWrapping="Wrap"
+                                   IsVisible="{Binding ReplyProblem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel" Command="{Binding CancelReplyCommand}" />
+                            <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Command="{Binding SendReplyCommand}" IsEnabled="{Binding !IsSendingReply}"
+                                    AutomationProperties.Name="Send">
+                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                    <ic:SymbolIcon Symbol="Send" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                                    <TextBlock Text="Send" Foreground="{DynamicResource HelmPillForeground}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer x:Name="Scroller" MaxHeight="440" HorizontalScrollBarVisibility="Disabled" Padding="10,0,14,0" core:ScrollFade.Enabled="True">
+                    <ItemsControl x:Name="ToDoList" ItemsSource="{Binding ToDo}" Margin="0,0,0,6">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:InboxItemViewModel">
+                                <Border Classes="glass" Padding="12,10" Margin="0,0,0,8">
+                                    <StackPanel Spacing="4">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                     Fill="{DynamicResource HelmDanger}" IsVisible="{Binding !IsUnsorted}" />
+                                            <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                     Fill="{DynamicResource HelmSecondaryText}" IsVisible="{Binding IsUnsorted}" />
+                                            <TextBlock Grid.Column="1" Classes="muted" FontSize="13" TextTrimming="CharacterEllipsis">
+                                                <Run Text="{Binding From}" FontWeight="SemiBold" Foreground="{DynamicResource TextControlForeground}" />
+                                                <Run Text="·" />
+                                                <Run Text="{Binding Where}" />
+                                            </TextBlock>
+                                            <TextBlock Grid.Column="2" Classes="muted" FontSize="12" Text="{Binding When}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding Waiting}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding HasWaiting}" />
+                                        <TextBlock Classes="muted" FontSize="12" Text="{Binding CountText}" IsVisible="{Binding HasCount}" />
+                                        <TextBlock Classes="muted" FontSize="12" Text="Not sorted yet" IsVisible="{Binding IsUnsorted}" />
+                                        <TextBlock Text="{Binding Headline}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" FontSize="13" Text="{Binding Text}" TextWrapping="Wrap" MaxLines="4" TextTrimming="WordEllipsis"
+                                                   IsVisible="{Binding ShowText}" />
+                                        <TextBlock Classes="muted" FontSize="13" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasBotReply}">
+                                            <Run Text="Replied for you:" FontWeight="SemiBold" />
+                                            <Run Text="{Binding BotReply}" />
+                                        </TextBlock>
+                                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="4" Margin="0,4,0,0">
+                                            <Button Classes="act reply" HorizontalAlignment="Stretch" Margin="0"
+                                                    Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).StartReplyCommand}" CommandParameter="{Binding}"
+                                                    ToolTip.Tip="Write your answer here; it goes to Slack as you" AutomationProperties.Name="Reply">
+                                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                                    <ic:SymbolIcon Symbol="ArrowReply" FontSize="15" />
+                                                    <TextBlock Text="Reply" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Grid.Column="1" Classes="act" HorizontalAlignment="Stretch" Margin="0"
+                                                    Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).OpenCommand}" CommandParameter="{Binding}"
+                                                    ToolTip.Tip="Open it in Slack" AutomationProperties.Name="Open in Slack">
+                                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                                    <ic:SymbolIcon Symbol="Open" FontSize="15" />
+                                                    <TextBlock Text="Slack" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Grid.Column="2" Classes="act" HorizontalAlignment="Stretch" Margin="0"
+                                                    Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).DoneCommand}" CommandParameter="{Binding}"
+                                                    ToolTip.Tip="Takes it off the list (replying in Slack or an emoji does too)" AutomationProperties.Name="Done">
+                                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="15" Foreground="{DynamicResource HelmSuccess}" />
+                                                    <TextBlock Text="Done" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Panel>
+</UserControl>
