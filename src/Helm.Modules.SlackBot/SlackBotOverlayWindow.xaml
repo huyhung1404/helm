@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:local="clr-namespace:Helm.Modules.SlackBot"
-    Title="Slack Bot"
+    Title="Slack Report"
     WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
     ShowInTaskbar="False" ShowActivated="False" Topmost="True" SizeToContent="WidthAndHeight"
     UseLayoutRounding="True">
@@ -30,7 +30,7 @@
         <!-- Folded: the icon and the count -->
         <Border x:Name="Folded" CornerRadius="18" BorderThickness="1" Padding="10,6" Cursor="Hand"
                 Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                AutomationProperties.Name="Open Slack Bot's list">
+                AutomationProperties.Name="Open Slack Report's list">
             <StackPanel Orientation="Horizontal">
                 <Image Width="18" Height="18" Source="{x:Static local:SlackBotLogo.Image}" VerticalAlignment="Center" />
                 <Border Margin="8,0,0,0" MinWidth="22" Height="22" CornerRadius="11" Padding="6,0" Background="{DynamicResource SystemFillColorCriticalBrush}"
@@ -52,10 +52,10 @@
                     <ui:Button DockPanel.Dock="Right" Style="{StaticResource SmallIcon}" Icon="{ui:SymbolIcon ChevronDown16}"
                                ToolTip="Fold" AutomationProperties.Name="Fold" Click="Fold_Click" />
                     <ui:Button DockPanel.Dock="Right" Style="{StaticResource SmallIcon}" Icon="{ui:SymbolIcon Open16}"
-                               ToolTip="Open Slack Bot" AutomationProperties.Name="Open Slack Bot" Command="{Binding ShowPageCommand}" />
+                               ToolTip="Open Slack Report" AutomationProperties.Name="Open Slack Report" Command="{Binding ShowPageCommand}" />
                     <Image Width="16" Height="16" Source="{x:Static local:SlackBotLogo.Image}" VerticalAlignment="Center" />
                     <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold">
-                        <Run Text="Slack Bot" />
+                        <Run Text="Slack Report" />
                         <Run Text="·" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <Run Text="{Binding ToDoCount, Mode=OneWay}" />
                         <Run Text="to do" />

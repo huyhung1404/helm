@@ -1,7 +1,7 @@
 namespace Helm.Modules.SlackBot;
 
 /// <summary>
-/// The Claude models and effort levels Slack Bot offers, as Claude Code in VS Code does. Models are Claude Code's
+/// The Claude models and effort levels Slack Report offers, as Claude Code in VS Code does. Models are Claude Code's
 /// aliases, so each always means the latest of its kind.
 /// </summary>
 public static class SlackAiOptions

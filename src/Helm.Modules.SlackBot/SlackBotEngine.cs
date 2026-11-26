@@ -24,7 +24,7 @@ public enum SlackBotState
 }
 
 /// <summary>
-/// Runs SlackBot while the tool is on: signs in with the saved tokens, lists the user's conversations, keeps the
+/// Runs Slack Report while the tool is on (it reads and shows; it never answers by itself): signs in with the saved tokens, lists the user's conversations, keeps the
 /// Socket Mode connection, catches up on what came while Helm was off (DMs, mentions, the user's threads, channels),
 /// sorts messages with Claude (for the user: within seconds; the rest every few minutes), and opens the report at the
 /// times set. Everything runs on worker threads and never throws; <see cref="Changed"/> says the state moved.
@@ -50,8 +50,6 @@ public sealed class SlackBotEngine : IAsyncDisposable
 
     private readonly SlackTokens _tokens;
     private readonly SlackSorter _sorter;
-    private readonly ISlackAgent _agent;
-    private readonly ISlackProjects? _projects;
     private readonly ISettingsStore<SlackBotSettings> _settings;
     private readonly ILogger<SlackBotEngine> _logger;
     private readonly SemaphoreSlim _sortGate = new(1, 1);
@@ -62,11 +60,9 @@ public sealed class SlackBotEngine : IAsyncDisposable
     private int _forYouPending;
     private bool _caughtUp;
 
-    public SlackBotEngine(SlackTokens tokens, SlackInboxFile inbox, SlackSorter sorter, ISlackAgent agent, ISettingsStoreFactory settings,
-        ILogger<SlackBotEngine> logger, ISlackProjects? projects = null)
+    public SlackBotEngine(SlackTokens tokens, SlackInboxFile inbox, SlackSorter sorter, ISettingsStoreFactory settings,
+        ILogger<SlackBotEngine> logger)
     {
-        _agent = agent;
-        _projects = projects;
         _tokens = tokens;
         Inbox = inbox.Inbox;
         _sorter = sorter;
@@ -101,9 +97,6 @@ public sealed class SlackBotEngine : IAsyncDisposable
 
     /// <summary>Raised (on a worker thread) when the state, the status or the conversations changed.</summary>
     public event EventHandler? Changed;
-
-    /// <summary>Raised (on a worker thread) after Lumi replied for the user: who, where, Claude's line, the link.</summary>
-    public event EventHandler<SlackAlertLine>? Replied;
 
     public void Start()
     {
@@ -160,7 +153,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
     public async Task<string?> ReplyAsUserAsync(string itemId, string text, CancellationToken ct)
     {
         if (text.Trim().Length == 0) return "Write something first.";
-        if (Api is not { } api || Me is not { } me) return "Slack Bot is not connected to Slack right now.";
+        if (Api is not { } api || Me is not { } me) return "Slack Report is not connected to Slack right now.";
         if (Inbox.Snapshot().FirstOrDefault(i => i.Id == itemId) is not { } item) return "That message is no longer on the list.";
         var thread = item.Kind is SlackConversationKind.DirectMessage or SlackConversationKind.GroupMessage ? item.ThreadTs : item.ThreadTs ?? item.Ts;
         try
@@ -172,7 +165,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
         }
         catch (SlackApiException ex)
         {
-            _logger.LogWarning(ex, "Slack Bot could not send the user's reply");
+            _logger.LogWarning(ex, "Slack Report could not send the user's reply");
             return ex.Error == "missing_scope"
                 ? "The Slack app cannot write yet: update it from the manifest (chat:write) and reinstall it."
                 : $"Slack refused it ({ex.Error}).";
@@ -182,9 +175,6 @@ public sealed class SlackBotEngine : IAsyncDisposable
             return "Slack cannot be reached right now.";
         }
     }
-
-    /// <summary>Tests: as if Lumi had just replied.</summary>
-    internal void RaiseRepliedForTests(SlackAlertLine line) => Replied?.Invoke(this, line);
 
     /// <summary>New tokens, or Reconnect: starts over.</summary>
     public async Task RestartAsync()
@@ -201,13 +191,6 @@ public sealed class SlackBotEngine : IAsyncDisposable
         await StopAsync().ConfigureAwait(false);
         _sortGate.Dispose();
     }
-
-    /// <summary>A conversation's model and effort, as the user switched them from Slack.</summary>
-    private void SetAi(string channel, SlackAiChoice choice) => _settings.Update(s =>
-    {
-        if (choice.Model.Length == 0 && choice.Effort.Length == 0) s.ChannelAi.Remove(channel);
-        else s.ChannelAi[channel] = choice;
-    });
 
     private async Task RunAsync(CancellationToken ct)
     {
@@ -228,24 +211,9 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 Me = await api.AuthTestAsync(ct).ConfigureAwait(false);
                 Inbox.WorkspaceUrl = Me.Url;
                 MeName = await api.UserNameAsync(Me.UserId, ct).ConfigureAwait(false) ?? Me.UserName;
-                _logger.LogInformation("Slack Bot signed in to {Workspace}", Me.Url);
+                _logger.LogInformation("Slack Report signed in to {Workspace}", Me.Url);
                 var reader = new SlackReader(api, Me, Inbox, () => _settings.Current);
                 reader.ForYou += (_, _) => SortSoon(ct);
-                var lumi = new SlackLumi(api, _agent, Inbox, reader, () => _settings.Current, Me, MeName, _logger, _projects, SetAi);
-                reader.Called += (_, m) => _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await lumi.AnswerAsync(m, DateTimeOffset.UtcNow, ct).ConfigureAwait(false);
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        _logger.LogWarning(ex, "Lumi could not answer a call");
-                    }
-                }, CancellationToken.None);
-                var replier = new SlackReplier(api, _agent, Inbox, reader, () => _settings.Current, MeName, _logger,
-                    item => Replied?.Invoke(this, new SlackAlertLine(item.From, item.Where, item.Summary,
-                        SlackText.Permalink(Me?.Url ?? "https://slack.com/", item.Channel, item.Ts, item.ThreadTs))));
                 await RefreshConversationsAsync(api, reader, ct).ConfigureAwait(false);
                 _reader = reader;
                 Api = api;
@@ -256,7 +224,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
                     if (!connected && !ct.IsCancellationRequested) Set(SlackBotState.Offline, "Lost the connection to Slack; trying again…");
                 };
                 using var timers = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                var background = TimersAsync(api, reader, replier, timers.Token);
+                var background = TimersAsync(api, reader, timers.Token);
                 try
                 {
                     await socket.RunAsync(
@@ -334,12 +302,12 @@ public sealed class SlackBotEngine : IAsyncDisposable
             // Only what the user turned on, and never DMs with people who left; the first time, channels start from now:
             // a day of every channel would bury what matters.
             var conversations = Conversations.Where(c => !c.Gone && reader.Reads(c.Id) && (!first || c.IsDirect)).ToList();
-            // Active ones first (a workspace keeps hundreds of old DMs): once they are in, Slack Bot is ready and the
+            // Active ones first (a workspace keeps hundreds of old DMs): once they are in, Slack Report is ready and the
             // rest is read in the background. "Seen" moves only when all of it is in.
             var recent = Inbox.RecentChannels(ActiveFor);
             var active = conversations.Where(c => recent.Contains(c.Id)).ToList();
             var older = conversations.Where(c => !recent.Contains(c.Id)).ToList();
-            _logger.LogInformation("Slack Bot catching up on {Active} active and {Older} older conversations since {Since}",
+            _logger.LogInformation("Slack Report catching up on {Active} active and {Older} older conversations since {Since}",
                 active.Count, older.Count, SlackIds.Time(since));
             var done = 0;
             foreach (var c in active)
@@ -348,7 +316,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 await ReadHistoryAsync(api, reader, c, since, ct).ConfigureAwait(false);
             }
             await ReadForYouAsync(api, reader, since, ct).ConfigureAwait(false);
-            // Quiet DMs (nobody wrote for a month) are left out once Slack Bot knows which they are, unless the user
+            // Quiet DMs (nobody wrote for a month) are left out once Slack Report knows which they are, unless the user
             // wants them; the first time each one's latest message is looked up (one call), and read only if it is new.
             var learned = Inbox.ActivityLearned;
             if (learned && !_settings.Current.CatchUpQuietDms) older.RemoveAll(c => c.IsDirect);
@@ -369,7 +337,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
             if (!learned && conversations.Any(c => c.IsDirect)) Inbox.ActivityLearned = true;
             Inbox.Seen(SlackIds.Ts(started));
             _caughtUp = true;
-            _logger.LogInformation("Slack Bot caught up in {Seconds:0} s", (DateTimeOffset.UtcNow - started).TotalSeconds);
+            _logger.LogInformation("Slack Report caught up in {Seconds:0} s", (DateTimeOffset.UtcNow - started).TotalSeconds);
             Set(SlackBotState.Connected, Connected());
             SortSoon(ct);
         }
@@ -464,7 +432,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
     }
 
     /// <summary>Channel sorting, report times, "seen", the conversation list and forgetting old messages.</summary>
-    private async Task TimersAsync(ISlackApi api, SlackReader reader, SlackReplier replier, CancellationToken ct)
+    private async Task TimersAsync(ISlackApi api, SlackReader reader, CancellationToken ct)
     {
         var lastChannelSort = DateTimeOffset.UtcNow;
         var lastList = DateTimeOffset.UtcNow;
@@ -486,7 +454,6 @@ public sealed class SlackBotEngine : IAsyncDisposable
                         lastChannelSort = now;
                         await SortAsync(directOnly: false, ct).ConfigureAwait(false);
                     }
-                    if (_caughtUp) await replier.ReplyAsync(now, ct).ConfigureAwait(false);
                     if (_caughtUp && now - lastCheck >= SafetyEvery)
                     {
                         lastCheck = now;

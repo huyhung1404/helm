@@ -7,7 +7,7 @@ using Helm.Core.Settings;
 namespace Helm.Modules.SlackBot;
 
 /// <summary>
-/// Slack for AI agents over MCP (Claude Code in VS Code, say): read the conversations the user turned on in Slack Bot,
+/// Slack for AI agents over MCP (Claude Code in VS Code, say): read the conversations the user turned on in Slack Report,
 /// post a report where the user allowed writing (<see cref="SlackChannelMode.Reply"/>), and — only when the user asks —
 /// wait for the team's replies in its thread. A post is always asked first with the exact text, goes out as the user's
 /// account behind the AI signature, and cannot ping a whole channel. Conversations that are off do not exist here.
@@ -33,7 +33,7 @@ public sealed partial class SlackMcpTools(SlackBotEngine engine, ISettingsStoreF
     public IEnumerable<McpTool> Tools =>
     [
         new("slack_conversations",
-            "The Slack channels and DMs the user turned on in Helm's Slack Bot: id, name, kind, and whether you may post there " +
+            "The Slack channels and DMs the user turned on in Helm's Slack Report: id, name, kind, and whether you may post there " +
             "(can_post; the user allows writing per conversation). Others do not exist for you.",
             McpArgs.Schema(("query", McpArgs.Text("Only those whose name contains this."), false)),
             (args, _) => Task.FromResult<object?>(Conversations(McpArgs.String(args, "query")))) { ReadOnly = true },
@@ -72,7 +72,7 @@ public sealed partial class SlackMcpTools(SlackBotEngine engine, ISettingsStoreF
     private (ISlackApi Api, SlackReader Reader) Connected() =>
         engine.Api is { } api && engine.Reader is { } reader
             ? (api, reader)
-            : throw new McpToolException("Slack Bot is not connected to Slack right now; ask the user to check Slack Bot in Helm.");
+            : throw new McpToolException("Slack Report is not connected to Slack right now; ask the user to check Slack Report in Helm.");
 
     private object Conversations(string? query)
     {
@@ -100,11 +100,11 @@ public sealed partial class SlackMcpTools(SlackBotEngine engine, ISettingsStoreF
             .Where(c => c.Id == name || string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
             .Where(c => s.ModeOf(c.Id, c.Kind) != SlackChannelMode.Off)
             .ToList();
-        if (matches.Count == 0) throw new McpToolException($"No conversation “{idOrName}” is turned on in Slack Bot; see slack_conversations.");
+        if (matches.Count == 0) throw new McpToolException($"No conversation “{idOrName}” is turned on in Slack Report; see slack_conversations.");
         if (matches.Count > 1) throw new McpToolException($"“{idOrName}” is several conversations; use the id from slack_conversations.");
         var conversation = matches[0];
         if (post && s.ModeOf(conversation.Id, conversation.Kind) != SlackChannelMode.Reply)
-            throw new McpToolException($"The user does not let Slack Bot write in {SlackReader.Where(conversation, false)}; they can turn Write on for it in Slack Bot's settings.");
+            throw new McpToolException($"The user does not let Slack Report write in {SlackReader.Where(conversation, false)}; they can turn Write on for it in Slack Report's settings.");
         return conversation;
     }
 

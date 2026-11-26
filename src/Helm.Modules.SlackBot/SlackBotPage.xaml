@@ -10,7 +10,7 @@
     <StackPanel>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Chat24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Open Slack Bot" Description="What needs you, and the report of what is worth knowing." />
+                <core:CardHeader Title="Open Slack Report" Description="What needs you, and the report of what is worth knowing." />
             </ui:CardControl.Header>
             <ui:Button Content="Open" Appearance="Primary" Command="{Binding OpenContentCommand}" />
         </ui:CardControl>
@@ -31,7 +31,7 @@
         <ui:CardExpander x:Name="AppExpander" Margin="0,0,0,4" Icon="{ui:SymbolIcon Key24}">
             <ui:CardExpander.Header>
                 <core:CardHeader Title="Your Slack app"
-                                 Description="Slack Bot reads Slack as you, through an app you make in your workspace. The tokens stay on this PC, encrypted." />
+                                 Description="Slack Report reads Slack as you, through an app you make in your workspace. The tokens stay on this PC, encrypted." />
             </ui:CardExpander.Header>
             <StackPanel>
                 <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
@@ -78,54 +78,21 @@
                 <ui:TextBox Margin="0,0,0,8" PlaceholderText="Find a channel or person" Icon="{ui:SymbolIcon Search24}"
                             Text="{Binding ChannelFilter, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Find a channel" />
                 <TextBlock Margin="0,0,0,8" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                           Text="Read: on your list and in the report. Write: Slack Bot may also reply there and AI agents may post reports (needs Read). Both off: nothing from it is read, kept or shown to Claude, and what was kept is removed." />
+                           Text="Read: on your list and in the report. Write: AI agents (Fairy) may post there, signed as AI and asked first each time (needs Read). Slack Report never answers by itself. Both off: nothing from it is read, kept or shown to Claude, and what was kept is removed." />
                 <ScrollViewer MaxHeight="380" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding Channels}" VirtualizingPanel.IsVirtualizing="True">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type local:SlackChannelRow}">
                                 <Border Style="{DynamicResource HelmExpanderRow}" Padding="0,6">
-                                    <StackPanel>
                                     <core:RowLayout>
                                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                            <!-- This conversation's own model and effort for Lumi and replies -->
-                                            <ui:Button Margin="0,0,16,0" Padding="8,3" Appearance="Transparent" Content="{Binding AiLabel}" Click="AiMenu_Click"
-                                                       ToolTip="Claude model and effort for Lumi here" Visibility="{Binding CanRead, Converter={StaticResource BoolToVisibility}}"
-                                                       AutomationProperties.Name="{Binding Name, StringFormat=Claude model and effort for {0}}" />
                                             <TextBlock Text="Read" VerticalAlignment="Center" Margin="0,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
                                             <ui:ToggleSwitch IsChecked="{Binding CanRead}" AutomationProperties.Name="{Binding Name, StringFormat=Read {0}}" />
                                             <TextBlock Text="Write" VerticalAlignment="Center" Margin="20,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
                                             <ui:ToggleSwitch IsChecked="{Binding CanWrite}" AutomationProperties.Name="{Binding Name, StringFormat=Write in {0}}" />
                                         </StackPanel>
                                     </core:RowLayout>
-                                    <!-- Where Write is on: the projects Lumi may read before answering -->
-                                    <StackPanel Margin="0,6,0,0" Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}">
-                                        <DockPanel>
-                                            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="Add folder…" Icon="{ui:SymbolIcon FolderAdd16}" Click="BrowseProject_Click"
-                                                       AutomationProperties.Name="{Binding Name, StringFormat=Add a project folder for {0}}" />
-                                            <Grid VerticalAlignment="Center">
-                                                <TextBlock Text="Projects Lumi may read" Style="{DynamicResource HelmSecondaryText}"
-                                                           Visibility="{Binding HasProjects, Converter={StaticResource BoolToVisibility}}" />
-                                                <TextBlock Text="No project: Lumi answers from the chat only" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
-                                                           Visibility="{Binding HasProjects, Converter={StaticResource InverseBoolToVisibility}}" />
-                                            </Grid>
-                                        </DockPanel>
-                                        <ItemsControl ItemsSource="{Binding Projects}" Margin="0,2,0,0">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <DockPanel Margin="0,2,0,0">
-                                                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="4" MinWidth="0" BorderThickness="0"
-                                                                   Icon="{ui:SymbolIcon Dismiss16}" ToolTip="Remove this folder" Click="RemoveProject_Click"
-                                                                   Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                                   AutomationProperties.Name="{Binding StringFormat=Remove {0}}" />
-                                                        <ui:SymbolIcon Symbol="Folder16" Margin="0,0,6,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                        <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding}" />
-                                                    </DockPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                    </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -160,7 +127,7 @@
         </ui:CardExpander>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Claude model" Description="Sorts the messages, and answers wherever a conversation has no model of its own (AI button in Channels and DMs)." />
+                <core:CardHeader Title="Claude model" Description="Sorts the messages." />
             </ui:CardControl.Header>
             <ComboBox MinWidth="240" ItemsSource="{Binding Models}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Model}"
                       AutomationProperties.Name="Claude model" />
@@ -183,51 +150,26 @@
             </StackPanel>
         </ui:CardControl>
 
-        <!-- Replying for the user, openly as an AI assistant -->
-        <TextBlock Text="Replies" Style="{DynamicResource HelmSectionHeader}" />
+        <!-- Posts by AI agents (Fairy, through the MCP tools), openly as AI -->
+        <TextBlock Text="Posts by AI agents" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon ChatArrowBack20}">
             <ui:CardExpander.Header>
                 <core:CardHeader Title="AI signature"
-                                 Description="A small grey line Helm puts under every message Slack Bot posts, so nobody takes it for you. {me} is your name; it always says AI." />
+                                 Description="A small grey line Helm puts under every message an AI agent posts where Write is on (asked first each time), so nobody takes it for you. {me} is your name; it always says AI. Slack Report itself never answers." />
             </ui:CardExpander.Header>
             <StackPanel>
                 <ui:TextBox AutomationProperties.Name="AI signature" Text="{Binding Signature, UpdateSourceTrigger=LostFocus}" />
                 <core:RowLayout Margin="0,8,0,0">
                     <core:CardHeader Title="Signature emoji"
-                                     Description="A Slack emoji code in front of the signature, e.g. :robot_face:, or your own emoji (upload one in Slack as :lumi:)." />
+                                     Description="A Slack emoji code in front of the signature, e.g. :robot_face:, or your own emoji uploaded in Slack." />
                     <ui:TextBox Width="180" HorizontalAlignment="Right" AutomationProperties.Name="Signature emoji"
                                 Text="{Binding SignatureEmoji, UpdateSourceTrigger=LostFocus}" />
                 </core:RowLayout>
-                <TextBlock Margin="0,8,0,0" Text="A reply looks like this (the words are Claude's; in Slack the last line is small and grey):" Style="{DynamicResource HelmSecondaryText}" />
+                <TextBlock Margin="0,8,0,0" Text="A post looks like this (in Slack the last line is small and grey):" Style="{DynamicResource HelmSecondaryText}" />
                 <TextBlock Margin="0,2,0,0" Text="{Binding ReplyPreview}" TextWrapping="Wrap" />
                 <ui:Button Margin="0,8,0,0" Appearance="Transparent" Content="Back to the default" Command="{Binding ResetSignatureCommand}" />
             </StackPanel>
         </ui:CardExpander>
-        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon TextEditStyle24}">
-            <ui:CardExpander.Header>
-                <core:CardHeader Title="How replies are written"
-                                 Description="Optional: tone, language, what to say. Claude sees only the one message it answers, never your other conversations; it never promises, approves or decides for you." />
-            </ui:CardExpander.Header>
-            <ui:TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" VerticalContentAlignment="Top" AutomationProperties.Name="How replies are written"
-                        PlaceholderText="e.g. Xưng em, gọi người nhắn là anh/chị, ngắn gọn, thân thiện."
-                        Text="{Binding ReplyStyle, UpdateSourceTrigger=LostFocus}" />
-        </ui:CardExpander>
-        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Timer24}">
-            <ui:CardControl.Header>
-                <core:CardHeader Title="Reply when you have not answered"
-                                 Description="Once per DM or thread every 4 hours, never to messages older than 2 hours. The message stays on your list." />
-            </ui:CardControl.Header>
-            <ComboBox MinWidth="200" ItemsSource="{Binding ReplyAfterChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
-                      SelectedValue="{Binding ReplyAfterMinutes}" AutomationProperties.Name="Reply when you have not answered" />
-        </ui:CardControl>
-
-        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon PersonChat24}">
-            <ui:CardControl.Header>
-                <core:CardHeader Title="Answer when someone calls Lumi"
-                                 Description="A message with &quot;lumi&quot; or &quot;@lumi&quot; (yours anywhere, others' where Write is on): Lumi answers in the thread from that conversation only, with the AI signature." />
-            </ui:CardControl.Header>
-            <ui:ToggleSwitch IsChecked="{Binding AnswerCalls}" />
-        </ui:CardControl>
 
         <!-- The report and the list on screen -->
         <TextBlock Text="On screen" Style="{DynamicResource HelmSectionHeader}" />
@@ -269,76 +211,5 @@
             <ui:Button Content="Reset" Command="{Binding ResetOverlayCommand}" />
         </ui:CardControl>
 
-        <!-- The phone, through the user's own Telegram bot -->
-        <TextBlock Text="Phone (Telegram)" Style="{DynamicResource HelmSectionHeader}" />
-        <ui:CardExpander x:Name="TelegramExpander" Margin="0,0,0,4" Icon="{ui:SymbolIcon Phone24}">
-            <ui:CardExpander.Header>
-                <core:CardHeader Title="Telegram bot" Description="{Binding TelegramStatus}" />
-            </ui:CardExpander.Header>
-            <StackPanel>
-                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
-                    <core:CardHeader Title="1. Make your bot"
-                                     Description="In Telegram open @BotFather, send /newbot, name it (Lumi), and copy the token it gives you. Only who wrote, where and Claude's one line go to Telegram, never the message itself." />
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="2. Bot token" Description="Kept on this PC only, encrypted." />
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <ui:PasswordBox x:Name="TelegramTokenBox" Width="260" PlaceholderText="123456789:AAH…" AutomationProperties.Name="Telegram bot token" />
-                            <ui:Button Margin="8,0,0,0" Content="Save" Click="SaveTelegramToken_Click" />
-                        </StackPanel>
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="3. Find your chat" Description="Open your bot in Telegram and send /start, then press this: a test message comes to your phone." />
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <ui:Button Content="Find my chat" Appearance="Primary" Command="{Binding FindTelegramChatCommand}" />
-                            <ui:Button Margin="8,0,0,0" Content="Send a test" Command="{Binding TestTelegramCommand}" />
-                            <ui:Button Margin="8,0,0,0" Content="Disconnect" Command="{Binding ForgetTelegramCommand}"
-                                       Visibility="{Binding HasTelegramToken, Converter={StaticResource BoolToVisibility}}" />
-                        </StackPanel>
-                    </core:RowLayout>
-                </Border>
-            </StackPanel>
-        </ui:CardExpander>
-        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Alert24}">
-            <ui:CardExpander.Header>
-                <core:RowLayout>
-                    <core:CardHeader Title="Send to my phone" Description="What goes to Telegram." />
-                    <ui:ToggleSwitch HorizontalAlignment="Right" Margin="0,0,16,0" IsChecked="{Binding TelegramEnabled}" AutomationProperties.Name="Send to my phone" />
-                </core:RowLayout>
-            </ui:CardExpander.Header>
-            <StackPanel IsEnabled="{Binding TelegramEnabled}">
-                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
-                    <core:RowLayout>
-                        <core:CardHeader Title="When Lumi replied for me" />
-                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding TelegramOnReply}" />
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Reminders of what still waits" Description="With the list's reminders (Remind me of what still waits)." />
-                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding TelegramOnRemind}" />
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Every new to-do" Description="Each message that lands on the list." />
-                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding TelegramOnNewToDo}" />
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Only when I'm away from the PC" Description="Away: no keyboard or mouse for this long." />
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <ComboBox MinWidth="140" ItemsSource="{Binding AwayChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
-                                      SelectedValue="{Binding AwayMinutes}" IsEnabled="{Binding TelegramOnlyAway}" AutomationProperties.Name="Away after" />
-                            <ui:ToggleSwitch Margin="12,0,0,0" IsChecked="{Binding TelegramOnlyAway}" AutomationProperties.Name="Only when I'm away from the PC" />
-                        </StackPanel>
-                    </core:RowLayout>
-                </Border>
-            </StackPanel>
-        </ui:CardExpander>
     </StackPanel>
 </core:ModulePageBase>

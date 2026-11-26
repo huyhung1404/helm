@@ -72,10 +72,10 @@ public sealed class InboxItem
 
     public DateTimeOffset? HandledAt { get; set; }
 
-    /// <summary>A worth-knowing item the user has seen in Slack Bot.</summary>
+    /// <summary>A worth-knowing item the user has seen in Slack Report.</summary>
     public bool Read { get; set; }
 
-    /// <summary>The reply Slack Bot sent for the user (it stays on the list all the same), or null.</summary>
+    /// <summary>The reply Slack Report sent for the user (it stays on the list all the same), or null.</summary>
     public string? BotReply { get; set; }
 
     public DateTimeOffset? BotReplyAt { get; set; }
@@ -130,9 +130,9 @@ public sealed class InboxData
     /// <summary>Every DM's latest message was looked up once: <see cref="Activity"/> knows which DMs are quiet.</summary>
     public bool ActivityLearned { get; set; }
 
-    /// <summary>Messages Slack Bot sent (channel:ts): they are the user's account but not the user's answer.</summary>
+    /// <summary>Messages Slack Report sent (channel:ts): they are the user's account but not the user's answer.</summary>
     public List<string> BotMessages { get; set; } = [];
 
-    /// <summary>When Slack Bot last replied per <see cref="InboxItem.Scope"/>: once in a while per DM or thread.</summary>
+    /// <summary>When Slack Report last replied per <see cref="InboxItem.Scope"/>: once in a while per DM or thread.</summary>
     public Dictionary<string, DateTimeOffset> BotScopes { get; set; } = [];
 }

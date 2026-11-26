@@ -4,8 +4,8 @@ using System.Text.RegularExpressions;
 namespace Helm.Modules.SlackBot;
 
 /// <summary>
-/// A message Slack Bot posts for the user: the words, then a small grey line with the bot's emoji and its label
-/// ("Lumi · trợ lý AI của Hưng"), as Slack shows a bot's credit. The plain text (notifications, old clients) carries the
+/// A message Slack Report posts for the user: the words, then a small grey line with the bot's emoji and its label
+/// ("Fairy · trợ lý AI của Hùng"), as Slack shows a bot's credit. The plain text (notifications, old clients) carries the
 /// label in front.
 /// </summary>
 public sealed record SlackSignedMessage(string Body, string Label, string Emoji)
@@ -33,11 +33,11 @@ public static partial class SlackSignature
     /// <summary>The label with the user's name; it always says AI, so nobody takes the message for the user's own.</summary>
     public static string Label(string template, string me)
     {
-        var label = (string.IsNullOrWhiteSpace(template) ? SlackBotSettings.DefaultSignature : template).Replace("{me}", me, StringComparison.Ordinal).Trim();
+        var label = (string.IsNullOrWhiteSpace(template) || template.Trim() == SlackBotSettings.OldDefaultSignature ? SlackBotSettings.DefaultSignature : template).Replace("{me}", me, StringComparison.Ordinal).Trim();
         return label.Contains("AI", StringComparison.OrdinalIgnoreCase) ? label : label + " (AI)";
     }
 
-    /// <summary>A Slack emoji code (:lumi:, :robot_face:), or the default when it is not one.</summary>
+    /// <summary>A Slack emoji code (:robot_face:, a custom one), or the default when it is not one.</summary>
     public static string Emoji(string emoji) => EmojiCode().IsMatch(emoji.Trim()) ? emoji.Trim() : DefaultEmoji;
 
     /// <summary>

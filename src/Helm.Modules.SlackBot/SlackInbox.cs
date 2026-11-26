@@ -297,7 +297,7 @@ public sealed class SlackInbox
 
     /// <summary>
     /// Messages for the user that are still to do, sorted, at least <paramref name="after"/> old (the user had time to
-    /// answer) and at most <paramref name="maxAge"/> (no reply hours later), with no reply from Slack Bot in their DM or
+    /// answer) and at most <paramref name="maxAge"/> (no reply hours later), with no reply from Slack Report in their DM or
     /// thread for <paramref name="perScope"/>: the latest one per DM or thread.
     /// </summary>
     public IReadOnlyList<InboxItem> ToReply(DateTimeOffset now, TimeSpan after, TimeSpan maxAge, TimeSpan perScope)
@@ -314,7 +314,7 @@ public sealed class SlackInbox
         }
     }
 
-    /// <summary>A reply is on its way to <paramref name="channel"/>: the user's account writing there now is Slack Bot.</summary>
+    /// <summary>A reply is on its way to <paramref name="channel"/>: the user's account writing there now is Slack Report.</summary>
     public void Sending(string channel)
     {
         lock (_gate) _sending.Add(channel);
@@ -327,7 +327,7 @@ public sealed class SlackInbox
     }
 
     /// <summary>
-    /// Slack Bot replied to <paramref name="id"/> with <paramref name="text"/>, or decided not to (null text): it is
+    /// Slack Report replied to <paramref name="id"/> with <paramref name="text"/>, or decided not to (null text): it is
     /// not asked again for that message. The item stays to do.
     /// </summary>
     public void BotReplied(string id, string channel, string? ts, string? text)
@@ -351,7 +351,7 @@ public sealed class SlackInbox
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>An AI agent posted <paramref name="ts"/> through Slack Bot (a report): the user's account, not the user's answer.</summary>
+    /// <summary>An AI agent posted <paramref name="ts"/> through Slack Report (a report): the user's account, not the user's answer.</summary>
     public void BotPosted(string channel, string? ts)
     {
         lock (_gate)
@@ -363,7 +363,7 @@ public sealed class SlackInbox
         }
     }
 
-    /// <summary>A message of the user's account that Slack Bot wrote (sent, or being sent to that channel).</summary>
+    /// <summary>A message of the user's account that Slack Report wrote (sent, or being sent to that channel).</summary>
     public bool IsBotMessage(string channel, string ts)
     {
         lock (_gate) return _sending.Contains(channel) || _data.BotMessages.Contains(SlackIds.Message(channel, ts));

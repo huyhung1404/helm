@@ -20,9 +20,6 @@ public sealed partial class SlackBotViewModel : ObservableObject
     private readonly IProcessLauncher _launcher;
     private readonly IServiceProvider _services;
     private readonly SlackBotOverlay _overlay;
-    private readonly SlackTelegramToken _telegramToken;
-    private readonly ITelegram _telegram;
-    private readonly SlackPhoneAlerts _phone;
     private List<SlackChannelRow> _allChannels = [];
     private bool _loading;
 
@@ -38,31 +35,16 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private string _effort = "";
     [ObservableProperty] private bool _playSound;
     [ObservableProperty] private int _remindEveryMinutes;
-    [ObservableProperty] private bool _answerCalls;
-    [ObservableProperty] private bool _telegramEnabled;
-    [ObservableProperty] private bool _telegramOnReply;
-    [ObservableProperty] private bool _telegramOnRemind;
-    [ObservableProperty] private bool _telegramOnNewToDo;
-    [ObservableProperty] private bool _telegramOnlyAway;
-    [ObservableProperty] private int _awayMinutes;
-    [ObservableProperty] private string _telegramStatus = "";
-    [ObservableProperty] private bool _hasTelegramToken;
     [ObservableProperty] private string _channelFilter = "";
     [ObservableProperty] private string _channelsSummary = "";
     [ObservableProperty] private string _signature = "";
     [ObservableProperty] private string _signatureEmoji = "";
-    [ObservableProperty] private string _replyStyle = "";
     [ObservableProperty] private string _replyPreview = "";
-    [ObservableProperty] private int _replyAfterMinutes;
     [ObservableProperty] private double _overlayOpacity;
 
     public SlackBotViewModel(SlackBotModule module, SlackBotEngine engine, SlackTokens tokens, ISettingsStoreFactory settings, IUiDispatcher ui,
-        IProcessLauncher launcher, IServiceProvider services, SlackBotOverlay overlay, SlackTelegramToken telegramToken, ITelegram telegram,
-        SlackPhoneAlerts phone)
+        IProcessLauncher launcher, IServiceProvider services, SlackBotOverlay overlay)
     {
-        _telegramToken = telegramToken;
-        _telegram = telegram;
-        _phone = phone;
         _overlay = overlay;
         Module = module;
         _engine = engine;
@@ -81,15 +63,6 @@ public sealed partial class SlackBotViewModel : ObservableObject
     public string Manifest => SlackAppManifest.Json;
 
     public ObservableCollection<SlackChannelRow> Channels { get; } = [];
-
-    public IReadOnlyList<SlackBotChoice<int>> ReplyAfterChoices { get; } =
-    [
-        new(1, "After 1 minute"),
-        new(3, "After 3 minutes"),
-        new(5, "After 5 minutes"),
-        new(10, "After 10 minutes"),
-        new(30, "After 30 minutes"),
-    ];
 
     public IReadOnlyList<SlackBotChoice<int>> RemindChoices { get; } =
     [
@@ -166,107 +139,17 @@ public sealed partial class SlackBotViewModel : ObservableObject
 
     partial void OnRemindEveryMinutesChanged(int value) => Save(s => s.RemindEveryMinutes = value);
 
-    partial void OnAnswerCallsChanged(bool value) => Save(s => s.AnswerCalls = value);
-
-    partial void OnTelegramEnabledChanged(bool value) => Save(s => s.TelegramEnabled = value);
-
-    partial void OnTelegramOnReplyChanged(bool value) => Save(s => s.TelegramOnReply = value);
-
-    partial void OnTelegramOnRemindChanged(bool value) => Save(s => s.TelegramOnRemind = value);
-
-    partial void OnTelegramOnNewToDoChanged(bool value) => Save(s => s.TelegramOnNewToDo = value);
-
-    partial void OnTelegramOnlyAwayChanged(bool value) => Save(s => s.TelegramOnlyAway = value);
-
-    partial void OnAwayMinutesChanged(int value) => Save(s => s.AwayMinutes = Math.Clamp(value, 1, 120));
-
-    public IReadOnlyList<SlackBotChoice<int>> AwayChoices { get; } =
-    [
-        new(2, "2 minutes"),
-        new(5, "5 minutes"),
-        new(10, "10 minutes"),
-        new(30, "30 minutes"),
-    ];
-
-    /// <summary>The phone is set up (a chat was found).</summary>
-    public bool TelegramConnected => _store.Current.TelegramChatId is not null;
-
-    /// <summary>Saves the bot's token (from the password box); false with the reason in <see cref="TelegramStatus"/>.</summary>
-    public bool SaveTelegramToken(string token)
-    {
-        if (SlackTelegramToken.Problem(token) is { } problem)
-        {
-            TelegramStatus = problem;
-            return false;
-        }
-        _telegramToken.Save(token.Trim());
-        HasTelegramToken = true;
-        TelegramStatus = "Token saved. Now send /start to your bot in Telegram, then press Find my chat.";
-        return true;
-    }
-
-    [RelayCommand]
-    private async Task FindTelegramChat()
-    {
-        if (_telegramToken.Load() is not { } token)
-        {
-            TelegramStatus = "Save the bot token first.";
-            return;
-        }
-        try
-        {
-            if (await _telegram.FindChatAsync(token, CancellationToken.None) is not { } chat)
-            {
-                TelegramStatus = "Nobody wrote to the bot yet: open it in Telegram, send /start, then press Find my chat again.";
-                return;
-            }
-            _store.Update(s =>
-            {
-                s.TelegramChatId = chat.Id;
-                s.TelegramChatName = chat.Name;
-            });
-            TelegramStatus = (await _phone.TestAsync(CancellationToken.None)) is { } why
-                ? why
-                : $"Connected to {chat.Name}: a test message is on your phone.";
-        }
-        catch (TelegramException ex)
-        {
-            TelegramStatus = ex.Message;
-        }
-    }
-
-    [RelayCommand]
-    private async Task TestTelegram() =>
-        TelegramStatus = await _phone.TestAsync(CancellationToken.None) ?? "Sent: look at your phone.";
-
-    [RelayCommand]
-    private void ForgetTelegram()
-    {
-        _telegramToken.Delete();
-        _store.Update(s =>
-        {
-            s.TelegramChatId = null;
-            s.TelegramChatName = "";
-        });
-        HasTelegramToken = false;
-        TelegramStatus = "Telegram is disconnected.";
-    }
-
     partial void OnSignatureChanged(string value)
     {
         UpdatePreview();
         Save(s => s.Signature = value);
     }
 
-    partial void OnReplyStyleChanged(string value) => Save(s => s.ReplyStyle = value);
-
     partial void OnSignatureEmojiChanged(string value)
     {
         UpdatePreview();
         Save(s => s.SignatureEmoji = value);
     }
-
-    partial void OnReplyAfterMinutesChanged(int value) => Save(s => s.ReplyAfterMinutes = value);
 
     partial void OnOverlayOpacityChanged(double value) => Save(s => s.OverlayOpacity = Math.Clamp(value, 0.3, 1));
 
@@ -305,21 +188,8 @@ public sealed partial class SlackBotViewModel : ObservableObject
             Effort = s.Effort;
             PlaySound = s.PlaySound;
             RemindEveryMinutes = s.RemindEveryMinutes;
-            AnswerCalls = s.AnswerCalls;
-            TelegramEnabled = s.TelegramEnabled;
-            TelegramOnReply = s.TelegramOnReply;
-            TelegramOnRemind = s.TelegramOnRemind;
-            TelegramOnNewToDo = s.TelegramOnNewToDo;
-            TelegramOnlyAway = s.TelegramOnlyAway;
-            AwayMinutes = s.AwayMinutes;
-            HasTelegramToken = _telegramToken.Exists;
-            TelegramStatus = s.TelegramChatId is null
-                ? (HasTelegramToken ? "Send /start to your bot in Telegram, then press Find my chat." : "Not set up.")
-                : $"Connected to {s.TelegramChatName}.";
             Signature = s.Signature;
             SignatureEmoji = s.SignatureEmoji;
-            ReplyStyle = s.ReplyStyle;
-            ReplyAfterMinutes = s.ReplyAfterMinutes;
             OverlayOpacity = s.OverlayOpacity;
         }
         finally
@@ -336,7 +206,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
     private void RefreshEngine()
     {
         HasTokens = _tokens.Exist;
-        Status = _engine.Status is { Length: > 0 } s ? s : _engine.State == SlackBotState.Off ? "Slack Bot is turned off." : "";
+        Status = _engine.Status is { Length: > 0 } s ? s : _engine.State == SlackBotState.Off ? "Slack Report is turned off." : "";
         // DMs with people who left are not worth a switch.
         var conversations = _engine.Conversations.Where(c => !c.Gone).ToList();
         if (conversations.Count == _allChannels.Count && conversations.Select(c => c.Id).SequenceEqual(_allChannels.Select(r => r.Id)))
@@ -345,25 +215,10 @@ public sealed partial class SlackBotViewModel : ObservableObject
             return;
         }
         var settings = _store.Current;
-        _allChannels = conversations.Select(c => new SlackChannelRow(c, settings.ModeOf(c.Id, c.Kind), SetMode,
-            settings.FoldersOf(c.Id), SetProjects, settings.ChannelAi.GetValueOrDefault(c.Id), SetAi)).ToList();
+        _allChannels = conversations.Select(c => new SlackChannelRow(c, settings.ModeOf(c.Id, c.Kind), SetMode)).ToList();
         FilterChannels();
         UpdatePreview();
     }
-
-    private void SetAi(string id, SlackAiChoice choice) => _store.Update(s =>
-    {
-        if (choice.Model.Length == 0 && choice.Effort.Length == 0) s.ChannelAi.Remove(id);
-        else s.ChannelAi[id] = new SlackAiChoice { Model = choice.Model, Effort = choice.Effort };
-    });
-
-    private void SetProjects(string id, IReadOnlyList<string> folders) => _store.Update(s =>
-    {
-        // The list now holds the old single folder too.
-        s.ChannelProjects.Remove(id);
-        if (folders.Count == 0) s.ChannelFolders.Remove(id);
-        else s.ChannelFolders[id] = [.. folders];
-    });
 
     private void SetMode(string id, SlackChannelMode mode)
     {
@@ -385,14 +240,14 @@ public sealed partial class SlackBotViewModel : ObservableObject
     private void UpdateSummary()
     {
         var read = _allChannels.Count(r => r.Mode != SlackChannelMode.Off);
-        var reply = _allChannels.Count(r => r.Mode == SlackChannelMode.Reply);
+        var write = _allChannels.Count(r => r.Mode == SlackChannelMode.Reply);
         ChannelsSummary = _allChannels.Count == 0
-            ? "The list appears once Slack Bot is connected."
-            : $"Reads {read} of {_allChannels.Count}, replies in {reply}. DMs are read unless you turn them off; channels are off until you turn them on.";
+            ? "The list appears once Slack Report is connected."
+            : $"Reads {read} of {_allChannels.Count}; AI agents may post in {write}. DMs are read unless you turn them off; channels are off until you turn them on.";
     }
 
-    /// <summary>How a reply looks: an example of what Claude writes, then the signature line.</summary>
+    /// <summary>How a post by an AI agent looks: an example, then the signature line.</summary>
     private void UpdatePreview() =>
-        ReplyPreview = new SlackSignedMessage("Dạ em đã nhận được tin nhắn và báo lại rồi ạ, anh ấy sẽ phản hồi sớm nhất có thể.",
+        ReplyPreview = new SlackSignedMessage("Báo cáo hôm nay: đã xong bản build Android, còn chờ test.",
             SlackSignature.Label(Signature, _engine.MeName is { Length: > 0 } me ? me : "you"), SlackSignature.Emoji(SignatureEmoji)).Preview;
 }

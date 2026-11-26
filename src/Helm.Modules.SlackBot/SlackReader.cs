@@ -15,9 +15,6 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
     /// <summary>Raised when a message for the user arrived (sort it soon).</summary>
     public event EventHandler? ForYou;
 
-    /// <summary>Raised for a message that names Lumi ("lumi, …", "@lumi"), whoever wrote it and wherever: Lumi decides.</summary>
-    public event EventHandler<SlackMessage>? Called;
-
     public SlackIdentity Me => me;
 
     public void SetConversations(IEnumerable<SlackConversation> conversations) =>
@@ -45,13 +42,12 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
     /// <summary>Takes in one message (live or caught up); false when it was not kept.</summary>
     public async Task<bool> ReadAsync(SlackMessage m, CancellationToken ct)
     {
-        if (SlackLumi.IsCall(m.Text)) Called?.Invoke(this, m);
         var reads = Reads(m.Channel);
         if (reads) inbox.Touch(m.Channel, m.Ts);
         var conversation = Conversation(m.Channel);
         if (m.User == me.UserId)
         {
-            // Slack Bot's own replies are sent as the user, but they answer nothing.
+            // Slack Report's own replies are sent as the user, but they answer nothing.
             if (!inbox.IsBotMessage(m.Channel, m.Ts)) inbox.Mine(m, conversation.Kind);
             return false;
         }

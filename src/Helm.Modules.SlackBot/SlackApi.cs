@@ -49,7 +49,7 @@ public interface ISlackApi
     /// </summary>
     Task<string?> PostMessageAsync(string channel, string text, string? blocks, string? threadTs, CancellationToken ct);
 
-    /// <summary>Removes a message the user wrote (Slack Bot's own, such as Lumi's "on it" line).</summary>
+    /// <summary>Removes a message the user wrote (Slack Report's own, such as Lumi's "on it" line).</summary>
     Task DeleteMessageAsync(string channel, string ts, CancellationToken ct) => throw new NotSupportedException();
 
     /// <summary>A fresh Socket Mode address (apps.connections.open, with the app-level token).</summary>

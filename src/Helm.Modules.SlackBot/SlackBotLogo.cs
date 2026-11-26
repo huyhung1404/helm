@@ -3,7 +3,7 @@ using System.Windows.Media;
 
 namespace Helm.Modules.SlackBot;
 
-/// <summary>The Slack Bot icon as a WPF vector image (<see cref="SlackBotIconShape"/>).</summary>
+/// <summary>The Slack Report icon as a WPF vector image (<see cref="SlackBotIconShape"/>).</summary>
 public static class SlackBotLogo
 {
     /// <summary>Frozen: shared by the navigation, Home, the pages and the overlay.</summary>

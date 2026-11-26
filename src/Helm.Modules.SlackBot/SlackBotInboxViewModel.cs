@@ -73,10 +73,7 @@ public sealed class InboxItemViewModel(InboxItem item, string link, DateTimeOffs
     /// <summary>Claude's line alone (null while not sorted).</summary>
     public string? Summary => item.Summary;
 
-    /// <summary>For a phone alert: who, where, Claude's line, the link, how long it waits.</summary>
-    public SlackAlertLine Alert => new(From, Where, Summary, Link, Waiting);
-
-    /// <summary>What Slack Bot answered for the user (the latest in the card), or null.</summary>
+    /// <summary>What Slack Report answered for the user (the latest in the card), or null.</summary>
     public string? BotReply => _all.LastOrDefault(i => i.BotReply is not null)?.BotReply;
 
     public bool HasBotReply => BotReply is not null;
@@ -173,12 +170,6 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
 
     /// <summary>Raised on the UI thread when something new lands on the to-do list.</summary>
     public event EventHandler? NewToDo;
-
-    /// <summary>Raised on the UI thread with what just landed on the to-do list (for the phone).</summary>
-    public event EventHandler<IReadOnlyList<SlackAlertLine>>? NewToDoLines;
-
-    /// <summary>What waits on the list for an hour or more, oldest first (for the phone).</summary>
-    public IReadOnlyList<SlackAlertLine> WaitingLines() => ToDo.Where(i => i.HasWaiting).Select(i => i.Alert).ToList();
 
     /// <summary>Raised on the UI thread when something has waited too long: bring the list back.</summary>
     public event EventHandler? Remind;
@@ -343,18 +334,14 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
         HasToDo = ToDoCount > 0;
         HasReport = ReportCount > 0;
         HasOverlay = HasToDo || HasReport;
-        Status = _engine.Status is { Length: > 0 } status ? status : _engine.State == SlackBotState.Off ? "Not connected (Slack Bot is off)." : "";
+        Status = _engine.Status is { Length: > 0 } status ? status : _engine.State == SlackBotState.Off ? "Not connected (Slack Report is off)." : "";
         SortProblem = _engine.SortProblem;
         HasSortProblem = SortProblem is not null;
         HasKnowing = Knowing.Count > 0;
         IsConnected = _engine.State == SlackBotState.Connected;
         // Not for what was already there when Helm started.
         // A card with a message not seen before: a new one, or one more in a thread already on the list.
-        if (_shown && ToDo.Where(i => i.Ids.Any(id => !before.Contains(id))).Select(i => i.Alert).ToList() is { Count: > 0 } added)
-        {
-            NewToDo?.Invoke(this, EventArgs.Empty);
-            NewToDoLines?.Invoke(this, added);
-        }
+        if (_shown && ToDo.Any(i => i.Ids.Any(id => !before.Contains(id)))) NewToDo?.Invoke(this, EventArgs.Empty);
         _shown = true;
     }
 

@@ -2,18 +2,18 @@ using Helm.Core.Settings;
 
 namespace Helm.Modules.SlackBot;
 
-/// <summary>What Slack Bot may do in a conversation.</summary>
+/// <summary>What Slack Report may do in a conversation.</summary>
 public enum SlackChannelMode
 {
     /// <summary>Not read: nothing from it is kept or shown to Claude.</summary>
     Off,
     /// <summary>Read and reported; never written to.</summary>
     Read,
-    /// <summary>Read, and messages for the user get the reply template (as an AI assistant, openly).</summary>
+    /// <summary>Read, and AI agents (Fairy, through the MCP tools) may post here, signed as AI and asked first.</summary>
     Reply,
 }
 
-/// <summary>Slack Bot's options, on this PC only (never synced: they name the workspace's channels).</summary>
+/// <summary>Slack Report's options, on this PC only (never synced: they name the workspace's channels).</summary>
 public sealed class SlackBotSettings : IVersionedSettings
 {
     public static int CurrentVersion => 1;
@@ -21,39 +21,18 @@ public sealed class SlackBotSettings : IVersionedSettings
     public static readonly IReadOnlyList<string> DefaultReportTimes = ["12:00", "17:00"];
 
     /// <summary>The small grey line Helm (not Claude) puts under every message it posts; {me} is the user's name.</summary>
-    public const string DefaultSignature = "Lumi · trợ lý AI của {me}";
+    public const string DefaultSignature = "Fairy · trợ lý AI của {me}";
+
+    /// <summary>The default before Lumi was removed (Helm 0.92 and older): read as <see cref="DefaultSignature"/>.</summary>
+    public const string OldDefaultSignature = "Lumi · trợ lý AI của {me}";
 
     public int Version { get; set; }
 
     /// <summary>
-    /// What Slack Bot may do per conversation, set by the user. Not listed: DMs and group DMs are read, channels are
+    /// What Slack Report may do per conversation, set by the user. Not listed: DMs and group DMs are read, channels are
     /// off (the user turns on the channels they want).
     /// </summary>
     public Dictionary<string, SlackChannelMode> Channels { get; set; } = [];
-
-    /// <summary>One project folder per conversation, as Helm 0.73–0.75 kept it; read still, <see cref="ChannelFolders"/> replaces it.</summary>
-    public Dictionary<string, string> ChannelProjects { get; set; } = [];
-
-    /// <summary>
-    /// The project folders of a conversation (where Write is on): Lumi may read them, and only them, to look into a
-    /// question before answering.
-    /// </summary>
-    public Dictionary<string, List<string>> ChannelFolders { get; set; } = [];
-
-    /// <summary>Every project folder set for <paramref name="channel"/>, as set (old and new way).</summary>
-    public IReadOnlyList<string> FoldersOf(string channel) =>
-        [.. (ChannelFolders.GetValueOrDefault(channel) ?? [])
-            .Concat(ChannelProjects.TryGetValue(channel, out var old) ? [old] : [])
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
-
-    /// <summary>The project folders Lumi may read for <paramref name="channel"/> that still exist (empty: none).</summary>
-    public IReadOnlyList<string> ProjectsOf(string channel) => [.. FoldersOf(channel).Where(System.IO.Directory.Exists)];
-
-    /// <summary>
-    /// Where the user's projects live: when the user calls Lumi naming one of its folders ("dự án GameStudio"), Lumi
-    /// works there. Others never pick a project by name.
-    /// </summary>
-    public string ProjectsRoot { get; set; } = @"C:\Project";
 
     /// <summary>Times of day (HH:mm) when the worth-knowing messages show up on screen.</summary>
     public List<string> ReportTimes { get; set; } = [.. DefaultReportTimes];
@@ -78,66 +57,23 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// <summary>What matters to the user, in their own words: given to Claude with every batch.</summary>
     public string AboutMe { get; set; } = "";
 
-    /// <summary>Claude Code model for sorting, and for answers where a conversation has none of its own ("" = the user's default).</summary>
+    /// <summary>Claude Code model for sorting ("" = the user's default).</summary>
     public string Model { get; set; } = "";
 
     /// <summary>Claude Code's effort, like <see cref="Model"/> ("" = its default; low, medium, high, xhigh, max).</summary>
     public string Effort { get; set; } = "";
 
-    /// <summary>A conversation's own model and effort for Lumi's answers and replies there; what is left "" follows the defaults.</summary>
-    public Dictionary<string, SlackAiChoice> ChannelAi { get; set; } = [];
-
-    /// <summary>The model and effort Claude Code runs with for <paramref name="channel"/> (null: Claude Code's own default).</summary>
-    public (string? Model, string? Effort) AiFor(string channel)
-    {
-        var own = ChannelAi.GetValueOrDefault(channel);
-        return (Pick(own?.Model, Model), Pick(own?.Effort, Effort));
-    }
-
-    private static string? Pick(string? own, string fallback) => own is { Length: > 0 } ? own : fallback.Length > 0 ? fallback : null;
-
-    /// <summary>The AI signature under every message Slack Bot posts; {me} is the user's name. It always says AI.</summary>
+    /// <summary>The AI signature under every message an AI agent posts through Slack Report; {me} is the user's name. It always says AI.</summary>
     public string Signature { get; set; } = DefaultSignature;
 
-    /// <summary>The Slack emoji before the signature: a custom one (:lumi:) or a standard one.</summary>
+    /// <summary>The Slack emoji before the signature: a custom one or a standard one.</summary>
     public string SignatureEmoji { get; set; } = SlackSignature.DefaultEmoji;
-
-    /// <summary>How the user wants replies written (tone, language, what to say), in their own words; may be empty.</summary>
-    public string ReplyStyle { get; set; } = "";
-
-    /// <summary>"lumi, …" or "@lumi …" on Slack gets an answer (from the user anywhere, from others where Write is on).</summary>
-    public bool AnswerCalls { get; set; } = true;
-
-    /// <summary>A message waits this long for the user to answer it before the reply goes.</summary>
-    public int ReplyAfterMinutes { get; set; } = 3;
 
     /// <summary>
     /// Minutes after which a message still to do brings the list back (unfolded, lit up, with the sound when on), and
     /// again every so often while it waits; 0 = never.
     /// </summary>
     public int RemindEveryMinutes { get; set; } = 60;
-
-    /// <summary>Alerts go to the user's phone through their own Telegram bot (token kept apart, encrypted).</summary>
-    public bool TelegramEnabled { get; set; } = true;
-
-    /// <summary>The user's private chat with the bot (found after they send /start), or null.</summary>
-    public long? TelegramChatId { get; set; }
-
-    public string TelegramChatName { get; set; } = "";
-
-    /// <summary>Tell the phone when Lumi replied for the user.</summary>
-    public bool TelegramOnReply { get; set; } = true;
-
-    /// <summary>Tell the phone when the list reminds of what still waits.</summary>
-    public bool TelegramOnRemind { get; set; } = true;
-
-    /// <summary>Tell the phone of every new to-do message.</summary>
-    public bool TelegramOnNewToDo { get; set; }
-
-    /// <summary>Only while the user is away from the PC (no keyboard or mouse for <see cref="AwayMinutes"/>).</summary>
-    public bool TelegramOnlyAway { get; set; } = true;
-
-    public int AwayMinutes { get; set; } = 5;
 
     /// <summary>A sound when something new lands on the to-do list.</summary>
     public bool PlaySound { get; set; }
@@ -159,12 +95,4 @@ public sealed class SlackBotSettings : IVersionedSettings
 
     public static SlackChannelMode DefaultMode(SlackConversationKind kind) =>
         kind is SlackConversationKind.DirectMessage or SlackConversationKind.GroupMessage ? SlackChannelMode.Read : SlackChannelMode.Off;
-}
-
-/// <summary>A conversation's Claude model and effort ("" = the defaults on the settings page).</summary>
-public sealed class SlackAiChoice
-{
-    public string Model { get; set; } = "";
-
-    public string Effort { get; set; } = "";
 }

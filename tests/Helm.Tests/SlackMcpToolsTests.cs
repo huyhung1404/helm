@@ -62,7 +62,7 @@ public sealed class SlackMcpToolsTests : IDisposable
         var protector = new PlainSecretProtector();
         var file = new SlackInboxFile(paths, protector, NullLogger<SlackInboxFile>.Instance);
         var agent = new NoAgent();
-        var engine = new SlackBotEngine(new SlackTokens(paths, protector), file, new SlackSorter(agent), agent, settings, NullLogger<SlackBotEngine>.Instance);
+        var engine = new SlackBotEngine(new SlackTokens(paths, protector), file, new SlackSorter(agent), settings, NullLogger<SlackBotEngine>.Instance);
         var slack = new FakeSlack();
         engine.ConnectedForTests(slack, new SlackIdentity("ME", "hung", "T1", "https://team.slack.com/"), "Hưng",
         [
@@ -107,12 +107,12 @@ public sealed class SlackMcpToolsTests : IDisposable
         Assert.Equal(McpRisk.Remote, post.Risk);
         var args = Args(new { conversation = "#release", text = "<!channel> Xong task build Android 2.3 @here" });
         var question = (await post.AskFirst!(args, default))!;
-        Assert.Equal("Xong task build Android 2.3\n\n:robot_face: Lumi · trợ lý AI của Hưng", question.Details);
+        Assert.Equal("Xong task build Android 2.3\n\n:robot_face: Fairy · trợ lý AI của Hưng", question.Details);
         Assert.Equal("#release", question.Target);
 
         var result = Json(await post.Run(args, default));
         Assert.Contains("\"ts\":\"500.0\"", result);
-        Assert.Equal(("C1", "Lumi · trợ lý AI của Hưng: Xong task build Android 2.3", (string?)null), Assert.Single(rig.Slack.Posted));
+        Assert.Equal(("C1", "Fairy · trợ lý AI của Hưng: Xong task build Android 2.3", (string?)null), Assert.Single(rig.Slack.Posted));
         // The bot's post coming back is not the user's answer.
         Assert.True(rig.Engine.Inbox.IsBotMessage("C1", "500.0"));
     }

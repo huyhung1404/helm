@@ -71,17 +71,13 @@ public sealed class SlackBotViewsTests : IDisposable
         var tokens = new SlackTokens(paths, protector);
         using var file = new SlackInboxFile(paths, protector, NullLogger<SlackInboxFile>.Instance);
         Seed(file.Inbox);
-        var engine = new SlackBotEngine(tokens, file, new SlackSorter(new NoAgent()), new NoAgent(), settings, NullLogger<SlackBotEngine>.Instance);
+        var engine = new SlackBotEngine(tokens, file, new SlackSorter(new NoAgent()), settings, NullLogger<SlackBotEngine>.Instance);
         var launcher = new Launcher();
         var ui = new StaUi();
         var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoServices(), settings);
         var windows = new WindowService(NullLogger<WindowService>.Instance);
         var overlay = new SlackBotOverlay(inbox, settings, windows, ui, NullLogger<SlackBotOverlay>.Instance);
-        var telegramToken = new SlackTelegramToken(paths, protector);
-        var telegram = new SlackPhoneAlertsTests.FakeTelegram();
-        var phone = new SlackPhoneAlerts(telegram, telegramToken, settings, new SlackPhoneAlertsTests.Activity(0), engine, inbox,
-            NullLogger<SlackPhoneAlerts>.Instance);
-        var module = new SlackBotModule(engine, overlay, phone) { IsEnabled = true };
+        var module = new SlackBotModule(engine, overlay) { IsEnabled = true };
 
         // To do: the DM and the mention (one unsorted), not the channel chatter or what the user answered.
         Assert.Equal(["Tuấn", "Linh"], inbox.ToDo.Select(i => i.From));
@@ -120,18 +116,14 @@ public sealed class SlackBotViewsTests : IDisposable
         settings.Get<SlackBotSettings>(SlackBotModule.ModuleId).Update(v =>
         {
             v.Channels["C1"] = SlackChannelMode.Reply;
-            v.ChannelFolders["C1"] = [@"C:\Project\GameStudio", @"D:\Work\Pitch"];
-            v.ChannelAi["C1"] = new SlackAiChoice { Model = "fable", Effort = "high" };
         });
-        var viewModel = new SlackBotViewModel(module, engine, tokens, settings, ui, launcher, new NoServices(), overlay, telegramToken, telegram, phone);
+        var viewModel = new SlackBotViewModel(module, engine, tokens, settings, ui, launcher, new NoServices(), overlay);
         Assert.False(viewModel.HasTokens);
         Assert.Equal([true, false, true], viewModel.Channels.Select(c => c.CanRead));
         Assert.Equal([true, false, false], viewModel.Channels.Select(c => c.CanWrite));
-        Assert.Equal(["AI: Fable · High", "AI: default", "AI: default"], viewModel.Channels.Select(c => c.AiLabel));
-        Assert.Equal(2, viewModel.Channels[0].Projects.Count);
         var page = new SlackBotPage(viewModel);
         Layout(page, new Size(1000, 1500), "4-settings");
-        // Opened, each conversation shows its AI button and, where Write is on, its project folders.
+        // Opened: each conversation with its Read and Write switches.
         foreach (var expander in Descendants<Wpf.Ui.Controls.CardExpander>(page)) expander.IsExpanded = true;
         Layout(page, new Size(1000, 2600), "4b-settings-open");
 
