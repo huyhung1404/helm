@@ -10,6 +10,5 @@ public static class VocabServices
             .AddVocabCore()
             .AddSingleton<IVocabAgent, ClaudeCodeVocabAgent>()
             .AddSingleton<VocabPopup>()
-            .AddHelmModule<VocabModule, VocabContentPage, VocabViewModel>()
-            .AddSingleton<VocabContentPage>();
+            .AddHelmModule<VocabModule, VocabViewModel>();
 }

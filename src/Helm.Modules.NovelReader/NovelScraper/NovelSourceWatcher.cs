@@ -138,7 +138,7 @@ public sealed class NovelSourceWatcher(NovelStore store, NovelScraperService scr
         try
         {
             services.GetRequiredService<IUserNotifications>().Show(title, message,
-                () => services.GetRequiredService<IShellNavigation>().ShowPage(typeof(NovelReaderContentPage)));
+                () => services.GetRequiredService<IShellNavigation>().ShowTool(NovelReaderIds.ModuleId));
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
         {

@@ -1,29 +1,40 @@
-using System.Windows.Media;
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
+using Helm.Modules.NovelReader.Grammar;
 using Helm.Modules.NovelReader.Speech.VieNeu;
-using Wpf.Ui.Controls;
+using Helm.Modules.NovelReader.Ui;
+using Helm.Shell.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.NovelReader;
 
 /// <summary>
 /// Novel Reader on Windows. The dictionaries load when a novel is opened and are freed when the tool is turned off; in
 /// the background only <see cref="NovelSourceWatcher"/> runs, looking for new chapters of the web novels that ask for it.
-/// The menu, Quick access and Home → Utilities open <see cref="NovelReaderContentPage"/>; its settings are a sheet inside it.
+/// The page is the shared <see cref="NovelReaderView"/>; its settings are a sheet inside it.
 /// </summary>
 public sealed class NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatcher ui, VieNeuSpeechEngine voice,
-    NovelSourceWatcher watcher) : HelmModuleBase, IModuleContent
+    NovelSourceWatcher watcher, IServiceProvider services) : HelmModuleBase
 {
     public override string Id => NovelReaderIds.ModuleId;
     public override string DisplayName => NovelReaderIds.DisplayName;
     public override string Description => NovelReaderIds.Description;
     public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
-    public override SymbolRegular Icon => SymbolRegular.BookOpen24;
-    public override ImageSource IconImage => NovelReaderLogo.Image;
-    public override Type SettingsPageType => typeof(NovelReaderContentPage);
-    public Type ContentPageType => typeof(NovelReaderContentPage);
+    public override Symbol Icon => Symbol.BookOpen;
+    public override IImage IconImage => NovelReaderIcon.Image;
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
+
+    public override Control CreatePage()
+    {
+        var host = new WindowsNovelReaderPageHost(services.GetRequiredService<WordClassDictionary>(), services.GetRequiredService<NovelScraperViewModel>());
+        var view = new NovelReaderView(this, viewModel, host, services.GetRequiredService<IClipboardService>());
+        host.View = view;
+        return view;
+    }
 
     public override Task EnableAsync(CancellationToken ct)
     {

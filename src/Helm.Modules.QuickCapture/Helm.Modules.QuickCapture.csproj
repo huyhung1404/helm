@@ -4,16 +4,20 @@
        task, a debt). The targets come from the tools themselves (ICaptureTarget in Helm.Core), so this project
        references no other tool. -->
   <PropertyGroup>
-    <UseWPF>true</UseWPF>
     <RootNamespace>Helm.Modules.QuickCapture</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Modules.QuickCapture.Core\Helm.Modules.QuickCapture.Core.csproj" />
-    <!-- The capture box and the page are the shared Avalonia views, shown through Helm.Ui.Windows. -->
+    <!-- The capture box and the page are the shared Avalonia views. -->
     <ProjectReference Include="..\Helm.Modules.QuickCapture.UI\Helm.Modules.QuickCapture.UI.csproj" />
     <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The icon as an Avalonia image: the phone app's builder, from the same QuickCaptureIconShape. -->
+    <Compile Include="..\Helm.Modules.QuickCapture.Android\QuickCaptureIcon.cs" Link="QuickCaptureIcon.cs" />
   </ItemGroup>
 
   <ItemGroup>

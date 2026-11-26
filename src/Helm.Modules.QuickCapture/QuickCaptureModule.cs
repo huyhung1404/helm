@@ -1,3 +1,6 @@
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Capture;
 using Helm.Core.Desktop;
 using Helm.Core.Hotkeys;
@@ -9,7 +12,6 @@ using Helm.Modules.QuickCapture.Ui;
 using Helm.Ui.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Wpf.Ui.Controls;
 
 namespace Helm.Modules.QuickCapture;
 
@@ -54,9 +56,12 @@ public sealed class QuickCaptureModule : HelmModuleBase, IQuickCapture, IDisposa
     public override string DisplayName => "Quick Capture";
     public override string Description => "Press a shortcut in any app to save a note, a task or a debt in a second, without opening Helm.";
     public override ModuleGroup Group => ModuleGroup.Planning;
-    public override SymbolRegular Icon => SymbolRegular.Flash24;
-    public override System.Windows.Media.ImageSource IconImage => QuickCaptureLogo.Image;
-    public override Type SettingsPageType => typeof(QuickCapturePage);
+    public override Symbol Icon => Symbol.Flash;
+    public override IImage IconImage => QuickCaptureIcon.Image;
+
+    /// <summary>The page (Home → Utilities): on/off, the shortcut, where text goes; the box itself floats over any app.</summary>
+    public override Control CreatePage() =>
+        new QuickCaptureView(_services.GetRequiredService<QuickCaptureViewModel>(), new WindowsQuickCapturePageHost());
 
     public override IReadOnlyList<HotkeyDefinition> Hotkeys =>
         [new HotkeyDefinition(ModuleId, HotkeyId, "Open Quick Capture", Settings.Current.Hotkey)];
@@ -117,7 +122,6 @@ public sealed class QuickCaptureModule : HelmModuleBase, IQuickCapture, IDisposa
         {
             if (!IsEnabled) return;
             // The box is an Avalonia window of its own, built the first time it opens.
-            HelmAvalonia.EnsureStarted();
             if (_window is null)
             {
                 _panel = new CaptureBoxView(new CaptureBoxViewModel(AvailableTargets, Settings));

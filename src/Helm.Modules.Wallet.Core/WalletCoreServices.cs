@@ -79,9 +79,13 @@ public static class WalletCoreServices
     /// opens a linked person.
     /// </summary>
     public static IServiceCollection AddWalletLinks(this IServiceCollection services, Type contentPage) =>
+        services.AddWalletLinks(navigation => navigation.ShowPage(contentPage));
+
+    /// <summary>As above, with how the platform opens Wallet (Windows: <c>ShowTool(WalletIds.ModuleId)</c>).</summary>
+    public static IServiceCollection AddWalletLinks(this IServiceCollection services, Action<IShellNavigation> showWallet) =>
         services.AddHelmLinks().AddSingleton<ILinkProvider>(sp => new DebtLinkProvider(sp.GetRequiredService<DebtBook>(), key =>
         {
-            sp.GetRequiredService<IShellNavigation>().ShowPage(contentPage);
+            showWallet(sp.GetRequiredService<IShellNavigation>());
             sp.GetRequiredService<WalletViewModel>().ShowPerson(key);
         }));
 }
