@@ -6,9 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Helm.Core.Mcp;
 
-/// <summary>Claude Code could not do the job: not installed, not connected to Helm, stopped with an error, too slow.</summary>
-public sealed class ClaudeCodeException(string message, Exception? inner = null) : Exception(message, inner);
-
 /// <summary>
 /// Runs Claude Code (the user's own Claude plan, no API key) without a window (<c>claude -p</c>), allowed only some of
 /// Helm's MCP tools, for the tools' AI helpers (Novel Reader's name scan and suggestions, Vocabulary's analysis). Claude Code reaches Helm's MCP server, which runs inside this Helm, so

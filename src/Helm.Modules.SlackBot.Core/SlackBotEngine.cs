@@ -66,7 +66,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
         _tokens = tokens;
         Inbox = inbox.Inbox;
         _sorter = sorter;
-        _settings = settings.Get<SlackBotSettings>(SlackBotModule.ModuleId);
+        _settings = settings.Get<SlackBotSettings>(SlackBotIds.ModuleId);
         _logger = logger;
     }
 
@@ -144,6 +144,25 @@ public sealed class SlackBotEngine : IAsyncDisposable
         _reader = new SlackReader(api, me, Inbox, () => _settings.Current);
         _reader.SetConversations(conversations);
         Api = api;
+    }
+
+    /// <summary>
+    /// The Gallery and the UI tests: the pages as if connected as <paramref name="me"/>, with no Slack behind them.
+    /// Nothing is read or sent (there is no API: a reply says Slack is not reachable, Sort now asks the agent).
+    /// </summary>
+    internal void ShowConnectedForPreview(SlackIdentity me, string meName, IReadOnlyList<SlackConversation> conversations)
+    {
+        Me = me;
+        MeName = meName;
+        Conversations = conversations;
+        Set(SlackBotState.Connected, Connected());
+    }
+
+    /// <summary>The Gallery and the UI tests: another state of the connection (not signed in, offline...).</summary>
+    internal void ShowStateForPreview(SlackBotState state, string status, string? sortProblem = null)
+    {
+        SortProblem = sortProblem;
+        Set(state, status);
     }
 
     /// <summary>

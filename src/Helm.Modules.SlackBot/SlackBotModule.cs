@@ -14,7 +14,7 @@ namespace Helm.Modules.SlackBot;
 /// </summary>
 public sealed class SlackBotModule(SlackBotEngine engine, SlackBotOverlay overlay) : HelmModuleBase, IModuleContent
 {
-    public const string ModuleId = "slackbot";
+    public const string ModuleId = SlackBotIds.ModuleId;
 
     public override string Id => ModuleId;
     public override string DisplayName => "Slack Report";

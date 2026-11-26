@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Window Zones page, ONE Avalonia view (Windows through Helm.Ui.Windows; the tool is Windows-only): the screens
+       to scale with their zones, a card per zone with its windows, the zone editor as a sheet, and the settings sheet.
+       What only Windows has (monitors, program icons, recording a shortcut) comes through IWindowZonesPageHost; what the
+       engine does (open/close a zone, show a window) through IWindowZones. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.WindowZones.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.WindowZones.Core\Helm.Modules.WindowZones.Core.csproj" />
+  </ItemGroup>
+
+</Project>

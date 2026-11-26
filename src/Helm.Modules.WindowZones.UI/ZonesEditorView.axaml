@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:ed="using:Helm.Modules.WindowZones.Editor"
+             xmlns:ui="using:Helm.Modules.WindowZones.Ui"
+             x:Class="Helm.Modules.WindowZones.Ui.ZonesEditorView"
+             x:DataType="ed:EditorSession">
+
+    <!-- The zone editor as a sheet: every screen to scale, drawn on directly (the same editing as the full-screen editor).
+         Save replaces the zones; zones keep their number, name and windows. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="WINDOW ZONES" />
+                <TextBlock FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap">
+                    <Run Text="Edit zones" />
+                    <Run Text="  " />
+                    <Run Text="{Binding Summary}" FontSize="13" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" />
+                </TextBlock>
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding CloseCommand}"
+                    ToolTip.Tip="Close without saving (Esc)" AutomationProperties.Name="Close the editor">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <TextBlock x:Name="Hint" Classes="secondary"
+                   Text="Drag on empty space to draw a zone · drag a zone to move it, its edges to resize it · right-click deletes it" />
+
+        <Border Classes="glass" BoxShadow="" Padding="12">
+            <ui:ZoneLayoutView x:Name="Layout" IsEditable="True" Session="{Binding}" MaxLayoutHeight="420" Focusable="True" />
+        </Border>
+
+        <!-- What to do with the chosen zone, and with all of them -->
+        <WrapPanel>
+            <Button Classes="act" Command="{Binding SplitVerticalCommand}" IsEnabled="{Binding CanEditZone}"
+                    ToolTip.Tip="Split the chosen zone into left and right halves" AutomationProperties.Name="Split left and right">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="↔" FontWeight="SemiBold" />
+                    <TextBlock Classes="label" Text="Split" />
+                </StackPanel>
+            </Button>
+            <Button Classes="act" Command="{Binding SplitHorizontalCommand}" IsEnabled="{Binding CanEditZone}"
+                    ToolTip.Tip="Split the chosen zone into top and bottom halves" AutomationProperties.Name="Split top and bottom">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="↕" FontWeight="SemiBold" />
+                    <TextBlock Classes="label" Text="Split" />
+                </StackPanel>
+            </Button>
+            <Button Classes="act" Command="{Binding DeleteZoneCommand}" IsEnabled="{Binding CanEditZone}"
+                    ToolTip.Tip="Delete the chosen zone (Del)" AutomationProperties.Name="Delete zone">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Delete" FontSize="15" Foreground="{DynamicResource HelmDanger}" />
+                    <TextBlock Classes="label" Text="Delete zone" Foreground="{DynamicResource HelmDanger}" />
+                </StackPanel>
+            </Button>
+            <Button Classes="act" Command="{Binding DeleteAllCommand}" ToolTip.Tip="Remove every zone and start again" AutomationProperties.Name="Delete all">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="DismissCircle" FontSize="15" Foreground="{DynamicResource HelmDanger}" />
+                    <TextBlock Classes="label" Text="Delete all" Foreground="{DynamicResource HelmDanger}" />
+                </StackPanel>
+            </Button>
+        </WrapPanel>
+
+        <!-- Full size on the screens (the app's editor), or done here -->
+        <Grid x:Name="Footer" ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+            <Button x:Name="ScreensButton" Classes="ghost" HorizontalAlignment="Left" ToolTip.Tip="Close this and draw over every monitor, at full size"
+                    AutomationProperties.Name="Edit on the screens">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ic:SymbolIcon Symbol="WindowNew" FontSize="15" />
+                    <TextBlock Text="Edit on the screens" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="CancelButton" Grid.Column="1" Classes="ghost" MinWidth="100" HorizontalContentAlignment="Center" Content="Cancel"
+                    Command="{Binding CloseCommand}" />
+            <Button x:Name="SaveButton" Grid.Column="2" Classes="pill" MinWidth="120" HorizontalContentAlignment="Center" Command="{Binding SaveCommand}"
+                    ToolTip.Tip="Save the zones (Ctrl+Enter). Windows in a zone follow it." AutomationProperties.Name="Save">
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                    <ic:SymbolIcon Symbol="Checkmark" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                    <TextBlock Text="Save" Foreground="{DynamicResource HelmPillForeground}" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </StackPanel>
+</UserControl>

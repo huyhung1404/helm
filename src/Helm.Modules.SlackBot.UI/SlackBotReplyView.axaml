@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.SlackBot"
+             x:Class="Helm.Modules.SlackBot.Ui.SlackBotReplyView"
+             x:DataType="vm:SlackBotInboxViewModel">
+
+    <!-- Your own answer to a message on the list, sent to Slack as you (no AI signature: it is your answer). In a DM it
+         goes where it was written, in a channel into the message's thread; the message then leaves the list. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="{Binding ReplyTo.Where, FallbackValue=''}" />
+                <TextBlock FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding ReplyTo.From, StringFormat='Reply to {0}', FallbackValue='Reply'}" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close the reply"
+                    Command="{Binding CancelReplyCommand}">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- What you answer: Claude's line and the message -->
+        <Border Classes="glass" BoxShadow="">
+            <Grid ColumnDefinitions="Auto,*">
+                <Border Width="3" CornerRadius="2" Margin="0,2,12,2" Background="{DynamicResource HelmEyebrow}" />
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Text="{Binding ReplyTo.Headline, FallbackValue=''}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding ReplyTo.Text, FallbackValue=''}" Classes="muted" FontSize="13" TextWrapping="Wrap" MaxLines="5"
+                               TextTrimming="CharacterEllipsis" IsVisible="{Binding ReplyTo.ShowText, FallbackValue=False}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <TextBox x:Name="ReplyBox" Classes="glass" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxHeight="220" VerticalContentAlignment="Top" Padding="12,10"
+                 PlaceholderText="Your answer — Enter sends, Shift+Enter for a new line" Text="{Binding ReplyText}"
+                 AutomationProperties.Name="Your answer" />
+
+        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding ReplyProblem, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <ic:SymbolIcon Symbol="ErrorCircle" FontSize="16" Margin="0,1,8,0" VerticalAlignment="Top" Foreground="{DynamicResource HelmDanger}" />
+            <TextBlock Grid.Column="1" Text="{Binding ReplyProblem}" Classes="late" TextWrapping="Wrap" />
+        </Grid>
+
+        <TextBlock Classes="secondary" Text="Sent as you, with no AI signature. In a channel it goes into the message's thread." />
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelReplyCommand}" />
+            <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding SendReplyCommand}"
+                    IsEnabled="{Binding !IsSendingReply}" AutomationProperties.Name="Send">
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                    <ic:SymbolIcon Symbol="Send" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                    <TextBlock Text="Send" Foreground="{DynamicResource HelmPillForeground}" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </StackPanel>
+</UserControl>

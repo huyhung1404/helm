@@ -56,9 +56,10 @@ public sealed class SlackBotViewsTests : IDisposable
         public Task<string?> PostMessageAsync(string channel, string text, string? blocks, string? threadTs, CancellationToken ct) => throw new NotSupportedException();
     }
 
-    private sealed class NoServices : IServiceProvider
+    private sealed class NoShell : ISlackBotShell
     {
-        public object? GetService(Type serviceType) => null;
+        public void ShowPage() { }
+        public void ResetOverlay() { }
     }
 
     [Fact]
@@ -74,7 +75,7 @@ public sealed class SlackBotViewsTests : IDisposable
         var engine = new SlackBotEngine(tokens, file, new SlackSorter(new NoAgent()), settings, NullLogger<SlackBotEngine>.Instance);
         var launcher = new Launcher();
         var ui = new StaUi();
-        var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoServices(), settings);
+        var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoShell(), settings);
         var windows = new WindowService(NullLogger<WindowService>.Instance);
         var overlay = new SlackBotOverlay(inbox, settings, windows, ui, NullLogger<SlackBotOverlay>.Instance);
         var module = new SlackBotModule(engine, overlay) { IsEnabled = true };
@@ -117,7 +118,7 @@ public sealed class SlackBotViewsTests : IDisposable
         {
             v.Channels["C1"] = SlackChannelMode.Reply;
         });
-        var viewModel = new SlackBotViewModel(module, engine, tokens, settings, ui, launcher, new NoServices(), overlay);
+        var viewModel = new SlackBotViewModel(module, engine, tokens, settings, ui, launcher, new NoShell());
         Assert.False(viewModel.HasTokens);
         Assert.Equal([true, false, true], viewModel.Channels.Select(c => c.CanRead));
         Assert.Equal([true, false, false], viewModel.Channels.Select(c => c.CanWrite));

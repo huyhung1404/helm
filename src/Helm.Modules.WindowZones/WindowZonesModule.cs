@@ -17,9 +17,9 @@ namespace Helm.Modules.WindowZones;
 /// drawer of windows: Ctrl+Alt+its number opens it, brings it to the front or closes it, and Win+PgDn / Win+PgUp
 /// switch between its windows like tabs.
 /// </summary>
-public sealed class WindowZonesModule : HelmModuleBase, IModuleContent
+public sealed class WindowZonesModule : HelmModuleBase, IModuleContent, IWindowZones
 {
-    public const string ModuleId = "window-zones";
+    public const string ModuleId = WindowZonesIds.ModuleId;
     private const string EditorHotkeyId = "editor";
 
     private readonly IHotkeyManager _hotkeys;

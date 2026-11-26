@@ -4,7 +4,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Services;
 using Helm.Core.Settings;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.SlackBot;
 
@@ -122,7 +121,7 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
     private readonly SlackBotEngine _engine;
     private readonly IUiDispatcher _ui;
     private readonly IProcessLauncher _launcher;
-    private readonly IServiceProvider _services;
+    private readonly ISlackBotShell _shell;
     private readonly ISettingsStore<SlackBotSettings> _settings;
     private readonly Timer _clock;
     private DateTimeOffset _lastRemind = DateTimeOffset.UtcNow;
@@ -139,6 +138,8 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
     [ObservableProperty] private string? _replyProblem;
     [ObservableProperty] private bool _isSendingReply;
     [ObservableProperty] private bool _hasKnowing;
+    /// <summary>Worth-knowing messages not read yet (all of them, not only those of the last report time).</summary>
+    [ObservableProperty] private int _knowingCount;
     [ObservableProperty] private bool _hasSortProblem;
     [ObservableProperty] private string _status = "";
     [ObservableProperty] private string? _sortProblem;
@@ -146,16 +147,16 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
     [ObservableProperty] private string _reportTitle = "";
     [ObservableProperty] private bool _isSorting;
 
-    public SlackBotInboxViewModel(SlackBotEngine engine, IUiDispatcher ui, IProcessLauncher launcher, IServiceProvider services,
+    public SlackBotInboxViewModel(SlackBotEngine engine, IUiDispatcher ui, IProcessLauncher launcher, ISlackBotShell shell,
         ISettingsStoreFactory settings)
     {
-        _settings = settings.Get<SlackBotSettings>(SlackBotModule.ModuleId);
+        _settings = settings.Get<SlackBotSettings>(SlackBotIds.ModuleId);
         // Every minute: "Waiting 2 h" moves on, and what waits too long is brought back (Remind).
         _clock = new Timer(_ => _ui!.Post(Tick), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         _engine = engine;
         _ui = ui;
         _launcher = launcher;
-        _services = services;
+        _shell = shell;
         engine.Inbox.Changed += (_, _) => QueueRefresh();
         engine.Changed += (_, _) => QueueRefresh();
         Refresh();
@@ -290,7 +291,7 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
 
     /// <summary>The SlackBot page, in front (from the overlay).</summary>
     [RelayCommand]
-    private void ShowPage() => _services.GetRequiredService<IShellNavigation>().ShowPage(typeof(SlackBotContentPage));
+    private void ShowPage() => _shell.ShowPage();
 
     private void QueueRefresh()
     {
@@ -338,6 +339,7 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
         SortProblem = _engine.SortProblem;
         HasSortProblem = SortProblem is not null;
         HasKnowing = Knowing.Count > 0;
+        KnowingCount = knowing.Count;
         IsConnected = _engine.State == SlackBotState.Connected;
         // Not for what was already there when Helm started.
         // A card with a message not seen before: a new one, or one more in a thread already on the list.

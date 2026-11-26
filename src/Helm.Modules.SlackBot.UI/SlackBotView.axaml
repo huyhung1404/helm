@@ -1,0 +1,357 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.SlackBot"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.SlackBot.Ui.SlackBotView"
+             x:DataType="vm:SlackBotInboxViewModel">
+
+    <!-- Slack Report itself, one view on every screen: what needs you (each until you reply in Slack, react, or press
+         Done), with what was handled today folded under it, and the worth-knowing report under its tab, grouped by
+         channel. Replying opens a sheet (SlackBotReplyView); the connection, the channels and everything else are in
+         the settings sheet (the gear). It only shows: it never answers by itself. -->
+    <UserControl.Styles>
+        <!-- A folded section's title keeps the text colour when open (Fluent paints a checked toggle's text for an accent fill) -->
+        <Style Selector="ToggleButton.fold:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+        </Style>
+        <Style Selector="Ellipse.status">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Fill" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Ellipse.status.on">
+            <Setter Property="Fill" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <!-- A message under its channel in the report: a thin line between messages -->
+        <Style Selector="Border.msg">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Padding" Value="0,12,0,2" />
+            <Setter Property="Margin" Value="0,10,0,0" />
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.Resources>
+        <!-- Who, where, when, how long it waits, Claude's line and the message (or the thread's last messages) -->
+        <DataTemplate x:Key="MessageBody" x:DataType="vm:InboxItemViewModel">
+            <StackPanel Spacing="5">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="muted" FontSize="13" TextWrapping="Wrap">
+                        <Run Text="{Binding From}" FontWeight="SemiBold" Foreground="{DynamicResource TextControlForeground}" />
+                        <Run Text="·" />
+                        <Run Text="{Binding Where}" />
+                    </TextBlock>
+                    <TextBlock Grid.Column="1" Text="{Binding When}" Classes="muted" FontSize="13" Margin="12,0,0,0" />
+                </Grid>
+                <WrapPanel>
+                    <WrapPanel.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                            <Binding Path="HasWaiting" />
+                            <Binding Path="HasCount" />
+                            <Binding Path="IsUnsorted" />
+                        </MultiBinding>
+                    </WrapPanel.IsVisible>
+                    <Border Classes="tag" IsVisible="{Binding HasWaiting}"><TextBlock Text="{Binding Waiting}" Foreground="{DynamicResource HelmDanger}" /></Border>
+                    <Border Classes="tag" IsVisible="{Binding IsUnsorted}" ToolTip.Tip="Claude has not sorted it yet: it is shown as it is">
+                        <TextBlock Text="Not sorted yet" Foreground="{DynamicResource HelmSecondaryText}" />
+                    </Border>
+                    <Border Classes="tag" IsVisible="{Binding HasCount}"><TextBlock Text="{Binding CountText}" /></Border>
+                </WrapPanel>
+                <TextBlock Text="{Binding Headline}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Text}" Classes="muted" FontSize="13" TextWrapping="Wrap" MaxLines="8" TextTrimming="CharacterEllipsis"
+                           IsVisible="{Binding ShowText}" />
+                <TextBlock Classes="muted" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasBotReply}">
+                    <Run Text="Replied for you:" FontWeight="SemiBold" />
+                    <Run Text="{Binding BotReply}" />
+                </TextBlock>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Panel>
+        <core:Backdrop />
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="Page" Margin="40,28,40,40">
+
+                <!-- Today and the counts; which list; the gear -->
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                    <TextBlock x:Name="TodayLine" Classes="eyebrow" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                    <StackPanel x:Name="Tabs" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Border x:Name="TabGroup" Classes="glass" Padding="3" CornerRadius="10" BoxShadow="">
+                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                <RadioButton x:Name="ToDoTab" Classes="seg" GroupName="SlackTab" IsChecked="True" Content="To do" IsCheckedChanged="Tab_Changed" />
+                                <RadioButton x:Name="KnowingTab" Classes="seg" GroupName="SlackTab" Content="Worth knowing" IsCheckedChanged="Tab_Changed" />
+                            </StackPanel>
+                        </Border>
+                        <Button x:Name="GearButton" Classes="chip" Click="Settings_Click" ToolTip.Tip="Slack Report settings" AutomationProperties.Name="Slack Report settings">
+                            <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Classes="display" Text="Slack Report" Margin="0,22,0,0" />
+
+                <!-- The connection in one line, with the two things to do about it here -->
+                <Grid x:Name="StatusRow" ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
+                    <Ellipse Classes="status" Classes.on="{Binding IsConnected}" VerticalAlignment="Center" Margin="2,0,10,0" />
+                    <TextBlock Grid.Column="1" Classes="muted" FontSize="13.5" Text="{Binding Status}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <Button x:Name="SortButton" Classes="act" Margin="0" Command="{Binding SortNowCommand}" IsEnabled="{Binding !IsSorting}"
+                                ToolTip.Tip="Have Claude sort every waiting message now" AutomationProperties.Name="Sort now">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Sparkle" FontSize="15" Foreground="{DynamicResource HelmEyebrow}" />
+                                <TextBlock Classes="label" Text="Sort now" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="act" Margin="0" Command="{Binding ReconnectCommand}" ToolTip.Tip="Connect to Slack again" AutomationProperties.Name="Reconnect">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="ArrowSync" FontSize="15" />
+                                <TextBlock Classes="label" Text="Reconnect" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Claude Code cannot sort: messages for you still show, unsorted -->
+                <Border Classes="glass" Margin="0,16,0,0" Background="{DynamicResource HelmWarningBackground}" core:Motion.EnterOnShow="True"
+                        IsVisible="{Binding HasSortProblem}">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <ic:SymbolIcon Symbol="Warning" FontSize="18" Margin="0,1,10,0" VerticalAlignment="Top" />
+                        <TextBlock Grid.Column="1" Text="{Binding SortProblem}" TextWrapping="Wrap" />
+                    </Grid>
+                </Border>
+
+                <Border x:Name="OffBar" Classes="glass" Margin="0,16,0,0" IsVisible="False">
+                    <StackPanel>
+                        <TextBlock Text="Slack Report is turned off" Classes="head" />
+                        <TextBlock Text="What it kept is still here. Turn Slack Report on in its settings (the gear) to read Slack again." Classes="muted" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel x:Name="Body">
+
+                    <!-- First run: Slack is not connected yet. Step 1 is the only thing to do now. -->
+                    <Border x:Name="FirstRun" Classes="glass hero enter" Margin="0,28,0,0" Padding="28,26" IsVisible="False">
+                        <StackPanel Spacing="18">
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="eyebrow" Text="START HERE" />
+                                <TextBlock Text="See what needs you in Slack, and nothing else" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Classes="muted" FontSize="13.5" TextWrapping="Wrap"
+                                           Text="Slack Report reads Slack as you, has Claude pick out what needs you, and keeps it here and on screen until you answer. It never answers by itself." />
+                            </StackPanel>
+                            <UniformGrid x:Name="FirstRunSteps" Columns="3">
+                                <Border Classes="glass" Margin="0,0,10,10" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="eyebrow" Text="1" />
+                                        <TextBlock Text="Make your Slack app" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="From the manifest Helm copies for you, in your own workspace." />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="eyebrow" Text="2" />
+                                        <TextBlock Text="Paste its two tokens" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="They stay on this PC, encrypted, and are never shown again." />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="eyebrow" Text="3" />
+                                        <TextBlock Text="Pick what it reads" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="Your DMs are read; turn on the channels that matter to you." />
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
+                            <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="Connect_Click"
+                                    AutomationProperties.Name="Connect Slack">
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                    <TextBlock Text="Connect Slack" Foreground="{DynamicResource HelmPillForeground}" />
+                                    <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- TO DO: each card stays until you reply in Slack, react with an emoji, or press Done -->
+                    <StackPanel x:Name="ToDoPanel" Classes="enter" core:Motion.EnterOnShow="True" Margin="0,22,0,0">
+                        <TextBlock Classes="muted" FontSize="13.5" Margin="0,0,0,12" TextWrapping="Wrap"
+                                   Text="Each stays here and on screen until you reply in Slack, react with an emoji, or press Done." />
+
+                        <Border Classes="glass" IsVisible="{Binding !HasToDo}" Margin="0,0,0,10">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="20" Margin="0,0,12,0" Foreground="{DynamicResource HelmSuccess}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Nothing waits for you" Classes="head" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="New messages for you show here within seconds. What is only worth knowing waits under its tab." />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <ItemsControl x:Name="ToDoList" ItemsSource="{Binding ToDo}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:InboxItemViewModel">
+                                    <Border Classes="glass lift fade" Padding="16,14" Margin="0,0,0,10">
+                                        <StackPanel Spacing="10">
+                                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MessageBody}" />
+                                            <WrapPanel>
+                                                <Button Classes="act" Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).StartReplyCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Answer in Slack, as you" AutomationProperties.Name="Reply">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <ic:SymbolIcon Symbol="ArrowReply" FontSize="15" Foreground="{DynamicResource HelmEyebrow}" />
+                                                        <TextBlock Classes="label" Text="Reply" Foreground="{DynamicResource HelmEyebrow}" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Classes="act" Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).OpenCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Open it in Slack" AutomationProperties.Name="Open in Slack">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <ic:SymbolIcon Symbol="Open" FontSize="15" />
+                                                        <TextBlock Classes="label" Text="Open in Slack" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Classes="act" Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).DoneCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Take it off the list" AutomationProperties.Name="Done">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <ic:SymbolIcon Symbol="Checkmark" FontSize="15" Foreground="{DynamicResource HelmSuccess}" />
+                                                        <TextBlock Classes="label" Text="Done" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Classes="act" Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).OnlyKnowCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Moves it to the report; Claude learns from it"
+                                                        AutomationProperties.Name="Only worth knowing">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <ic:SymbolIcon Symbol="ArrowDown" FontSize="15" Foreground="{DynamicResource HelmSecondaryText}" />
+                                                        <TextBlock Classes="label" Text="Only worth knowing" Foreground="{DynamicResource HelmSecondaryText}" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Handled today, folded: what left the list, and how -->
+                        <Button x:Name="HandledHeader" Classes="flat" HorizontalAlignment="Left" Padding="4,8" Margin="0,4,0,4" Click="ToggleHandled_Click"
+                                AutomationProperties.Name="Handled today">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Panel x:Name="HandledChevron" Width="12" Height="12" Classes="turn" core:Motion.Turn="False">
+                                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" />
+                                </Panel>
+                                <TextBlock x:Name="HandledTitle" Text="Handled today" Classes="muted" FontSize="13" />
+                            </StackPanel>
+                        </Button>
+                        <ItemsControl x:Name="HandledList" ItemsSource="{Binding Handled}" IsVisible="False" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:InboxItemViewModel">
+                                    <Border Classes="glass" Padding="16,12" Margin="0,0,0,10" Opacity="0.8">
+                                        <StackPanel Spacing="8">
+                                            <Grid ColumnDefinitions="Auto,*">
+                                                <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="15" Margin="0,0,6,0" Foreground="{DynamicResource HelmSuccess}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" Text="{Binding HandledText}" FontWeight="SemiBold" Foreground="{DynamicResource HelmSuccess}" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MessageBody}" />
+                                            <WrapPanel>
+                                                <Button Classes="act" Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).RestoreCommand}"
+                                                        CommandParameter="{Binding}" ToolTip.Tip="Put it back on the to-do list" AutomationProperties.Name="Back to the list">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <ic:SymbolIcon Symbol="ArrowUndo" FontSize="15" />
+                                                        <TextBlock Classes="label" Text="Back to the list" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- WORTH KNOWING: unread, by channel or DM; nothing to do about them -->
+                    <StackPanel x:Name="KnowingPanel" core:Motion.EnterOnShow="True" IsVisible="False" Margin="0,22,0,0">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                            <TextBlock Classes="muted" FontSize="13.5" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"
+                                       Text="Nothing to do about these. They show on screen together at the report times." />
+                            <Button Grid.Column="1" Classes="ghost" Command="{Binding MarkAllReadCommand}" IsVisible="{Binding HasKnowing}"
+                                    ToolTip.Tip="Mark every message here read" AutomationProperties.Name="Mark all read">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="15" />
+                                    <TextBlock Classes="label" Text="Mark all read" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <Border Classes="glass" IsVisible="{Binding !HasKnowing}">
+                            <StackPanel>
+                                <TextBlock Text="Nothing new" Classes="head" />
+                                <TextBlock Classes="muted" TextWrapping="Wrap" Text="Messages that need nothing from you collect here, by channel, until you read them." />
+                            </StackPanel>
+                        </Border>
+
+                        <ItemsControl ItemsSource="{Binding Knowing}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:InboxGroupViewModel">
+                                    <Border Classes="glass fade" Padding="16,12" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <ToggleButton x:Name="Fold" Classes="fold" IsChecked="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                              AutomationProperties.Name="{Binding Where}">
+                                                    <Grid ColumnDefinitions="Auto,*">
+                                                        <Panel Width="12" Height="12" Margin="0,0,10,0" Classes="turn" core:Motion.Turn="{Binding #Fold.IsChecked}" VerticalAlignment="Center">
+                                                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" />
+                                                        </Panel>
+                                                        <TextBlock Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource TextControlForeground}">
+                                                            <Run Text="{Binding Where}" FontWeight="SemiBold" FontSize="15" />
+                                                            <Run Text="  " />
+                                                            <Run Text="{Binding Count}" Foreground="{DynamicResource HelmSecondaryText}" FontSize="12.5" />
+                                                        </TextBlock>
+                                                    </Grid>
+                                                </ToggleButton>
+                                                <Button Grid.Column="1" Classes="act" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                        Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).MarkGroupReadCommand}" CommandParameter="{Binding}"
+                                                        ToolTip.Tip="Mark this channel's messages read" AutomationProperties.Name="{Binding Where, StringFormat='Mark {0} read'}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <ic:SymbolIcon Symbol="Checkmark" FontSize="15" />
+                                                        <TextBlock Classes="label" Text="Read" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                            <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding #Fold.IsChecked}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:InboxItemViewModel">
+                                                        <Border Classes="msg">
+                                                            <StackPanel Spacing="8">
+                                                                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource MessageBody}" />
+                                                                <WrapPanel>
+                                                                    <Button Classes="act" Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).OpenCommand}"
+                                                                            CommandParameter="{Binding}" ToolTip.Tip="Open it in Slack" AutomationProperties.Name="Open in Slack">
+                                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                            <ic:SymbolIcon Symbol="Open" FontSize="15" />
+                                                                            <TextBlock Classes="label" Text="Open in Slack" />
+                                                                        </StackPanel>
+                                                                    </Button>
+                                                                    <Button Classes="act" Command="{Binding $parent[UserControl].((vm:SlackBotInboxViewModel)DataContext).NeedsMeCommand}"
+                                                                            CommandParameter="{Binding}" ToolTip.Tip="Moves it to the to-do list; Claude learns from it"
+                                                                            AutomationProperties.Name="Needs me">
+                                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                            <ic:SymbolIcon Symbol="ArrowUp" FontSize="15" Foreground="{DynamicResource HelmEyebrow}" />
+                                                                            <TextBlock Classes="label" Text="Needs me" />
+                                                                        </StackPanel>
+                                                                    </Button>
+                                                                </WrapPanel>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Desktop;
@@ -12,13 +11,14 @@ using Helm.Modules.WindowZones.Model;
 namespace Helm.Modules.WindowZones;
 
 /// <summary>A window in a zone card: its icon, title and program, with Show and Take out.</summary>
-public sealed partial class ZoneWindowRowViewModel(WindowZonesModule module, ZoneWindowSnapshot window) : ObservableObject
+public sealed partial class ZoneWindowRowViewModel(IWindowZones module, ZoneWindowSnapshot window) : ObservableObject
 {
     public string Title => string.IsNullOrWhiteSpace(window.Title) ? window.ProcessName : window.Title;
 
     public string Detail => window.IsMinimized ? $"{window.ProcessName} · minimized" : window.IsTop ? $"{window.ProcessName} · on top" : window.ProcessName;
 
-    public ImageSource? Icon => string.IsNullOrEmpty(window.ProcessPath) ? null : ShellIcons.ForFile(window.ProcessPath);
+    /// <summary>The program's .exe, for its icon (each app draws it its own way).</summary>
+    public string ProcessPath => window.ProcessPath;
 
     public bool IsTop => window.IsTop;
 
@@ -38,6 +38,8 @@ public sealed partial class ZoneCardViewModel : ObservableObject
     [ObservableProperty] private string _name = string.Empty;
     [ObservableProperty] private int _numberIndex;
     [ObservableProperty] private string _label = string.Empty;
+    /// <summary>The zone's shortcut number for its tile, or a dot without one.</summary>
+    [ObservableProperty] private string _numberText = "·";
     [ObservableProperty] private string _monitorName = string.Empty;
     [ObservableProperty] private string _stateText = string.Empty;
     [ObservableProperty] private bool _isConnected;
@@ -63,6 +65,7 @@ public sealed partial class ZoneCardViewModel : ObservableObject
         _loading = true;
         if (Name != zone.Name) Name = zone.Name;
         NumberIndex = zone.Number ?? 0;
+        NumberText = zone.Number is { } number ? number.ToString(System.Globalization.CultureInfo.InvariantCulture) : "·";
         Label = zone.Label;
         MonitorName = zone.MonitorName;
         IsConnected = zone.IsConnected;
@@ -119,7 +122,7 @@ public sealed partial class WindowZonesViewModel : ObservableObject
     [ObservableProperty] private string _summary = string.Empty;
     [ObservableProperty] private bool _hasZones;
 
-    public WindowZonesViewModel(WindowZonesModule module, IUiDispatcher ui)
+    public WindowZonesViewModel(IWindowZones module, IUiDispatcher ui)
     {
         Module = module;
         _ui = ui;
@@ -138,7 +141,7 @@ public sealed partial class WindowZonesViewModel : ObservableObject
         RefreshZones();
     }
 
-    public WindowZonesModule Module { get; }
+    public IWindowZones Module { get; }
 
     public ObservableCollection<ZoneCardViewModel> Zones { get; } = [];
 

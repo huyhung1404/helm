@@ -23,7 +23,7 @@ public sealed class SlackTokens(HelmPaths paths, ISecretProtector protector)
 {
     private const string Purpose = "helm.slackbot.tokens";
 
-    private string FilePath => Path.Combine(paths.ModuleDataDirectory(SlackBotModule.ModuleId), "tokens.bin");
+    private string FilePath => Path.Combine(paths.ModuleDataDirectory(SlackBotIds.ModuleId), "tokens.bin");
 
     public bool Exist => File.Exists(FilePath);
 

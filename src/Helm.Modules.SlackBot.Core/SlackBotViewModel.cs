@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Services;
 using Helm.Core.Settings;
-using Microsoft.Extensions.DependencyInjection;
+using Helm.Core.Modules;
 
 namespace Helm.Modules.SlackBot;
 
@@ -18,8 +18,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
     private readonly SlackTokens _tokens;
     private readonly IUiDispatcher _ui;
     private readonly IProcessLauncher _launcher;
-    private readonly IServiceProvider _services;
-    private readonly SlackBotOverlay _overlay;
+    private readonly ISlackBotShell _shell;
     private List<SlackChannelRow> _allChannels = [];
     private bool _loading;
 
@@ -42,23 +41,22 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private string _replyPreview = "";
     [ObservableProperty] private double _overlayOpacity;
 
-    public SlackBotViewModel(SlackBotModule module, SlackBotEngine engine, SlackTokens tokens, ISettingsStoreFactory settings, IUiDispatcher ui,
-        IProcessLauncher launcher, IServiceProvider services, SlackBotOverlay overlay)
+    public SlackBotViewModel(IModule module, SlackBotEngine engine, SlackTokens tokens, ISettingsStoreFactory settings, IUiDispatcher ui,
+        IProcessLauncher launcher, ISlackBotShell shell)
     {
-        _overlay = overlay;
+        _shell = shell;
         Module = module;
         _engine = engine;
         _tokens = tokens;
-        _store = settings.Get<SlackBotSettings>(SlackBotModule.ModuleId);
+        _store = settings.Get<SlackBotSettings>(SlackBotIds.ModuleId);
         _ui = ui;
         _launcher = launcher;
-        _services = services;
         Load(_store.Current);
         engine.Changed += (_, _) => _ui.Post(RefreshEngine);
         RefreshEngine();
     }
 
-    public SlackBotModule Module { get; }
+    public IModule Module { get; }
 
     public string Manifest => SlackAppManifest.Json;
 
@@ -104,10 +102,10 @@ public sealed partial class SlackBotViewModel : ObservableObject
     private void OpenSlackApps() => _launcher.OpenUrl(SlackAppManifest.AppsUrl);
 
     [RelayCommand]
-    private void OpenContent() => _services.GetRequiredService<IShellNavigation>().ShowPage(typeof(SlackBotContentPage));
+    private void OpenContent() => _shell.ShowPage();
 
     [RelayCommand]
-    private void ResetOverlay() => _overlay.Reset();
+    private void ResetOverlay() => _shell.ResetOverlay();
 
     partial void OnReportTimesChanged(string value)
     {
