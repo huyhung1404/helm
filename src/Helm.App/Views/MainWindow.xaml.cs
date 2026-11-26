@@ -102,14 +102,14 @@ internal partial class MainWindow : FluentWindow
         return null;
     }
 
-    /// <summary>"--page Diagnostics" (dev/testing) opens that page's tab in front; without it the last session's tabs come back.</summary>
+    /// <summary>"--page GeneralPage" (dev/testing) opens that page's tab in front; without it the last session's tabs come back.</summary>
     private Type? StartupPage()
     {
         var args = Environment.GetCommandLineArgs();
         var index = Array.FindIndex(args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
         if (index < 0 || index + 1 >= args.Length) return null;
         var name = args[index + 1];
-        var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(BugReportsPage) }
+        var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(WelcomePage), typeof(BugReportsPage) }
             .Concat(_viewModel.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
             .Concat(_viewModel.Groups.SelectMany(g => g.Modules).OfType<IModuleContent>().Select(m => m.ContentPageType));
         return candidates.FirstOrDefault(t => t.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase)) ?? typeof(HomePage);

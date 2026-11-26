@@ -123,7 +123,6 @@ internal static class HelmHost
         builder.Services.AddSingleton<Helm.Shell.Windows.IShellWindowsHost, ShellWindowsHost>();
         builder.Services.AddShellWindows();
         builder.Services.AddSingleton<WelcomePage>();
-        builder.Services.AddSingleton<DiagnosticsPage>();
 
         // Bug reports: the black box, the synced bugs, the AI agents' bug_ tools, the report window and the page
         // (the menu's footer).

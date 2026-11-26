@@ -26,7 +26,7 @@ A few command-line flags are handy while developing:
 
 - `--no-elevate`: skip self-elevation for quick UI checks. Hooks then cannot touch elevated windows.
 - `--startup`: start hidden in the tray (this is what the logon task uses).
-- `--page <Name>`: open a page directly, for example `--page Zones` or `--page Diagnostics`.
+- `--page <Name>`: open a page directly, for example `--page Zones` or `--page GeneralPage`.
 
 ## Where things live
 
@@ -51,7 +51,7 @@ src/
   Helm.Shell.Windows/        Windows: the WPF pages that host Home, General and Bug reports, the report window, the MCP consent window, this PC's pictures and MCP part
   Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
                              GDI overlay window, DPAPI, the few WPF controls the shell still uses (Ui/); namespaces stay Helm.Core.*
-  Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, the WPF pages that host Welcome and Diagnostics
+  Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, the WPF page that hosts Welcome
   Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
   Helm.Keyboard.Engine/      net8.0: Telex (namespace Helm.Typing), the ids Helm and the input method share

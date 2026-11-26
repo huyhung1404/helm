@@ -103,8 +103,6 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Quick Capture", "Capture box", "Quick Capture", m => QuickCaptureDemo.Create(m, QuickCaptureStage.Box), Framed: false),
         new("Quick Capture", "Capture box, no tool on", "Quick Capture", m => QuickCaptureDemo.Create(m, QuickCaptureStage.BoxNoTargets), Framed: false),
         new("Welcome", "First run", "Welcome to Helm", _ => ShellPagesDemo.Welcome(), Framed: false),
-        new("Diagnostics", "This PC", "Diagnostics", _ => ShellPagesDemo.Diagnostics(DiagnosticsStage.ThisPc), Framed: false),
-        new("Diagnostics", "Hooks test, shortcut taken", "Diagnostics", _ => ShellPagesDemo.Diagnostics(DiagnosticsStage.Watching), Framed: false),
         new("Novel Reader", "Library", "Novel Reader", m => NovelDemo.Create(m, NovelStage.Library), Framed: false),
         new("Novel Reader", "Library (phone)", "Novel Reader", m => NovelDemo.Create(m, NovelStage.LibraryPhone), Framed: false),
         new("Novel Reader", "First run", "Novel Reader", m => NovelDemo.Create(m, NovelStage.FirstRun), Framed: false),
