@@ -30,6 +30,15 @@ internal enum WindowZonesStage
     SettingsEnd,
 }
 
+/// <summary>Which full-screen editor a Gallery entry shows.</summary>
+internal enum ZoneScreenStage
+{
+    /// <summary>The full-screen editor on the monitor it was opened on: the toolbar, a zone chosen.</summary>
+    Toolbar,
+    /// <summary>The full-screen editor on the other monitor: where the toolbar is, a zone chosen.</summary>
+    OtherMonitor,
+}
+
 /// <summary>
 /// The real Window Zones view and view model over zones in a temporary folder and a pretend engine: two pretend monitors,
 /// pretend windows. Nothing touches a real window: opening, closing and taking out only change the pretend list.
@@ -37,6 +46,21 @@ internal enum WindowZonesStage
 internal static class WindowZonesDemo
 {
     public static Control Create(FakeModule module, WindowZonesStage stage) => Build(module, stage).View;
+
+    /// <summary>The full-screen editor (one monitor's window content), over the same pretend zones.</summary>
+    public static Control Screen(FakeModule module, ZoneScreenStage stage) => ScreenEditor(module, stage);
+
+    /// <summary>The editor's view for one pretend monitor, its session shared as on the real screens.</summary>
+    public static ZoneScreenEditorView ScreenEditor(FakeModule module, ZoneScreenStage stage)
+    {
+        var (_, _, zones) = Build(module, WindowZonesStage.Zones);
+        var session = new Helm.Modules.WindowZones.Editor.EditorSession(zones.Data, Monitors, Monitors[0]);
+        // The big zone chosen on the first screen; the unnamed one on the second.
+        session.Edit.Select(stage == ZoneScreenStage.Toolbar ? 0 : 5);
+        return stage == ZoneScreenStage.Toolbar
+            ? new ZoneScreenEditorView(session, Monitors[0], isHome: true)
+            : new ZoneScreenEditorView(session, Monitors[1], isHome: false);
+    }
 
     /// <summary>The view with its view model and pretend engine (the UI tests drive them).</summary>
     public static (WindowZonesView View, WindowZonesViewModel ViewModel, PretendZones Zones) Build(FakeModule module, WindowZonesStage stage)

@@ -52,7 +52,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **Window Zones has the new look on the PC**: your screens drawn to scale with their zones, a card per zone with its
   windows (show one, take it out), first-run steps while there are no zones, and the zone editor as a sheet over the page.
   The settings (drag key, shortcuts, the on/off switch) are a sheet behind the gear; Home → Utilities opens Window Zones
-  itself. Edit on the screens, the drag overlay and the tab strip are unchanged.
+  itself. The drag overlay and the tab strip are unchanged.
+- **Window Zones: Edit on the screens has the new look too.** Each monitor shows its zones at full size on the dark veil;
+  the monitor you opened it on has the toolbar card (split, delete, Cancel, Save), the others say where it is. Esc cancels,
+  Del deletes the chosen zone, Ctrl+Enter saves, as before.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the
