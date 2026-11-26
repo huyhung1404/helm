@@ -21,7 +21,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Ssh.Android\SshIcon.cs" Link="ToolIcons\SshIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Tracker.Android\TrackerIcon.cs" Link="ToolIcons\TrackerIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Vocab.Android\VocabIcon.cs" Link="ToolIcons\VocabIcon.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Wallet.Android\WalletIcon.cs" Link="ToolIcons\WalletIcon.cs" />
   </ItemGroup>
 
 </Project>

@@ -7,8 +7,8 @@ namespace Helm.Modules.Wallet;
 
 /// <summary>
 /// Wallet on Windows. The transactions come from the phone (it reads the banks' notifications) through Helm Sync; the
-/// PC shows them, categorizes them and adds cash by hand. Nothing runs in the background. The menu and Quick access
-/// open <see cref="WalletContentPage"/>; Home → Utilities opens the settings (<see cref="WalletPage"/>).
+/// PC shows them, categorizes them and adds cash by hand. Nothing runs in the background. The menu, Quick access
+/// and Home → Utilities open <see cref="WalletContentPage"/>; its settings are a sheet inside it.
 /// </summary>
 public sealed class WalletModule : HelmModuleBase, IModuleContent
 {
@@ -18,7 +18,7 @@ public sealed class WalletModule : HelmModuleBase, IModuleContent
     public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
     public override SymbolRegular Icon => SymbolRegular.Wallet24;
     public override ImageSource IconImage => WalletLogo.Image;
-    public override Type SettingsPageType => typeof(WalletPage);
+    public override Type SettingsPageType => typeof(WalletContentPage);
     public Type ContentPageType => typeof(WalletContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 

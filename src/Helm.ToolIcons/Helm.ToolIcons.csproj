@@ -13,6 +13,7 @@
     <ProjectReference Include="..\Helm.Shell.UI\Helm.Shell.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Tracker.UI\Helm.Modules.Tracker.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Wallet.Core\Helm.Modules.Wallet.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Wallet.UI\Helm.Modules.Wallet.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vault.UI\Helm.Modules.Vault.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Habits.UI\Helm.Modules.Habits.UI.csproj" />
   </ItemGroup>
