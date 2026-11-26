@@ -17,7 +17,7 @@ public static class Program
         {
             var dataDir = Array.FindIndex(args, a => a.Equals("--data-dir", StringComparison.OrdinalIgnoreCase));
             var paths = new Core.Settings.HelmPaths(dataDir >= 0 && dataDir + 1 < args.Length ? args[dataDir + 1] : null);
-            return Core.Mcp.McpBridge.RunAsync(paths, Shell.Services.AppInfo.Version).GetAwaiter().GetResult();
+            return Core.Mcp.McpBridge.RunAsync(paths, Helm.Shell.Services.AppInfo.Version).GetAwaiter().GetResult();
         }
 
         // 1. Velopack first (vpk checks it is literally in Main): install/update/uninstall hooks exit inside Run().

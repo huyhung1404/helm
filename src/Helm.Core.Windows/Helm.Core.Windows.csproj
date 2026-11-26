@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Windows-only infrastructure on top of Helm.Core: WPF-UI controls, Win32 (CsWin32), hooks, hotkeys, overlays,
-       DPAPI. Namespaces stay Helm.Core.* so modules do not care which assembly a type lives in. -->
+  <!-- Windows-only infrastructure on top of Helm.Core: Win32 (CsWin32), hooks, hotkeys, overlays, DPAPI, the clipboard,
+       and the Windows module contract (IHelmModule, Avalonia types). No UI of its own. UseWPF stays only for two Windows
+       desktop assemblies it reads with, not for UI: UI Automation (BrowserSites, the site in the browser in front) and
+       Windows imaging (ShellIcons: a file's icon to PNG). Namespaces stay Helm.Core.*. -->
   <PropertyGroup>
     <UseWPF>true</UseWPF>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

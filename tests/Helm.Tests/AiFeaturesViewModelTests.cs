@@ -213,8 +213,7 @@ public sealed class AiFeaturesViewModelTests
 
         Assert.All(vm.Rows, r =>
         {
-            Assert.True(Enum.TryParse<Wpf.Ui.Controls.SymbolRegular>(r.Symbol + "24", out var symbol), r.Symbol);
-            Assert.True((int)symbol <= 0xFFFF, r.Symbol);
+            Assert.True(Enum.TryParse<FluentIcons.Common.Symbol>(r.Symbol, out _), r.Symbol);
         });
         Assert.Equal("wallet", Row(vm, AiFeatureIds.WalletCategorize).Tool);
         Assert.Null(Row(vm, AiFeatureIds.AskHelm).Tool);

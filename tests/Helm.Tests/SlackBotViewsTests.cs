@@ -33,13 +33,21 @@ public sealed class SlackBotViewsTests : IDisposable
         public void StartNewInstance(string? arguments = null) { }
     }
 
-    /// <summary>The STA thread's dispatcher, like the app's UI thread: the view model's delayed refresh comes back to it.</summary>
-    private sealed class StaUi : IUiDispatcher
+    /// <summary>The UI thread, by hand: posted work waits in a queue until <see cref="Flush"/> runs it on the test's thread.</summary>
+    private sealed class QueueUi : IUiDispatcher
     {
-        private readonly System.Windows.Threading.Dispatcher _dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
-        public bool CheckAccess() => _dispatcher.CheckAccess();
-        public void Post(Action action) => _dispatcher.BeginInvoke(action);
-        public Task InvokeAsync(Action action) => _dispatcher.InvokeAsync(action).Task;
+        private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _queue = new();
+        public bool CheckAccess() => true;
+        public void Post(Action action) => _queue.Enqueue(action);
+        public Task InvokeAsync(Action action)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+        public void RunPending()
+        {
+            while (_queue.TryDequeue(out var action)) action();
+        }
     }
 
     private sealed class NoSlack : ISlackApi
@@ -61,9 +69,8 @@ public sealed class SlackBotViewsTests : IDisposable
     }
 
     [Fact]
-    public void The_overlay_loads_with_messages() => WpfHost.Run(() =>
+    public void The_overlay_loads_with_messages()
     {
-        SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
         var paths = new HelmPaths(_dir.Path);
         using var settings = new SettingsStoreFactory(paths);
         var protector = new PlainSecretProtector();
@@ -72,11 +79,11 @@ public sealed class SlackBotViewsTests : IDisposable
         Seed(file.Inbox);
         var engine = new SlackBotEngine(tokens, file, new SlackSorter(new NoAgent()), settings, NullLogger<SlackBotEngine>.Instance);
         var launcher = new Launcher();
-        var ui = new StaUi();
+        var ui = new QueueUi();
         var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoShell(), settings);
         var windows = new WindowService(NullLogger<WindowService>.Instance);
         var overlay = new SlackBotOverlay(inbox, settings, windows, new MonitorService(), ui, NullLogger<SlackBotOverlay>.Instance);
-        var module = new SlackBotModule(engine, overlay, new Microsoft.Extensions.DependencyInjection.ServiceCollection().BuildServiceProvider()) { IsEnabled = true };
+        var module = new SlackBotModule(engine, overlay, Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(new Microsoft.Extensions.DependencyInjection.ServiceCollection())) { IsEnabled = true };
 
         // To do: the DM and the mention (one unsorted), not the channel chatter or what the user answered.
         Assert.Equal(["Tuấn", "Linh"], inbox.ToDo.Select(i => i.From));
@@ -86,7 +93,6 @@ public sealed class SlackBotViewsTests : IDisposable
         // The report shows what came before the last report time.
         Assert.Equal(1, inbox.ReportCount);
         Assert.True(inbox.HasOverlay);
->>>>
 
         inbox.StartReplyCommand.Execute(inbox.ToDo[0]);
         inbox.ReplyText = "Ok em, chiều nay anh xem nhé";
@@ -116,10 +122,10 @@ public sealed class SlackBotViewsTests : IDisposable
         // Done takes the card off the list (both of the DM's messages); replying in the thread takes the mention off too.
         inbox.DoneCommand.Execute(inbox.ToDo[0]);
         engine.Inbox.Mine(new SlackMessage("C1", "1700000300.000100", "1700000200.000100", "ME", "đang xem", false), SlackConversationKind.Channel);
-        Flush(() => inbox.ToDo.Count == 0);
+        Flush(ui, () => inbox.ToDo.Count == 0);
         Assert.Empty(inbox.ToDo);
         Assert.Equal(4, inbox.Handled.Count);
-    });
+    }
 
     private static void Seed(SlackInbox inbox)
     {
@@ -163,20 +169,18 @@ public sealed class SlackBotViewsTests : IDisposable
         inbox.Digest(DateTimeOffset.FromUnixTimeSeconds(1_650_000_000));
     }
 
-    /// <summary>Runs the dispatcher until <paramref name="done"/> holds (the lists refresh 300 ms after a change; a slow
+    /// <summary>Runs the posted work until <paramref name="done"/> holds (the lists refresh 300 ms after a change; a slow
     /// CI runner takes longer), at most 5 s.</summary>
-    private static void Flush(Func<bool> done)
+    private static void Flush(QueueUi ui, Func<bool> done)
     {
-        var frame = new System.Windows.Threading.DispatcherFrame();
         var until = DateTime.UtcNow.AddSeconds(5);
-        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
-        timer.Tick += (_, _) =>
+        do
         {
-            if (!done() && DateTime.UtcNow < until) return;
-            timer.Stop();
-            frame.Continue = false;
-        };
-        timer.Start();
-        System.Windows.Threading.Dispatcher.PushFrame(frame);
+            ui.RunPending();
+            if (done()) return;
+            Thread.Sleep(50);
+        }
+        while (DateTime.UtcNow < until);
+        ui.RunPending();
     }
 }

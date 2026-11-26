@@ -809,14 +809,12 @@ public sealed class WalletChartTests
     private static readonly DateTimeOffset T0 = new(2026, 10, 4, 9, 0, 0, TimeSpan.FromHours(7));
 
     [Fact]
-    public void Every_icon_exists_in_wpf_ui_below_ffff()
+    public void Every_icon_exists_in_fluent_icons()
     {
-        // Android's FluentIcons has the same names (checked when the list was made); WPF-UI draws a symbol as one
-        // 16-bit char, so a value above U+FFFF would show a stray letter.
+        // Both apps draw these names with FluentIcons.
         foreach (var name in WalletIcons.Choices.Append(WalletIcons.Uncategorized).Concat(WalletCategories.BuiltIn.Select(c => c.Icon)))
         {
-            Assert.True(Enum.TryParse<Wpf.Ui.Controls.SymbolRegular>(name + "24", out var symbol), name);
-            Assert.True((int)symbol <= 0xFFFF, name);
+            Assert.True(Enum.TryParse<FluentIcons.Common.Symbol>(name, out _), name);
         }
         Assert.All(WalletCategories.BuiltIn, c => Assert.InRange(c.Color, 0, WalletPalette.Slots));
     }

@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -72,7 +73,7 @@ internal static class NotificationCard
         // Under the mouse it stays; it goes once the mouse leaves and the time is up.
         card.PointerEntered += (_, _) => _timer?.Stop();
         card.PointerExited += (_, _) => _timer?.Start();
-        window.Content = new Avalonia.Styling.ThemeVariantScope { Child = card };
+        window.Content = new ThemeVariantScope { Child = card };
         _shown = window;
         window.Closed += (_, _) =>
         {

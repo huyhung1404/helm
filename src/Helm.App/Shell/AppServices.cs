@@ -32,7 +32,7 @@ internal sealed class DialogService : IDialogService
         Dispatcher.UIThread.InvokeAsync(() =>
             DesktopWindows.Active?.Content is Control anchor
                 ? new GlassDialogs(() => anchor).ConfirmAsync(title, message, confirmText)
-                : Task.FromResult(false)).GetTask().Unwrap();
+                : Task.FromResult(false));
 }
 
 internal sealed class ClipboardService : IClipboardService
