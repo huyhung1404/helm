@@ -12,7 +12,7 @@ namespace Helm.Ui.Tests;
 
 /// <summary>
 /// What Window Zones shows on the screens themselves (Windows puts each in a window of its own): the full-screen editor
-/// of one monitor, over the Gallery's pretend zones.
+/// of one monitor and a zone's tab strip, over the Gallery's pretend zones.
 /// </summary>
 public sealed class ZoneScreensTests
 {
@@ -103,5 +103,37 @@ public sealed class ZoneScreensTests
         Assert.Contains("narrow", view.Classes);
         Assert.Equal(1, Grid.GetRow(Named<Button>(view, "SaveButton")));
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public void The_tab_strip_has_a_tab_per_window_the_front_one_chosen_and_a_click_asks_for_that_window()
+    {
+        var strip = WindowZonesDemo.Tabs(ZoneScreenStage.Tabs);
+        var window = new Window { Content = strip, Width = 1200, Height = 200 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var tabs = strip.GetVisualDescendants().OfType<Button>().ToList();
+        Assert.Equal(3, tabs.Count);
+        Assert.Equal("1 · Code", Named<TextBlock>(strip, "Label").Text);
+        Assert.Equal([false, true, false], tabs.Select(t => t.Classes.Contains("selected")));
+        Assert.All(tabs, t => Assert.Equal(ZoneTabStripView.TabWidth, t.Width));
+        Assert.All(tabs, t => Assert.False(t.Focusable));
+
+        nint chosen = 0;
+        strip.TabChosen += (_, handle) => chosen = handle;
+        tabs[2].RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal((nint)0x1008, chosen);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Tabs_share_a_narrow_zone_but_never_get_too_small()
+    {
+        var view = WindowZonesDemo.TabStrip(ZoneScreenStage.ManyTabs);
+        // 1075 px at 125 % is 860 wide: what the label leaves, shared by five.
+        Assert.InRange(ZoneTabStripView.TabWidthFor(view), 130, 145);
+        var tiny = view with { Zone = new Helm.Core.Geometry.PixelRect(0, 0, 300, 400) };
+        Assert.Equal(ZoneTabStripView.MinTabWidth, ZoneTabStripView.TabWidthFor(tiny));
     }
 }

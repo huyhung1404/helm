@@ -1,7 +1,4 @@
-using System.Collections.Concurrent;
-using System.IO;
 using System.Windows.Controls;
-using System.Windows.Media.Imaging;
 using Avalonia.Media;
 using Helm.Core.Desktop;
 using Helm.Core.Hotkeys;
@@ -17,7 +14,6 @@ namespace Helm.Modules.WindowZones;
 public partial class WindowZonesContentPage : Page, IWindowZonesPageHost
 {
     private readonly IMonitorService _monitors;
-    private readonly ConcurrentDictionary<string, IImage?> _icons = new(StringComparer.OrdinalIgnoreCase);
 
     public WindowZonesContentPage(WindowZonesViewModel viewModel, IMonitorService monitors)
     {
@@ -33,7 +29,7 @@ public partial class WindowZonesContentPage : Page, IWindowZonesPageHost
     public IReadOnlyList<MonitorInfo> Monitors() => _monitors.GetMonitors();
 
     /// <summary>The program's icon from Windows, handed to Avalonia as a picture; cached per .exe.</summary>
-    public IImage? IconFor(string processPath) => _icons.GetOrAdd(processPath, Load);
+    public IImage? IconFor(string processPath) => ProgramIcons.For(processPath);
 
     public Avalonia.Controls.Control? CreateHotkeyPicker(HotkeyGesture gesture, Action<HotkeyGesture> changed)
     {
@@ -43,16 +39,5 @@ public partial class WindowZonesContentPage : Page, IWindowZonesPageHost
             if (e.Property == Helm.Ui.Windows.HotkeyBox.GestureProperty) changed(box.Gesture);
         };
         return box;
-    }
-
-    private static IImage? Load(string path)
-    {
-        if (Helm.Core.Desktop.ShellIcons.ForFile(path) is not BitmapSource icon) return null;
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(icon));
-        using var png = new MemoryStream();
-        encoder.Save(png);
-        png.Position = 0;
-        return new Avalonia.Media.Imaging.Bitmap(png);
     }
 }

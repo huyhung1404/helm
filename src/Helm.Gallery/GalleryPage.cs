@@ -87,6 +87,8 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Window Zones", "Settings (lower part)", "Window Zones", m => WindowZonesDemo.Create(m, WindowZonesStage.SettingsEnd), Framed: false),
         new("Zone editor", "Toolbar", "Window Zones", m => WindowZonesDemo.Screen(m, ZoneScreenStage.Toolbar), Framed: false),
         new("Zone editor", "Other monitor", "Window Zones", m => WindowZonesDemo.Screen(m, ZoneScreenStage.OtherMonitor), Framed: false),
+        new("Zone tabs", "Three windows", "Window Zones", m => WindowZonesDemo.Screen(m, ZoneScreenStage.Tabs), Framed: false),
+        new("Zone tabs", "Many windows", "Window Zones", m => WindowZonesDemo.Screen(m, ZoneScreenStage.ManyTabs), Framed: false),
         new("Novel Reader", "Library", "Novel Reader", m => NovelDemo.Create(m, NovelStage.Library), Framed: false),
         new("Novel Reader", "Library (phone)", "Novel Reader", m => NovelDemo.Create(m, NovelStage.LibraryPhone), Framed: false),
         new("Novel Reader", "First run", "Novel Reader", m => NovelDemo.Create(m, NovelStage.FirstRun), Framed: false),

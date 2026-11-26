@@ -93,8 +93,8 @@ src/
   Helm.Modules.SlackBot.UI/  Avalonia: the Slack Report page, its reply sheet and settings sheet
   Helm.Modules.SlackBot/     Windows only: the module, the always-on-top list window, the WPF page that hosts the shared view
   Helm.Modules.WindowZones.Core/ net8.0: zone layouts, rules, engine contracts, shared view model
-  Helm.Modules.WindowZones.UI/ Avalonia: the Window Zones page, its settings sheet and the zone layout view
-  Helm.Modules.WindowZones/  Windows only: the module, the snapping engine and drag overlay, the full-screen editor, the WPF page that hosts the shared view
+  Helm.Modules.WindowZones.UI/ Avalonia: the Window Zones page, its settings sheet, the zone layout view, the full-screen editor and the tab strip
+  Helm.Modules.WindowZones/  Windows only: the module, the snapping engine and drag overlay, the Avalonia windows of the full-screen editor and the tab strip, the WPF page that hosts the shared view
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
   Helm.Core.Linux/           net8.0, Linux for the connector: secrets under a host key (0600, optionally sealed by
                              systemd-creds), MCP on a Unix socket, plain child processes; namespaces stay Helm.Core.*

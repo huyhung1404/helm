@@ -1,0 +1,14 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Helm.Modules.WindowZones.Ui.ZoneTabStripView">
+
+    <!-- The tabs of a zone, shown for a moment at the top of the zone when you switch windows or open it (Windows puts this
+         card in a see-through window of its own that never takes the focus): the zone's name, then one tab per window, its
+         program's icon and title. The window in front is the chosen tab; a minimized one is faded. Clicking a tab brings
+         that window forward. The margin leaves room for the card's shadow: the tight card shadow, as a window clips a bigger one. -->
+    <Border x:Name="Card" Classes="sheet" CornerRadius="14" Padding="6" Margin="16" BoxShadow="{DynamicResource HelmGlassShadow}">
+        <StackPanel x:Name="Row" Orientation="Horizontal" Spacing="4">
+            <TextBlock x:Name="Label" Classes="muted" FontSize="12" FontWeight="SemiBold" Margin="8,0,8,0" VerticalAlignment="Center" />
+        </StackPanel>
+    </Border>
+</UserControl>
