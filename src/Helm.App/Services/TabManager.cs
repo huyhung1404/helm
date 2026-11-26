@@ -237,7 +237,6 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
             yield return (Describe(page), page);
         }
         yield return (Describe(typeof(GeneralPage)), typeof(GeneralPage));
-        yield return (Describe(typeof(AiPage)), typeof(AiPage));
     }
 
     internal void Register(TabHost host)
@@ -270,7 +269,6 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
     {
         if (pageType == typeof(HomePage)) return new("Home", () => new SymbolIcon(SymbolRegular.Home24));
         if (pageType == typeof(GeneralPage)) return new("General", () => new SymbolIcon(SymbolRegular.Settings24));
-        if (pageType == typeof(AiPage)) return new("AI", () => new SymbolIcon(SymbolRegular.Sparkle24));
         if (pageType == typeof(WhatsNewPage)) return new("What's new", () => new SymbolIcon(SymbolRegular.Megaphone24));
         if (pageType == typeof(WelcomePage)) return new("Welcome", () => new SymbolIcon(SymbolRegular.HandWave24));
         if (pageType == typeof(DiagnosticsPage)) return new("Diagnostics", () => new SymbolIcon(SymbolRegular.Bug24));
@@ -295,13 +293,13 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
         return new Point(p.X, p.Y);
     }
 
-    /// <summary>The AI page was the AI &amp; MCP page before: a tab saved then opens the AI page.</summary>
-    private const string LegacyMcpPage = "Helm.App.Views.Pages.McpPage";
+    /// <summary>The AI page (once the AI &amp; MCP page) is gone; its MCP part is in General: a tab saved then opens General.</summary>
+    private static readonly string[] LegacyAiPages = ["Helm.App.Views.Pages.McpPage", "Helm.App.Views.Pages.AiPage"];
 
     private Type? Resolve(string? name)
     {
         if (string.IsNullOrEmpty(name)) return null;
-        if (name == LegacyMcpPage) return typeof(AiPage);
+        if (LegacyAiPages.Contains(name)) return typeof(GeneralPage);
         // Home and General moved to Helm.Shell.Windows: tabs saved before open the same pages.
         if (name == "Helm.App.Views.Pages.HomePage") return typeof(HomePage);
         if (name == "Helm.App.Views.Pages.GeneralPage") return typeof(GeneralPage);

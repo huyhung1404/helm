@@ -139,7 +139,7 @@ public sealed partial class TrackerProposalViewModel(TrackerStore store, IAiText
     {
         if (ai is null)
         {
-            Status = "AI is not set up: AI → Proxy or Models & keys on the PC.";
+            Status = Helm.Core.Ai.AiNotice.NoModel;
             return;
         }
         var asked = _asked;

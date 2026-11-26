@@ -43,7 +43,6 @@ public sealed class GeneralComposer : IGeneralHost
         MirrorJobs();
         MirrorPlatform();
         Model.SettingsFolder = platform.SettingsFolder;
-        Model.HasAiFeatures = platform.HasAiFeatures;
     }
 
     public GeneralViewModel Model { get; }
@@ -208,8 +207,6 @@ public sealed class GeneralComposer : IGeneralHost
         else _updates.CheckCommand.Execute(null);
         return Task.CompletedTask;
     }
-
-    public void OpenAiFeatures() => _platform.OpenAiFeatures();
 
     public void OpenSettingsFolder() => _platform.OpenSettingsFolder();
 

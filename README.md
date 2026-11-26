@@ -25,9 +25,9 @@ Notes, tasks, a password vault and tools for Claude Code in one Fluent app, sync
 - **Local-first, end-to-end encrypted sync.** Every device keeps a full copy of your data; the sync server only ever sees encrypted records.
 - **Updates itself.** New versions download in the background from GitHub Releases and install when you choose.
 - **Keyboard-first.** Hold Ctrl, Alt or Win to see the shortcuts of the app in front, Win+Alt+N to capture a note or task from any app.
-- **Helm tools for AI agents (MCP).** Claude Code, VS Code, Claude Desktop, Cursor or any MCP client can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **AI → Agents & MCP**.
+- **Helm tools for AI agents (MCP).** Claude Code, VS Code, Claude Desktop, Cursor or any MCP client can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **General › MCP**. Helm itself is passive: Fairy and other agents do the automating through these tools.
 - **Report a bug from anywhere, with a black box.** Ctrl+Alt+F12 on PC, a shake or a Quick Settings tile on the phone: the report carries the last 60 seconds of what you did and how Helm answered (errors, freezes, never what you typed) and your own pictures; AI agents read, fix and hand bugs back through Helm's MCP tools, and only you close them ([docs/bug-fixing.md](docs/bug-fixing.md)).
-- **Your AI keys in one place.** Claude and Grok API keys in **AI → Models & keys**: Helm tests each one, shows what it can reach (and Grok's prepaid balance), and syncs them end-to-end encrypted to your phone, so Helm's tools can call AI models on every device ([docs/ai-keys.md](docs/ai-keys.md)).
+- **AI inside the tools keeps working, with no settings page.** The AI page (models and keys, proxy, features) and Ask Helm were removed in 0.93: the keys, agents and choices set before are kept and still used, and a feature with no model says so plainly ([docs/ai-keys.md](docs/ai-keys.md)). The old code is at tag `archive/helm-ai-2026-11-26`.
 
 ## Tools
 

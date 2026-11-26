@@ -91,11 +91,11 @@ public partial class App : Application
             var engine = Services.GetRequiredService<Core.Sync.SyncEngine>();
             engine.Start();
             engine.SetLive(true);
-            // The agents on this PC (AI → Proxy) take the phone's AI jobs (Ask Helm) through Helm Sync, from launch on;
+            // The agents on this PC take the phone's AI jobs (its AI features) through Helm Sync, from launch on;
             // a sign-in or a change of the list tells the phone at once instead of at the next heartbeat.
             var worker = Services.GetRequiredService<Helm.Ai.Assistant.AgentJobWorker>();
             worker.Start();
-            // And the user's VPS, when it is set up and on (AI → Proxy → Your VPS); it hears of the ready agents too.
+            // And the user's VPS, when it is set up and on (its settings stay; the AI page that set them is gone); it hears of the ready agents too.
             var vps = Services.GetRequiredService<Helm.Ai.Vps.VpsWorker>();
             Services.GetRequiredService<Helm.Ai.Vps.VpsWorkerControl>().Apply();
             Services.GetRequiredService<Helm.Ai.Agents.AgentRegistry>().Changed += (_, _) =>

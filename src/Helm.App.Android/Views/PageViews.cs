@@ -18,7 +18,6 @@ internal static class PageViews
         {
             Helm.Home.HomeViewModel home => new Helm.Home.HomeView(home),
             Helm.General.GeneralViewModel general => new Helm.General.GeneralView(general),
-            Helm.Ai.AiFeaturesViewModel => new AiFeaturesView(),
             Helm.Shell.BugReports.BugReportsViewModel => new BugReports.BugReportsView(),
             Helm.Shell.BugReports.BugReportFormViewModel => new BugReports.BugReportView(),
             ModulePage module => new ModulePageTemplate().Build(module)!,

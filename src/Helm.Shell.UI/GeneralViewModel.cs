@@ -79,8 +79,6 @@ public interface IGeneralHost
 
     Task UpdateAsync();
 
-    void OpenAiFeatures();
-
     void OpenSettingsFolder();
 
     void OpenLogs();
@@ -90,8 +88,9 @@ public interface IGeneralHost
 
 /// <summary>
 /// General, in parts instead of one long page: Tools (on or off), Sync, Updates, Appearance &amp; startup, Running in the
-/// background, Help &amp; troubleshooting. Each part says how it stands in the list, so most visits end there. Portable:
-/// each platform fills it and answers its buttons (<see cref="IGeneralHost"/>).
+/// background, MCP (a PC: AI agents using Helm's tools, <see cref="AttachMcp"/>), Help &amp; troubleshooting. Each part says
+/// how it stands in the list, so most visits end there. Portable: each platform fills it and answers its buttons
+/// (<see cref="IGeneralHost"/>).
 /// </summary>
 public sealed partial class GeneralViewModel : ObservableObject
 {
@@ -170,7 +169,18 @@ public sealed partial class GeneralViewModel : ObservableObject
     /// <summary>Windows (and later macOS): startup, tray, administrator mode, the update channel's install-on-restart.</summary>
     public bool IsDesktop { get; }
 
-    public IReadOnlyList<GeneralSection> Sections { get; }
+    public ObservableCollection<GeneralSection> Sections { get; }
+
+    /// <summary>The MCP part's content (a PC's own view), or null where Helm serves no MCP (the phone, the Gallery).</summary>
+    public object? McpContent { get; private set; }
+
+    /// <summary>Adds the MCP part, before Help, showing <paramref name="content"/> (the platform's own view of it).</summary>
+    public void AttachMcp(object content)
+    {
+        McpContent = content;
+        if (Sections.All(s => s.Id != "mcp")) Sections.Insert(Sections.Count - 1, new GeneralSection("mcp", "MCP", Symbol.PlugConnected));
+        OnPropertyChanged(nameof(McpContent));
+    }
 
     public ObservableCollection<HomeTool> Tools { get; } = [];
 
@@ -204,6 +214,8 @@ public sealed partial class GeneralViewModel : ObservableObject
 
     public bool IsHelp => Selected.Id == "help";
 
+    public bool IsMcp => Selected.Id == "mcp";
+
     public bool HasJobs => Jobs.Count > 0;
 
     public string SortLabel => GroupByCategory ? "By category" : "A–Z";
@@ -214,7 +226,7 @@ public sealed partial class GeneralViewModel : ObservableObject
     {
         if (oldValue is not null) oldValue.IsSelected = false;
         newValue.IsSelected = true;
-        foreach (var name in new[] { nameof(IsTools), nameof(IsSync), nameof(IsUpdates), nameof(IsAppearance), nameof(IsBackground), nameof(IsHelp) })
+        foreach (var name in new[] { nameof(IsTools), nameof(IsSync), nameof(IsUpdates), nameof(IsAppearance), nameof(IsBackground), nameof(IsHelp), nameof(IsMcp) })
             OnPropertyChanged(name);
     }
 
@@ -304,12 +316,6 @@ public sealed partial class GeneralViewModel : ObservableObject
 
     [RelayCommand]
     private Task UpdateAsync() => _host.UpdateAsync();
-
-    /// <summary>The phone's page of AI feature settings is offered in Help.</summary>
-    public bool HasAiFeatures { get; set; }
-
-    [RelayCommand]
-    private void OpenAiFeatures() => _host.OpenAiFeatures();
 
     [RelayCommand]
     private void OpenSettingsFolder() => _host.OpenSettingsFolder();

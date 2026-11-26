@@ -74,10 +74,6 @@ internal sealed class WindowsGeneralPlatform : ObservableObject, IGeneralPlatfor
         }
     }
 
-    public bool HasAiFeatures => false;
-
-    public void OpenAiFeatures() { }
-
     public void OpenSettingsFolder() => _launcher.OpenFolder(_settings.Paths.SettingsDirectory);
 
     public void OpenLogs() => _launcher.OpenFolder(_settings.Paths.LogsDirectory);

@@ -109,7 +109,7 @@ internal partial class MainWindow : FluentWindow
         var index = Array.FindIndex(args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
         if (index < 0 || index + 1 >= args.Length) return null;
         var name = args[index + 1];
-        var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(AiPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(WhatsNewPage), typeof(BugReports.BugReportsPage) }
+        var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(WhatsNewPage), typeof(BugReports.BugReportsPage) }
             .Concat(_viewModel.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
             .Concat(_viewModel.Groups.SelectMany(g => g.Modules).OfType<IModuleContent>().Select(m => m.ContentPageType));
         return candidates.FirstOrDefault(t => t.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase)) ?? typeof(HomePage);
@@ -174,7 +174,6 @@ internal partial class MainWindow : FluentWindow
 
         Navigation.MenuItems.Add(NavItem("Home", SymbolRegular.Home24, typeof(HomePage)));
         Navigation.MenuItems.Add(NavItem("General", SymbolRegular.Settings24, typeof(GeneralPage)));
-        Navigation.MenuItems.Add(NavItem("AI", SymbolRegular.Sparkle24, typeof(AiPage)));
         // One flat list: every tool keeps its own icon in the collapsed strip, under a header that is the same height
         // open or collapsed, so opening the pane never pushes the item under the mouse down.
         foreach (var group in _viewModel.Groups)

@@ -46,6 +46,10 @@ public static class ShellWindowsServices
             return composer;
         });
 
+        // General › MCP: AI agents using Helm's tools (this PC serves them).
+        services.TryAddSingleton<Mcp.McpPermissionsViewModel>();
+        services.TryAddSingleton<Mcp.McpViewModel>();
+
         // The two pages (WPF, each hosting its shared Avalonia view).
         services.AddSingleton<HomePage>();
         services.AddSingleton<GeneralPage>();

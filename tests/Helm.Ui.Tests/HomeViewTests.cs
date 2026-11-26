@@ -60,15 +60,34 @@ public sealed class HomeViewTests
     }
 
     [AvaloniaFact]
+    public void Mcp_is_a_part_of_General_before_Help_where_the_platform_serves_it()
+    {
+        var (window, view) = Show<GeneralView>(HomeDemo.General(desktop: true));
+        var model = (GeneralViewModel)view.DataContext!;
+        Assert.DoesNotContain(model.Sections, s => s.Id == "mcp");
+
+        model.AttachMcp(new TextBlock { Text = "Helm's tools for AI agents" });
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["mcp", "help"], model.Sections.TakeLast(2).Select(s => s.Id));
+        Assert.Empty(Shown(view, "Helm's tools for AI agents"));
+
+        model.Selected = model.Section("mcp");
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(model.IsMcp);
+        Assert.Single(Shown(view, "Helm's tools for AI agents"));
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void General_lists_its_parts_with_their_state_and_a_switch_counts_in_tools()
     {
         var (window, view) = Show<GeneralView>(HomeDemo.General(desktop: true));
         var vm = (GeneralViewModel)view.DataContext!;
 
-        Assert.Equal("13 of 16 on", vm.Section("tools").Summary);
+        Assert.Equal("13 of 15 on", vm.Section("tools").Summary);
         Assert.True(vm.IsTools);
         vm.Tools.Single(t => t.Name == "Helm Keyboard").IsEnabled = true;
-        Assert.Equal("14 of 16 on", vm.Section("tools").Summary);
+        Assert.Equal("14 of 15 on", vm.Section("tools").Summary);
 
         vm.Selected = vm.Section("sync");
         Dispatcher.UIThread.RunJobs();

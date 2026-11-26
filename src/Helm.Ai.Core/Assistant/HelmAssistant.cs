@@ -184,9 +184,9 @@ public sealed class HelmAssistant(
     /// <summary>Why Ask Helm cannot answer now, or null.</summary>
     public string? Unavailable()
     {
-        if (!Choice.Enabled) return "Ask Helm is turned off: AI → Features on the PC, or General › AI features on the phone.";
+        if (!Choice.Enabled) return Helm.Core.Ai.AiNotice.TurnedOff;
         if (Current() is null)
-            return "No Helm PC with an agent is online, and there is no API key: add an agent on the PC (AI → Proxy) or a Claude or Grok key (AI → Models & keys); keys sync to this phone.";
+            return Helm.Core.Ai.AiNotice.NoModel;
         return null;
     }
 
@@ -244,11 +244,11 @@ public sealed class HelmAssistant(
     {
         var choice = WebChoice;
         if (choice.Route == AiRoutePolicy.PcOnly)
-            return "Web search runs on the API only (agents on a PC do not search the web): set its route to API in AI → Features.";
+            return "Web search runs on the API only (agents on a PC do not search the web), and this feature is set not to use the API, so it cannot run.";
         if (!HasKeyFor(AiProviders.Claude))
-            return "Web search needs a Claude API key (AI → Models & keys on the PC); agents on a PC do not search the web.";
+            return "Web search needs a Claude API key and none is kept (agents on a PC do not search the web), so it cannot run.";
         return usage.SpentToday(AiFeatureIds.WebSearch) >= choice.DailyCapUsd
-            ? $"Today's limit for web search (${choice.DailyCapUsd.ToString("0.00", CultureInfo.InvariantCulture)}) is reached. It starts again tomorrow, or raise it in AI → Features."
+            ? $"Today's limit for web search (${choice.DailyCapUsd.ToString("0.00", CultureInfo.InvariantCulture)}) is reached. It starts again tomorrow."
             : null;
     }
 

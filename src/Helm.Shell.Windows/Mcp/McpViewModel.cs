@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Helm.App.Mcp;
 using Helm.Core.Mcp;
 using Helm.Core.Modules;
 using Helm.Core.Processes;
@@ -10,7 +9,7 @@ using Helm.Core.Services;
 using Helm.Core.Settings;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.App.ViewModels;
+namespace Helm.Shell.Windows.Mcp;
 
 /// <summary>The tools of one risk that AI agents are offered now (or that the switches hold back).</summary>
 internal sealed record McpToolGroup(string Title, string Description, IReadOnlyList<McpTool> Tools, string? Empty)
@@ -33,6 +32,12 @@ internal sealed partial class McpClientRow(McpClientKind kind, string title, str
     [ObservableProperty] private McpClientState _state;
     [ObservableProperty] private string _statusText = "";
 
+    /// <summary>Its setup steps are shown (General › MCP folds each client).</summary>
+    [ObservableProperty] private bool _isOpen;
+
+    [RelayCommand]
+    private void Toggle() => IsOpen = !IsOpen;
+
     public bool IsAdded => State == McpClientState.Added;
     public bool IsElsewhere => State == McpClientState.AddedElsewhere;
 
@@ -43,7 +48,7 @@ internal sealed partial class McpClientRow(McpClientKind kind, string title, str
     }
 }
 
-/// <summary>The Agents &amp; MCP part of the AI page: how AI agents (Claude Code, VS Code, any MCP client) reach Helm's tools, and what they may do.</summary>
+/// <summary>General › MCP (a PC): how AI agents (Claude Code, VS Code, any MCP client) reach Helm's tools, and what they may do.</summary>
 internal sealed partial class McpViewModel : ObservableObject
 {
     private readonly ISettingsStore<McpSettings> _store;
@@ -63,6 +68,11 @@ internal sealed partial class McpViewModel : ObservableObject
     [ObservableProperty] private string _claudeOutput = "";
     [ObservableProperty] private bool _claudeFailed;
     [ObservableProperty] private bool _claudeMissing;
+    [ObservableProperty] private bool _toolsOpen;
+    [ObservableProperty] private bool _otherOpen;
+
+    /// <summary>The part's line in General's list: "On · 64 tools · 2 connected", "Off".</summary>
+    [ObservableProperty] private string _summary = "";
 
     public McpViewModel(McpPermissionsViewModel permissions, ISettingsStoreFactory settings, McpClientConfig config, McpPipeHost host,
         IEnumerable<IMcpToolProvider> providers, IModuleHost modules, IUiDispatcher ui, IProcessLauncher launcher,
@@ -157,6 +167,12 @@ internal sealed partial class McpViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ToggleTools() => ToolsOpen = !ToolsOpen;
+
+    [RelayCommand]
+    private void ToggleOther() => OtherOpen = !OtherOpen;
+
+    [RelayCommand]
     private Task AddToClaudeCode() => RunClaudeAsync(ct => _setup.AddAsync(ct));
 
     [RelayCommand]
@@ -232,7 +248,14 @@ internal sealed partial class McpViewModel : ObservableObject
             Connections.Add(new McpConnectionRow(c.Id, name, $"Connected since {since} · {calls}"));
         }
         OnPropertyChanged(nameof(HasConnections));
+        UpdateSummary();
     }
+
+    private int _offered;
+
+    private void UpdateSummary() => Summary = !Enabled
+        ? "Off"
+        : $"On · {(_offered == 1 ? "1 tool" : $"{_offered} tools")}" + (Connections.Count switch { 0 => "", 1 => " · 1 connected", var n => $" · {n} connected" });
 
     private void RefreshTools()
     {
@@ -253,6 +276,8 @@ internal sealed partial class McpViewModel : ObservableObject
         ToolsSummary = !Enabled
             ? "Off: AI agents get no Helm tools, even where Helm is added."
             : offered.Count == 1 ? "1 tool is offered now." : $"{offered.Count} tools are offered now.";
+        _offered = offered.Count;
+        UpdateSummary();
 
         McpToolGroup Group(McpRisk risk, string title, string description)
         {

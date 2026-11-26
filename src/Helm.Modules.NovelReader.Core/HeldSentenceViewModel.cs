@@ -24,7 +24,7 @@ public sealed partial class HeldSentenceViewModel(IEnumerable<ICaptureTarget>? t
     internal static TimeSpan ToastFor { get; set; } = TimeSpan.FromSeconds(8);
 
     /// <summary>Without AI the sheet still says the sentence and offers the held word.</summary>
-    public const string NoAi = "Explaining a sentence needs AI: an agent on a Helm PC, or a Claude or Grok key (AI → Models & keys on the PC).";
+    public const string NoAi = "Explaining a sentence needs an AI model, and none is set up (no agent on a Helm PC is online and no API key is kept), so it cannot run.";
 
     private readonly ICaptureTarget? _vocabulary = targets?.FirstOrDefault(t => t.Id == VocabularyTarget);
     // A sentence held meanwhile makes an explanation still on its way stale; a newer toast outlives the older one's timer.

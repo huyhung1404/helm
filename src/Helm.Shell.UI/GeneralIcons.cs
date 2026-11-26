@@ -21,8 +21,18 @@ public static class GeneralIcons
         "appearance" => Appearance.Value,
         "background" => Background.Value,
         "help" => Help.Value,
+        "mcp" => Mcp.Value,
         _ => null,
     };
+
+    /// <summary>A plug with its cord: AI agents plugged into Helm's tools (MCP).</summary>
+    private static readonly Lazy<IImage> Mcp = new(() => Draw(0xFFF97316, 0xFFFACC15, (pen, _, g) =>
+    {
+        g.Add(pen, Geometry.Parse("M36 6V24"));
+        g.Add(pen, Geometry.Parse("M64 6V24"));
+        g.Add(pen, new RectangleGeometry(new Rect(22, 24, 56, 36), 12, 12));
+        g.Add(pen, Geometry.Parse("M50 60V72C50 88 34 90 22 94"));
+    }));
 
     /// <summary>A switch that is on: turning tools on and off.</summary>
     private static readonly Lazy<IImage> Tools = new(() => Draw(0xFF7B5CFA, 0xFFE25CFF, (pen, fill, g) =>

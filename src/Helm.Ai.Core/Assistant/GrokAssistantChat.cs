@@ -132,7 +132,7 @@ internal sealed class GrokAssistantChat : IAssistantChat
         if (_imagePending && status is >= 400 and < 500 and not (401 or 403 or 429)
             && (json?["error"]?.ToJsonString() ?? json?.ToJsonString() ?? "").Contains("image", StringComparison.OrdinalIgnoreCase))
             throw new AssistantImageException($"{_model} does not take this photo.");
-        if (status is 401 or 403) throw new AssistantException("xAI does not accept the API key, or the team has no credit left. Test it on the AI page.");
+        if (status is 401 or 403) throw new AssistantException("xAI does not accept the kept API key, or the team has no credit left, so it cannot run.");
         if (status == 429) throw new AssistantException("Too many requests right now, or the team has no credit left.");
         if (status >= 500) throw new AssistantException("xAI's servers had a problem. Try again later.");
         if (status != 200 || json?["choices"]?[0]?["message"] is not JsonObject message)

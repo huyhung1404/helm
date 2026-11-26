@@ -3,6 +3,32 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+Helm becomes a passive app: it shows and keeps your things, and Fairy does the automating through Helm's MCP tools.
+The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
+
+### Changed
+- **MCP moved into General.** AI agents (Fairy, Claude Code, VS Code, Claude Desktop, any MCP client) and Helm's tools now
+  live in **General › MCP** on the PC: the two switches, the tools they reach, how to connect each client, who is connected,
+  and the permissions with the activity log. Nothing about the tools changed: same names, same rules, same questions first.
+- **Slack Bot is now Slack Report.** It reads your Slack, sorts it with Claude and keeps what needs you on screen, but it
+  never answers by itself. Where you turn Write on, AI agents (Fairy) may post, behind the AI signature and asked first each
+  time; the signature now says Fairy.
+- **Opening a tool no longer shows black edges.** The page comes into focus over its background (a short blur, no zoom)
+  instead of growing from smaller.
+- **An AI feature with no model says so at once**, in plain words, instead of pointing to a settings page that is gone.
+
+### Removed
+- **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the
+  phone. What was set there is kept and still used: the keys, the agents, the proxy and VPS, each feature's choice.
+- **Ask Helm** on the phone: the card, its Quick Settings tile, widget, edge handle and launcher icon, the text-selection
+  entries (Helm: Dịch, Sửa, Viết lại, Kiểm tra tin), and the Nói button of Wallet's "What was it?" notification (it now
+  offers three categories). The connector's route that handed Ask Helm's jobs to Fairy Core (`helm/jobs`) went with it.
+- **Lumi** in Slack (answers when called, per-conversation models and project folders), Slack's automatic replies and its
+  Telegram phone alerts.
+- **Weekly Report.**
+
 ## [0.92.1] - 2026-11-26
 
 ### Fixed

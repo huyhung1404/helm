@@ -22,7 +22,7 @@ public static partial class WebSearch
     public const string LookupName = "web_lookup";
 
     /// <summary>Said when a post is to be checked while web search is off.</summary>
-    public const string Off = "Checking a post needs Web search, which is off: turn it on in AI → Features on the PC or General › AI features on the phone (about $0.01 a search, on the API).";
+    public const string Off = "Checking a post needs Web search, which is turned off, so it cannot run.";
 
     /// <summary>What a request to check a post starts with ("Helm: Kiểm tra tin" sends it that way).</summary>
     public const string FactCheckPrefix = "Kiểm tra tin này: ";

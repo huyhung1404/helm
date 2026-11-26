@@ -56,7 +56,7 @@ public sealed partial class AssistantSession
             if (Sonnet() is not { } sonnet)
                 return new AssistantReply("", [], false, _helm.HasKeyFor(picked.Provider)
                     ? $"{picked.Name} cannot read photos, and there is no Claude key to read it with Sonnet."
-                    : "Photos are read through the API: add a Claude or Grok key (AI → Models & keys on the PC).");
+                    : "Photos are read through the API, and no API key (Claude or Grok) is kept, so they cannot be read.");
             model = sonnet;
             note = $"{Short(picked.Name)} không đọc được ảnh nên em nhờ {Short(sonnet.Name)}.";
         }

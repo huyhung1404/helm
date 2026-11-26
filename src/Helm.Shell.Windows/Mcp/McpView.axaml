@@ -1,0 +1,331 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Ui"
+             xmlns:mcp="using:Helm.Shell.Windows.Mcp"
+             xmlns:tools="using:Helm.Core.Mcp"
+             x:Class="Helm.Shell.Windows.Mcp.McpView"
+             x:DataType="mcp:McpViewModel">
+
+    <!-- General › MCP: AI agents (Claude Code, VS Code, any MCP client) using Helm's tools: on or off, how to connect,
+         who is connected, what they may do. -->
+    <UserControl.Styles>
+        <Style Selector="Border.tool">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+        </Style>
+        <Style Selector="Border.tool > TextBlock">
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="TextBox.code">
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="FontFamily" Value="Consolas" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.caution">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+
+        <!-- On or off, and what that reaches -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Classes="head" Text="AI agents and Helm's tools" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Let an AI agent (Fairy, Claude Code, VS Code, Claude Desktop, Cursor or any MCP client) use Helm's tools. Helm has to be running. The vault is never included." />
+                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Let AI agents use Helm's tools" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Find and read your notes, lists, Wallet, missions, habits and words, and the menus of the servers you allow in SSH." />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Let AI agents use Helm's tools" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsEnabled="{Binding Enabled}">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="AI agents may change things" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Off: they only read. On: they also add and edit, tick tasks, plan missions and ask to run a server's menu or commands. Nothing is deleted for good." />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding AllowChanges}" OnContent="" OffContent="" VerticalAlignment="Center"
+                                  AutomationProperties.Name="AI agents may change things" />
+                </Grid>
+                <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="0,4" Command="{Binding ToggleToolsCommand}"
+                        AutomationProperties.Name="Tools AI agents can reach">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel>
+                            <TextBlock Text="Tools AI agents can reach" />
+                            <TextBlock Classes="secondary" Text="{Binding ToolsSummary}" />
+                        </StackPanel>
+                        <Panel Grid.Column="1" Width="14" Height="14" VerticalAlignment="Center" Classes="turn" core:Motion.Turn="{Binding ToolsOpen}">
+                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" />
+                        </Panel>
+                    </Grid>
+                </Button>
+                <ItemsControl ItemsSource="{Binding ToolGroups}" IsVisible="{Binding ToolsOpen}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True"
+                              AutomationProperties.Name="Tools AI agents can reach">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="mcp:McpToolGroup">
+                            <StackPanel Spacing="4" Margin="0,0,0,12">
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding Description}" />
+                                <TextBlock Classes="muted" FontStyle="Italic" TextWrapping="Wrap" Text="{Binding Empty}" IsVisible="{Binding !HasTools}" />
+                                <ItemsControl ItemsSource="{Binding Tools}" IsVisible="{Binding HasTools}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="tools:McpTool">
+                                            <Border Classes="tool" ToolTip.Tip="{Binding Description}"><TextBlock Text="{Binding Name}" /></Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Connect: one folded card per client -->
+        <Border Classes="glass" IsVisible="{Binding IsTestCopy}">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <ic:SymbolIcon Symbol="Info" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" TextWrapping="Wrap" Text="This Helm uses its own data folder, so everything below starts it with --data-dir. Your usual Helm is not affected." />
+            </Grid>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="0" Command="{Binding ClaudeCode.ToggleCommand}"
+                        AutomationProperties.Name="Claude Code">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel>
+                            <TextBlock Classes="head" Text="Claude Code" />
+                            <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding ClaudeCode.StatusText}" />
+                        </StackPanel>
+                        <Panel Grid.Column="1" Width="14" Height="14" VerticalAlignment="Center" Classes="turn" core:Motion.Turn="{Binding ClaudeCode.IsOpen}">
+                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" />
+                        </Panel>
+                    </Grid>
+                </Button>
+                <StackPanel Spacing="10" IsVisible="{Binding ClaudeCode.IsOpen}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="The terminal and the VS Code extension share your user settings, so this one command adds Helm in every folder. Start a new Claude session afterwards." />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Classes="glass code" Text="{Binding ClaudeCodeCommand, Mode=OneWay}" AutomationProperties.Name="Command to add Helm to Claude Code" />
+                        <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding CopyCommand}" CommandParameter="{Binding ClaudeCodeCommand}"
+                                ToolTip.Tip="Copy" AutomationProperties.Name="Copy the command">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                        </Button>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add for me"
+                                Command="{Binding AddToClaudeCodeCommand}" IsEnabled="{Binding !IsClaudeBusy}" />
+                        <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Remove"
+                                Command="{Binding RemoveFromClaudeCodeCommand}" IsEnabled="{Binding !IsClaudeBusy}" />
+                    </Grid>
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding IsClaudeBusy}" Text="Running claude mcp…" />
+                    <StackPanel Spacing="6" IsVisible="{Binding ClaudeMissing}">
+                        <TextBlock Classes="caution" TextWrapping="Wrap"
+                                   Text="Claude Code is not installed. Install it, open a new terminal and check that claude --version works, then press Add for me again. Until then you can copy the command above." />
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="How to install Claude Code"
+                                Command="{Binding OpenClaudeCodeSetupCommand}" />
+                    </StackPanel>
+                    <TextBox Classes="glass code" MaxHeight="160" Text="{Binding ClaudeOutput, Mode=OneWay}" AutomationProperties.Name="What Claude Code printed"
+                             IsVisible="{Binding ClaudeOutput, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ClaudeCode.Where, StringFormat='Reads Helm’s entry in {0}, nothing else.'}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="0" Command="{Binding VsCode.ToggleCommand}"
+                        AutomationProperties.Name="VS Code">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel>
+                            <TextBlock Classes="head" Text="VS Code (built-in MCP)" />
+                            <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding VsCode.StatusText}" />
+                        </StackPanel>
+                        <Panel Grid.Column="1" Width="14" Height="14" VerticalAlignment="Center" Classes="turn" core:Motion.Turn="{Binding VsCode.IsOpen}">
+                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" />
+                        </Panel>
+                    </Grid>
+                </Button>
+                <StackPanel Spacing="10" IsVisible="{Binding VsCode.IsOpen}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="In VS Code run “MCP: Open User Configuration” and add this. If the file already has other servers, copy only the helm entry into its servers." />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Classes="glass code" AcceptsReturn="True" Text="{Binding VsCodeSnippet, Mode=OneWay}" AutomationProperties.Name="mcp.json for VS Code" />
+                        <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding CopyCommand}" CommandParameter="{Binding VsCodeSnippet}"
+                                ToolTip.Tip="Copy" AutomationProperties.Name="Copy the VS Code entry">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                        </Button>
+                    </Grid>
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding VsCode.Where, StringFormat='User file: {0}'}" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open its folder"
+                            Command="{Binding OpenFolderCommand}" CommandParameter="{Binding VsCode}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="0" Command="{Binding ClaudeDesktop.ToggleCommand}"
+                        AutomationProperties.Name="Claude Desktop">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel>
+                            <TextBlock Classes="head" Text="Claude Desktop" />
+                            <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding ClaudeDesktop.StatusText}" />
+                        </StackPanel>
+                        <Panel Grid.Column="1" Width="14" Height="14" VerticalAlignment="Center" Classes="turn" core:Motion.Turn="{Binding ClaudeDesktop.IsOpen}">
+                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" />
+                        </Panel>
+                    </Grid>
+                </Button>
+                <StackPanel Spacing="10" IsVisible="{Binding ClaudeDesktop.IsOpen}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="In Claude Desktop open Settings → Developer → Edit Config, add the helm entry to mcpServers, save, and restart Claude Desktop." />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Classes="glass code" AcceptsReturn="True" Text="{Binding ClaudeDesktopSnippet, Mode=OneWay}" AutomationProperties.Name="claude_desktop_config.json" />
+                        <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding CopyCommand}" CommandParameter="{Binding ClaudeDesktopSnippet}"
+                                ToolTip.Tip="Copy" AutomationProperties.Name="Copy the Claude Desktop entry">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                        </Button>
+                    </Grid>
+                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ClaudeDesktop.Where, StringFormat='Config file: {0}'}" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open its folder"
+                            Command="{Binding OpenFolderCommand}" CommandParameter="{Binding ClaudeDesktop}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="0" Command="{Binding ToggleOtherCommand}"
+                        AutomationProperties.Name="Other MCP clients">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel>
+                            <TextBlock Classes="head" Text="Other MCP clients" />
+                            <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Fairy, Cursor, Windsurf, Gemini CLI… any agent that starts a local MCP server (stdio)." />
+                        </StackPanel>
+                        <Panel Grid.Column="1" Width="14" Height="14" VerticalAlignment="Center" Classes="turn" core:Motion.Turn="{Binding OtherOpen}">
+                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" />
+                        </Panel>
+                    </Grid>
+                </Button>
+                <StackPanel Spacing="10" IsVisible="{Binding OtherOpen}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Add a server named helm that starts this command. Most clients take the JSON below in their mcpServers settings; the client's own MCP guide says which file that is." />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Classes="glass code" Text="{Binding StartCommand, Mode=OneWay}" AutomationProperties.Name="Command that starts Helm's MCP server" />
+                        <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding CopyCommand}" CommandParameter="{Binding StartCommand}"
+                                ToolTip.Tip="Copy" AutomationProperties.Name="Copy the command">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                        </Button>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Classes="glass code" AcceptsReturn="True" Text="{Binding McpServersSnippet, Mode=OneWay}" AutomationProperties.Name="mcpServers entry for other clients" />
+                        <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding CopyCommand}" CommandParameter="{Binding McpServersSnippet}"
+                                ToolTip.Tip="Copy" AutomationProperties.Name="Copy the mcpServers entry">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Connected now -->
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <TextBlock Classes="head" Text="Connected now" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !HasConnections}"
+                           Text="Nothing is connected now. Add Helm to a client above, then start a new session there: it connects when the session starts and shows up here." />
+                <ItemsControl ItemsSource="{Binding Connections}" AutomationProperties.Name="Connections">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="mcp:McpConnectionRow">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,10">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                    <TextBlock Classes="muted" Text="{Binding Detail}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center" Content="Disconnect"
+                                        Command="{Binding $parent[UserControl].((mcp:McpViewModel)DataContext).DisconnectCommand}" CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{Binding Name, StringFormat='Disconnect {0}'}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Permissions -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12" DataContext="{Binding Permissions}" x:DataType="mcp:McpPermissionsViewModel">
+                <TextBlock Classes="head" Text="Permissions" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Ask before every change" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="AI agents ask before they change your notes, Tracker, Wallet or Missions, even when Helm is not running as Administrator." />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding AskBeforeChanges}" OnContent="" OffContent="" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Ask before every change" />
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <ic:SymbolIcon Symbol="ShieldKeyhole" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                    <TextBlock Grid.Column="1" Classes="secondary" TextWrapping="Wrap" Text="{Binding ElevationText}" />
+                </Grid>
+
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Allowed for this session" FontWeight="SemiBold" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !HasAllowances}"
+                               Text="Nothing yet. A session allowance ends when the agent disconnects or Helm restarts." />
+                    <ItemsControl ItemsSource="{Binding Allowances}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="mcp:McpAllowanceRow">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,8">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding Detail}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center" Content="Revoke"
+                                            Command="{Binding $parent[ItemsControl].((mcp:McpPermissionsViewModel)DataContext).RevokeCommand}" CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Activity" FontWeight="SemiBold" />
+                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding ActivitySummary}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center" Content="Clear" Command="{Binding ClearActivityCommand}" IsVisible="{Binding HasActivity}" />
+                    </Grid>
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !HasActivity}"
+                               Text="Nothing yet. Every call that changes something, or runs on a server, is listed here." />
+                    <ItemsControl ItemsSource="{Binding Activity}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="mcp:McpActivityRow">
+                                <StackPanel Margin="0,0,0,8" ToolTip.Tip="{Binding Details}">
+                                    <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                                    <TextBlock Classes="muted" Classes.caution="{Binding NotDone}" TextWrapping="Wrap" Text="{Binding Detail}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

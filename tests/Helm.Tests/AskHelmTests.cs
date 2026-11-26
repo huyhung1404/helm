@@ -115,11 +115,11 @@ public sealed class AskHelmTests
     }
 
     [Fact]
-    public void Without_a_key_it_says_where_to_add_one()
+    public void Without_a_model_it_says_so_plainly()
     {
         var assistant = new HelmAssistant(new AiKeyStore(new MemorySynced<AiKey>()), _features, new AiUsageBook(_usage), [], [new ScriptedFactory()], _ => true);
 
-        Assert.Contains("AI → Models & keys", assistant.Unavailable());
+        Assert.Equal(Helm.Core.Ai.AiNotice.NoModel, assistant.Unavailable());
     }
 
     [Fact]

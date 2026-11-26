@@ -23,11 +23,6 @@ public interface IGeneralPlatform : INotifyPropertyChanged
     /// <summary>Helm is running as administrator now (shown, not changed).</summary>
     bool RunAsAdministrator { get; }
 
-    /// <summary>The platform has a page for each AI feature's settings (the phone; on the PC they live in the AI page).</summary>
-    bool HasAiFeatures { get; }
-
-    void OpenAiFeatures();
-
     void OpenSettingsFolder();
 
     void OpenLogs();

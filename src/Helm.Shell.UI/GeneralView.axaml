@@ -341,17 +341,11 @@
                             </ItemsControl>
                         </StackPanel>
 
+                        <!-- MCP (a PC): the platform's own view of AI agents using Helm's tools -->
+                        <ContentControl Content="{Binding McpContent}" IsVisible="{Binding IsMcp}" core:Motion.EnterOnShow="True" />
+
                         <!-- HELP & TROUBLESHOOTING -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsHelp}" core:Motion.EnterOnShow="True">
-                            <Border Classes="glass" IsVisible="{Binding HasAiFeatures}">
-                                <StackPanel Spacing="10">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Classes="head" Text="AI features" />
-                                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="On or off, where each one runs, its model and daily cap. The same settings as on the PC." />
-                                    </StackPanel>
-                                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open AI features" Command="{Binding OpenAiFeaturesCommand}" />
-                                </StackPanel>
-                            </Border>
                             <Border Classes="glass">
                                 <StackPanel Spacing="12">
                                     <StackPanel Spacing="2" IsVisible="{Binding HasSettingsFolder}">

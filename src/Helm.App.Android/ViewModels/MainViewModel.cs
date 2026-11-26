@@ -33,9 +33,7 @@ public sealed partial class NavEntry(string title, Symbol icon, bool isHeader, A
     [ObservableProperty]
     private bool _isActive;
 
-    /// <remarks>General's row stays marked on its AI features page.</remarks>
-    public bool Shows(ShellTab? tab) => tab is not null && (Module is not null ? ReferenceEquals(tab.Module, Module)
-        : tab.Key == pageKey || (pageKey == "general" && tab.Key == ShellNavigator.AiFeaturesKey));
+    public bool Shows(ShellTab? tab) => tab is not null && (Module is not null ? ReferenceEquals(tab.Module, Module) : tab.Key == pageKey);
 }
 
 /// <summary>The shell: app bar, navigation drawer (Home, tools by group, General) and the confirmation overlay.</summary>
@@ -176,14 +174,6 @@ public sealed partial class MainViewModel : ObservableObject
         if (Navigator.CurrentPage is Helm.Shell.BugReports.BugReportFormViewModel)
         {
             _bugs.CloseReport();
-            return true;
-        }
-        // General › AI features: a feature's detail goes back to the list, the list to General.
-        if (Navigator.CurrentPage is Helm.Ai.AiFeaturesViewModel features && Navigator.ActiveTab is { } featuresTab)
-        {
-            if (features.Back()) return true;
-            Navigator.GoGeneral();
-            Navigator.Close(featuresTab);
             return true;
         }
         // General on a phone: a part goes back to the list of parts.

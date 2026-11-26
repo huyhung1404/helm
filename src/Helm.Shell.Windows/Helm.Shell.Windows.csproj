@@ -1,17 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Home and General on Windows: the shared Avalonia pages (Helm.Shell.UI) inside two WPF pages, filled from Helm's tools,
-       plus what only Windows answers (startup task, administrator state, hotkey conflicts, the folders). Helm.App holds no
+       plus what only Windows answers (startup task, administrator state, hotkey conflicts, the folders, General › MCP). Helm.App holds no
        Avalonia types, so everything that touches them lives here. -->
   <PropertyGroup>
     <UseWPF>true</UseWPF>
     <RootNamespace>Helm.Shell.Windows</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Shell.UI\Helm.Shell.UI.csproj" />
     <ProjectReference Include="..\Helm.ToolIcons\Helm.ToolIcons.csproj" />
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
     <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>
 

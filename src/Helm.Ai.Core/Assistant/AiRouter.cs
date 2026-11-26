@@ -151,7 +151,7 @@ public sealed class AiRouter(IEnumerable<IAgentRoute> routes)
             return $"{agent} trên PC không trả lời được: {why.TrimEnd('.')}. Chọn Auto hoặc một model API.";
         }
         return _routes.Count == 0
-            ? "No Helm PC has an agent for this (AI → Proxy on the PC)."
+            ? Helm.Core.Ai.AiNotice.NoModel
             : $"No Helm PC agent can take it now ({string.Join("; ", _routes.Select(r => $"{r.Device}: {r.Unavailable() ?? "busy"}"))}).";
     }
 }

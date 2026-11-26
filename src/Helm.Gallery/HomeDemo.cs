@@ -128,9 +128,6 @@ internal static class HomeDemo
         public Task TurnOffSyncAsync() => Task.CompletedTask;
 
         public Task UpdateAsync() => Task.CompletedTask;
-
-        public void OpenAiFeatures() { }
-
         public void OpenSettingsFolder() { }
 
         public void OpenLogs() { }

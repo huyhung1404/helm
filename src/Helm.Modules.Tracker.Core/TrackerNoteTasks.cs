@@ -25,7 +25,7 @@ public sealed class TrackerNoteTasks(TrackerStore store, IAiText? ai, TimeProvid
 
     public async Task<NoteTaskAnswer> ProposeAsync(string title, string text, CancellationToken ct)
     {
-        if (ai is null) return new NoteTaskAnswer([], "AI is not set up: AI → Proxy or Models & keys on the PC.");
+        if (ai is null) return new NoteTaskAnswer([], Helm.Core.Ai.AiNotice.NoModel);
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_time.GetUtcNow(), TimeZoneInfo.Local).DateTime);
         AiTextAnswer answer;
         try

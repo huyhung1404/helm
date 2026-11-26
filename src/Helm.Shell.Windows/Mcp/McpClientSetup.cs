@@ -5,7 +5,7 @@ using Helm.Core.Mcp;
 using Helm.Core.Processes;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.App.Mcp;
+namespace Helm.Shell.Windows.Mcp;
 
 /// <summary>What running <c>claude</c> gave: whether it worked, and what it printed (shown to the user, never logged).</summary>
 internal sealed record McpClientSetupResult(bool Succeeded, string Output);

@@ -213,7 +213,7 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         }
         catch (AnthropicUnauthorizedException ex)
         {
-            throw new AssistantException("Claude does not accept the API key. Test it on the AI page.", ex);
+            throw new AssistantException(Helm.Core.Ai.AiNotice.KeyRefused("Claude"), ex);
         }
         catch (AnthropicRateLimitException ex)
         {

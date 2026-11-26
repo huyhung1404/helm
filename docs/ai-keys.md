@@ -1,5 +1,13 @@
 # Models & keys
 
+> **Since Helm 0.93 (2026-11-26) Helm has no AI page and no Ask Helm.** Helm became a passive app: Fairy does the
+> automating through Helm's MCP tools (General › MCP on the PC). Removed: the AI page (Models & keys, Proxy, Features,
+> Skill Hub card), Ask Helm on the phone (card, tile, widget, edge handle, text-selection entries, Wallet's Nói button),
+> Fairy Core's `helm/jobs` route in the connector, Lumi and Weekly Report. Kept and still running: the stored keys,
+> agents, proxy/VPS settings and feature choices (`ai.*` sync), the router, the assistant engine, the PC's agent worker,
+> the auto jobs and every AI feature inside the tools; with no model a feature says so (`Helm.Core.Ai.AiNotice`).
+> What follows describes the old pages; the code is at tag `archive/helm-ai-2026-11-26`.
+
 Helm's tools can call AI models themselves, with your own API keys, on the PC and on the phone. Keys live on the
 **AI** page, right after General, under **Models & keys**: one section per provider (Claude and Grok for now), each
 with its keys.

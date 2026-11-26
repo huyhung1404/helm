@@ -45,7 +45,7 @@ internal sealed class AndroidHomeLinks(IModuleHost<IAndroidModule> modules, IEnu
     public void OpenWhatsNew() => launcher.OpenUrl($"{AppInfo.ReleasesUrl}/tag/v{AppInfo.Version}");
 }
 
-/// <summary>What General's own rows do on the phone: the theme, sharing the latest log, AI features, reset.</summary>
+/// <summary>What General's own rows do on the phone: the theme, sharing the latest log, reset.</summary>
 internal sealed class AndroidGeneralPlatform : ObservableObject, IGeneralPlatform
 {
     private readonly ISettingsStoreFactory _settings;
@@ -90,10 +90,6 @@ internal sealed class AndroidGeneralPlatform : ObservableObject, IGeneralPlatfor
     public bool StartMinimized { get => false; set { } }
 
     public bool RunAsAdministrator => false;
-
-    public bool HasAiFeatures => true;
-
-    public void OpenAiFeatures() => _navigator.GoAiFeatures();
 
     public void OpenSettingsFolder() { }
 
