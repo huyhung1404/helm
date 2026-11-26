@@ -1,0 +1,252 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="using:System"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             xmlns:ui="using:Helm.Modules.Vocab.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Vocab.Ui.VocabRootsPanel"
+             x:DataType="vm:VocabRootsViewModel">
+
+    <UserControl.DataTemplates>
+        <!-- A family: the part, its kind and how many words have it; its meaning; the first of its words, the part marked -->
+        <DataTemplate DataType="vm:VocabRootRow">
+            <Button Classes="glass fade" Command="{Binding Select}" Padding="16,14" AutomationProperties.Name="{Binding Form}">
+                <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Text="{Binding Form}" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Bottom" />
+                        <TextBlock Grid.Column="1" Text="{Binding Kind}" Classes="muted" Margin="8,0,0,3" VerticalAlignment="Bottom" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Text="{Binding CountText}" Classes="muted" Margin="8,0,0,3" VerticalAlignment="Bottom" TextWrapping="NoWrap" />
+                    </Grid>
+                    <TextBlock Text="{Binding Meaning}" TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding FirstWords}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel ItemSpacing="12" LineSpacing="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:VocabWordLink">
+                                <TextBlock FontSize="13.5"><Run Text="{Binding Split.Before}" /><Run Classes="hl" Text="{Binding Split.Match}" /><Run Text="{Binding Split.After}" /></TextBlock>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding MoreWordsText}" Classes="muted" FontSize="12" IsVisible="{Binding HasMoreWords}" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <!-- The Roots tab: the parts several of the user's words share (families), the biggest first, then the parts in one
+         word so far; Practise asks a root's meaning card by card; a family opened takes the whole tab. -->
+    <Panel>
+        <!-- ===== The families ===== -->
+        <StackPanel x:Name="ListPanel">
+            <StackPanel.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="ShowsList" />
+                    <Binding Path="!HasPractice" />
+                </MultiBinding>
+            </StackPanel.IsVisible>
+            <Grid ColumnDefinitions="*,Auto" Margin="0,22,0,16">
+                <StackPanel>
+                    <TextBlock Classes="display" Text="Roots" />
+                    <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" TextWrapping="Wrap"
+                               Text="The parts of your words. A part several words share makes a family: learn it once, read them all." />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Margin="16,0,0,0" VerticalAlignment="Bottom" Command="{Binding NextRootCommand}" IsVisible="{Binding HasRoots}"
+                        ToolTip.Tip="A root alone: say its meaning, then see its family" AutomationProperties.Name="Practise roots">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="HatGraduation" FontSize="16" />
+                        <TextBlock Classes="label" Text="Practise roots" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <Border x:Name="LanguageSeg" Classes="glass" Padding="3" CornerRadius="10" BoxShadow="" HorizontalAlignment="Left" Margin="0,0,0,14">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <RadioButton Classes="seg" GroupName="RootsLanguage" IsChecked="{Binding IsEnglish, Mode=OneWay}" Command="{Binding ShowEnglishCommand}"
+                                 AutomationProperties.Name="English roots">
+                        <TextBlock><Run Text="English " /><Run Text="{Binding EnglishCount}" /></TextBlock>
+                    </RadioButton>
+                    <RadioButton Classes="seg" GroupName="RootsLanguage" IsChecked="{Binding IsChinese, Mode=OneWay}" Command="{Binding ShowChineseCommand}"
+                                 AutomationProperties.Name="Chinese parts">
+                        <TextBlock><Run Text="中文 " /><Run Text="{Binding ChineseCount}" /></TextBlock>
+                    </RadioButton>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="glass" Padding="28,24" IsVisible="{Binding HasNoRoots}">
+                <TextBlock Classes="muted" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480"
+                           Text="The parts of your words show up here once an AI agent has broken them down." />
+            </Border>
+
+            <TextBlock x:Name="FamiliesHead" Classes="eyebrow" Text="FAMILIES" Margin="2,0,0,10" />
+            <ItemsControl x:Name="FamiliesList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <core:MasonryPanel MinColumnWidth="300" Spacing="10" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+            <TextBlock x:Name="SinglesHead" Classes="eyebrow" Text="IN ONE WORD SO FAR" Margin="2,22,0,10" />
+            <ItemsControl x:Name="SinglesList">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <core:MasonryPanel MinColumnWidth="300" Spacing="10" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,12,0,0" IsVisible="{Binding Pages.HasPages}">
+                <Button Classes="ghost" Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page">
+                    <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="ChevronLeft" FontSize="14" /><TextBlock Classes="label" Text="Previous" /></StackPanel>
+                </Button>
+                <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Pages.PageText}" FontSize="13" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding Pages.RangeText}" Classes="muted" FontSize="12" HorizontalAlignment="Center" />
+                </StackPanel>
+                <Button Grid.Column="2" Classes="ghost" Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page">
+                    <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="label" Text="Next" /><ic:SymbolIcon Symbol="ChevronRight" FontSize="14" /></StackPanel>
+                </Button>
+            </Grid>
+        </StackPanel>
+
+        <!-- ===== Practising a root: the part alone, then its meaning and family (Stop, Show the meaning and Next root are
+             in the answer bar) ===== -->
+        <StackPanel x:Name="PracticePanel" core:Motion.EnterOnShow="True">
+            <StackPanel.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="ShowsList" />
+                    <Binding Path="HasPractice" />
+                </MultiBinding>
+            </StackPanel.IsVisible>
+            <StackPanel Margin="0,22,0,16">
+                <TextBlock Classes="display" Text="Root practice" />
+                <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" TextWrapping="Wrap" Text="Say what the part means, then check: its family comes with it." />
+            </StackPanel>
+            <Border Classes="glass" Padding="0">
+                <StackPanel>
+                    <Grid ColumnDefinitions="*,Auto" Margin="16,12,10,0">
+                        <Border Classes="tag acc" HorizontalAlignment="Left" VerticalAlignment="Center"><TextBlock Text="{Binding Practice.Kind, FallbackValue=''}" /></Border>
+                        <Button Grid.Column="1" Classes="chip" Command="{Binding ClosePracticeCommand}" ToolTip.Tip="Stop practising (Esc)" AutomationProperties.Name="Stop practising">
+                            <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                        </Button>
+                    </Grid>
+                    <Button Classes="front" Margin="6,4,6,6" MinHeight="200" Command="{Binding RevealRootCommand}" AutomationProperties.Name="Show the meaning">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="What does this part mean?" Classes="muted" FontSize="13" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding Practice.Form, FallbackValue=''}" FontSize="52" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" IsVisible="{Binding !IsPracticeRevealed}">
+                                <TextBlock Text="Tap to see the meaning" Classes="muted" FontSize="13" VerticalAlignment="Center" />
+                                <Border Classes="kbd"><TextBlock Text="Space" /></Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </Button>
+                    <StackPanel IsVisible="{Binding IsPracticeRevealed}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                        <Border Height="1" Margin="20,0" Background="{DynamicResource HelmGlassStroke}" />
+                        <StackPanel Spacing="8" Margin="20,18,20,22">
+                            <TextBlock Text="{Binding Practice.Meaning, FallbackValue=''}" FontSize="20" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                            <TextBlock Text="{Binding Practice.Origin, FallbackValue=''}" Classes="muted" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center"
+                                       IsVisible="{Binding Practice.HasOrigin, FallbackValue=False}" />
+                            <TextBlock Classes="eyebrow" Text="ITS FAMILY IN YOUR WORDS" HorizontalAlignment="Center" Margin="0,10,0,0" />
+                            <ItemsControl ItemsSource="{Binding Practice.Words, FallbackValue={x:Null}}" HorizontalAlignment="Center">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel ItemSpacing="6" LineSpacing="6" ItemsAlignment="Center" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:VocabWordLink">
+                                        <Button Classes="wordlink" Command="{Binding Open}" ToolTip.Tip="{Binding Meaning}" AutomationProperties.Name="{Binding Text}">
+                                            <TextBlock><Run Text="{Binding Split.Before}" /><Run Classes="hl" Text="{Binding Split.Match}" /><Run Text="{Binding Split.After}" /></TextBlock>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- ===== A family opened: back to the list, the families before and after it ===== -->
+        <StackPanel x:Name="FamilyPanel" IsVisible="{Binding HasSelected}" Margin="0,22,0,0" core:Motion.EnterOnShow="True">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                <Button Classes="ghost" Command="{Binding CloseSelectedCommand}" ToolTip.Tip="Back to the list (Esc)" AutomationProperties.Name="All roots">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowLeft" FontSize="14" />
+                        <TextBlock Text="All roots" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Grid.Column="1" Classes="muted" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center"
+                           Text="{Binding RootPosition, Converter={x:Static ui:VocabConverters.Position}}" />
+                <Button Grid.Column="2" Classes="chip" Command="{Binding PreviousFamilyCommand}" IsEnabled="{Binding HasPreviousRoot}" ToolTip.Tip="The family before (←)"
+                        AutomationProperties.Name="Previous family">
+                    <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+                </Button>
+                <Button Grid.Column="3" Classes="chip" Command="{Binding NextFamilyCommand}" IsEnabled="{Binding HasNextRoot}" ToolTip.Tip="The family after (→)"
+                        AutomationProperties.Name="Next family">
+                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+                </Button>
+            </Grid>
+
+            <Border Classes="glass" Padding="22,20" Margin="0,16,0,0">
+                <StackPanel Spacing="6">
+                    <WrapPanel>
+                        <TextBlock Text="{Binding Selected.Form, FallbackValue=''}" FontSize="36" FontWeight="SemiBold" Margin="0,0,12,0" VerticalAlignment="Bottom" />
+                        <Border Classes="tag" VerticalAlignment="Bottom" Margin="0,0,0,8"><TextBlock Text="{Binding Selected.Kind, FallbackValue=''}" /></Border>
+                    </WrapPanel>
+                    <TextBlock Text="{Binding Selected.Meaning, FallbackValue=''}" FontSize="19" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Selected.Origin, FallbackValue=''}" Classes="muted" FontSize="14" IsVisible="{Binding Selected.HasOrigin, FallbackValue=False}" />
+                    <!-- More words of the family: Claude Code adds and breaks down a few (where it runs) -->
+                    <StackPanel Margin="0,10,0,0" Spacing="8" IsVisible="{Binding Agent.CanRun}">
+                        <Button Classes="pill" HorizontalAlignment="Left" Command="{Binding SuggestCommand}" IsEnabled="{Binding !Agent.IsBusy}"
+                                ToolTip.Tip="Claude Code adds and breaks down a few useful words of this family" AutomationProperties.Name="Suggest 3 more words">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                                <TextBlock Text="Suggest 3 more words" Foreground="{DynamicResource HelmPillForeground}" />
+                            </StackPanel>
+                        </Button>
+                        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding Agent.IsBusy}">
+                            <ic:SymbolIcon Symbol="ArrowSync" Classes="spin" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource HelmEyebrow}" />
+                            <TextBlock Grid.Column="1" Text="{Binding Agent.Status}" Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                    <TextBlock Classes="muted" FontSize="12.5" Margin="0,8,0,0" IsVisible="{Binding !Agent.CanRun}" TextWrapping="Wrap"
+                               Text="More words of this family: on the PC, Suggest 3 more words asks Claude Code for a few." />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Classes="eyebrow" Margin="2,22,0,10" Text="{Binding Selected.Words.Count, StringFormat='YOUR WORDS WITH IT ({0})', FallbackValue=''}" />
+            <ItemsControl ItemsSource="{Binding Selected.Words, FallbackValue={x:Null}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VocabWordLink">
+                        <Border Classes="glass lift fade" Padding="14,10" Margin="0,0,0,8">
+                            <Button Classes="rowhit" Padding="0" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock FontSize="16" FontWeight="SemiBold"><Run Text="{Binding Split.Before}" /><Run Classes="hl" Text="{Binding Split.Match}" /><Run Text="{Binding Split.After}" /></TextBlock>
+                                        <TextBlock Text="{Binding Meaning}" Classes="muted" FontSize="13.5" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <ItemsControl Grid.Column="1" ItemsSource="{Binding Dots}" VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="3" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="sys:Boolean">
+                                                <Ellipse Classes="dot" Classes.on="{Binding}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Grid>
+                            </Button>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Panel>
+</UserControl>

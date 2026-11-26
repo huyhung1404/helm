@@ -1,0 +1,306 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ic="using:FluentIcons.Avalonia"
+        xmlns:ui="using:Helm.Modules.Vocab.Ui">
+
+    <!-- What Vocabulary's parts share (the page and its sheets; a sheet sits outside the page, so it includes this too):
+         the tones' colours, the part marked inside a word, the dots of how well a word is known, the tree's boxes, the
+         key hints, the typed answer's letters. Everything else comes from HelmTheme. -->
+    <Styles.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- Tone 1 red, 2 green, 3 blue, 4 purple, neutral grey: the colours learners know from Pleco and most dictionaries -->
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="VocabTone1" Color="#D32F2F" />
+                    <SolidColorBrush x:Key="VocabTone2" Color="#2E7D32" />
+                    <SolidColorBrush x:Key="VocabTone3" Color="#1565C0" />
+                    <SolidColorBrush x:Key="VocabTone4" Color="#8E24AA" />
+                    <SolidColorBrush x:Key="VocabTone5" Color="#5F5F5F" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="VocabTone1" Color="#FF7A7A" />
+                    <SolidColorBrush x:Key="VocabTone2" Color="#6FD08C" />
+                    <SolidColorBrush x:Key="VocabTone3" Color="#5CB3FF" />
+                    <SolidColorBrush x:Key="VocabTone4" Color="#D58BEA" />
+                    <SolidColorBrush x:Key="VocabTone5" Color="#C5C5C5" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Styles.Resources>
+
+    <!-- The agent at work: its icon turns -->
+    <Style Selector="ic|SymbolIcon.spin">
+        <Setter Property="RenderTransform"><RotateTransform /></Setter>
+        <Style.Animations>
+            <Animation Duration="0:0:1.4" IterationCount="INFINITE">
+                <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="0" /></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="360" /></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+
+    <!-- How many words are learned (the Learn tab) -->
+    <Style Selector="ProgressBar.learned">
+        <Setter Property="Height" Value="6" />
+        <Setter Property="MinHeight" Value="6" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+    </Style>
+
+    <!-- A line that says something is under way (a text waiting for the agent) -->
+    <Style Selector="TextBlock.accent">
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+    </Style>
+
+    <!-- The part inside a word (re[lat]ive): the accent, bold -->
+    <Style Selector="Run.hl">
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <!-- How well a word is known: one dot per quiz level, filled up to its level -->
+    <Style Selector="Ellipse.dot">
+        <Setter Property="Width" Value="6" />
+        <Setter Property="Height" Value="6" />
+        <Setter Property="Fill" Value="{DynamicResource HelmGlassStroke}" />
+    </Style>
+    <Style Selector="Ellipse.dot.on">
+        <Setter Property="Fill" Value="{DynamicResource HelmEyebrow}" />
+    </Style>
+
+    <!-- A key on the PC ("Space", "1"): a small outlined label beside an action; hidden on a phone -->
+    <Style Selector="Border.kbd">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Padding" Value="5,0" />
+        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Opacity" Value="0.7" />
+    </Style>
+    <Style Selector="Border.kbd > TextBlock">
+        <Setter Property="FontSize" Value="11" />
+    </Style>
+    <Style Selector=":is(UserControl).narrow Border.kbd">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <!-- Tags that say something: often forgotten (danger), pinyin slips (tone 4), new / a new way to remember it (accent) -->
+    <Style Selector="Border.tag.warn > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+    </Style>
+    <Style Selector="Border.tag.py > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource VocabTone4}" />
+    </Style>
+    <Style Selector="Border.tag.acc > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+    </Style>
+    <Style Selector="Border.tag.ok > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+    </Style>
+    <Style Selector="Border.tag.mute">
+        <Setter Property="Opacity" Value="0.7" />
+    </Style>
+
+    <!-- A boxed note inside a card: the tapped part, the pinyin hook, a waiting text -->
+    <Style Selector="Border.inset">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14,12" />
+    </Style>
+
+    <!-- A word to open, as a small rounded link (a family's words, "Also in your words") -->
+    <Style Selector="Button.wordlink">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="MinHeight" Value="32" />
+    </Style>
+    <Style Selector="Button.wordlink:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+    </Style>
+
+    <!-- The tree's boxes: the word's own box filled like the pill, a part on glass, the tapped one with the strong stroke -->
+    <Style Selector="Button.node">
+        <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1.5" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="MinWidth" Value="60" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.node:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+    </Style>
+    <Style Selector="Button.node.root">
+        <Setter Property="Background" Value="{DynamicResource HelmPillBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmPillBackground}" />
+    </Style>
+    <Style Selector="Button.node.root:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmPillBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
+        <Setter Property="Opacity" Value="0.9" />
+    </Style>
+    <Style Selector="Button.node.picked">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+    </Style>
+    <Style Selector="Button.node.picked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="Button.node TextBlock.nodemeaning">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+    </Style>
+    <Style Selector="Button.node.root TextBlock.nodemeaning">
+        <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
+        <Setter Property="Opacity" Value="0.75" />
+    </Style>
+    <!-- What a component does in its character: MEANING green, SOUND in tone 3's blue -->
+    <Style Selector="TextBlock.role">
+        <Setter Property="FontSize" Value="9.5" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="LetterSpacing" Value="0.8" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+    </Style>
+    <Style Selector="TextBlock.role.sound">
+        <Setter Property="Foreground" Value="{DynamicResource VocabTone3}" />
+    </Style>
+    <Style Selector="Border.treeline">
+        <Setter Property="Background" Value="{DynamicResource HelmSecondaryText}" />
+        <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <!-- The phone's outline of the tree: a row per box, indented under its parent -->
+    <Style Selector="Button.orow">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="MinHeight" Value="40" />
+    </Style>
+    <Style Selector="Button.orow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.orow.picked">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+    </Style>
+    <Style Selector="Border.obox">
+        <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="MinWidth" Value="34" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.obox > TextBlock">
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.obox.root">
+        <Setter Property="Background" Value="{DynamicResource HelmPillBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmPillBackground}" />
+    </Style>
+    <Style Selector="Border.obox.root > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
+    </Style>
+
+    <!-- A typed answer letter by letter: right, wrong (red, struck), left out (underlined) -->
+    <Style Selector="TextBlock.piece">
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+    </Style>
+    <Style Selector="TextBlock.piece.wrong">
+        <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        <Setter Property="TextDecorations" Value="Strikethrough" />
+    </Style>
+    <Style Selector="TextBlock.piece.missing">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        <Setter Property="TextDecorations" Value="Underline" />
+    </Style>
+
+    <!-- The answer a typed word suggests (Remembered after a right answer, Forgot after a wrong one): the strong stroke -->
+    <Style Selector="Button.ghost.suggest">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+
+    <!-- The Learn card's front: the whole area is the tap target -->
+    <Style Selector="Button.front">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Padding" Value="20" />
+        <Setter Property="MinHeight" Value="200" />
+    </Style>
+    <Style Selector="Button.front:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+    </Style>
+    <Style Selector="Button.front:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+    </Style>
+
+    <!-- A menu row in a sheet (the card's ⋯): icon, name and what it does, the whole row a button -->
+    <Style Selector="Button.menurow">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="MinHeight" Value="52" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.menurow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+    </Style>
+
+    <!-- A foldable section's header (ui:FoldSection): the title with its turning arrow -->
+    <Style Selector="ui|FoldSection">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <StackPanel Spacing="8">
+                    <Button Name="PART_Header" Classes="rowhit" Padding="0,2" HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="{TemplateBinding Title}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Panel Name="PART_Chevron" Width="12" Height="12" Margin="0,0,8,0" Classes="turn" VerticalAlignment="Center">
+                                <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" />
+                            </Panel>
+                            <TextBlock Grid.Column="1" Name="PART_Title" Text="{TemplateBinding Title}" Classes="head" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        </Grid>
+                    </Button>
+                    <ContentPresenter Name="PART_Body" Content="{TemplateBinding Content}" Margin="20,0,0,0" />
+                </StackPanel>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ui|FoldSection.memo /template/ TextBlock#PART_Title">
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+    </Style>
+    <Style Selector="ui|FoldSection.py /template/ TextBlock#PART_Title">
+        <Setter Property="Foreground" Value="{DynamicResource VocabTone4}" />
+    </Style>
+    <Style Selector="ui|FoldSection.warn /template/ TextBlock#PART_Title">
+        <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+    </Style>
+</Styles>

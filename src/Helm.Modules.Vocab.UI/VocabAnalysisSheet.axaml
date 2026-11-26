@@ -1,0 +1,151 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             x:Class="Helm.Modules.Vocab.Ui.VocabAnalysisSheet"
+             x:DataType="vm:VocabViewModel">
+
+    <!-- What waits for the AI agent and what it does now (the waiting card's Details, the top bar's agent chip): the
+         run (Analyze now, Stop), the words waiting with ✕, what else is on its list, every step of the run, and the
+         request to paste into Claude Code by hand. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Vocab.UI/VocabStyles.axaml" />
+        <Style Selector="TextBlock.logline.result">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <Style Selector="TextBlock.logline.problem">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="TextBlock.logline.note">
+            <Setter Property="FontStyle" Value="Italic" />
+        </Style>
+        <Style Selector="TextBlock.logline.edge">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="ANALYSIS" />
+                <TextBlock Text="{Binding AgentChipText}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- The agent: here (the PC), or on the PC (the phone) -->
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="Auto,*">
+                    <Panel Width="22" Margin="0,1,10,0" VerticalAlignment="Top">
+                        <ic:SymbolIcon Symbol="ArrowSync" Classes="spin" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding IsAgentBusy}" />
+                        <ic:SymbolIcon Symbol="Bot" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding !IsAgentBusy}" />
+                    </Panel>
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Classes="head" TextWrapping="Wrap" IsVisible="{Binding Agent.IsBusy}">
+                            <Run Text="Claude Code is at work · step " /><Run Text="{Binding Agent.Steps}" />
+                        </TextBlock>
+                        <TextBlock Classes="head" TextWrapping="Wrap" Text="Another AI agent is working on your words" IsVisible="{Binding IsExternalAgentBusy}" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding Agent.Status}" IsVisible="{Binding Agent.HasStatus}" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding Agent.CanRun}"
+                                   Text="Claude Code works without a window: it breaks new words into parts, writes new ways to remember the words you keep forgetting, and fills in missing details." />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !Agent.CanRun}"
+                                   Text="Claude Code on your PC breaks these down while Helm runs there. They come back here through sync." />
+                    </StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding Agent.CanRun}">
+                    <Button Classes="pill" HorizontalAlignment="Stretch" Command="{Binding Agent.AnalyzeCommand}" IsVisible="{Binding !Agent.IsBusy}" AutomationProperties.Name="Analyze now">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                            <TextBlock Text="Analyze now" Foreground="{DynamicResource HelmPillForeground}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Stop" Command="{Binding Agent.StopCommand}" IsVisible="{Binding Agent.IsBusy}" />
+                    <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding CopyLogCommand}" IsEnabled="{Binding Agent.HasLog}"
+                            ToolTip.Tip="Copy every line, to keep or to share" AutomationProperties.Name="Copy log">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="14" />
+                            <TextBlock Text="Copy log" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- The words waiting to be broken down -->
+        <Border Classes="glass">
+            <StackPanel Spacing="8">
+                <TextBlock Classes="head" Text="{Binding PendingCount, StringFormat='Waiting to be broken down ({0})'}" />
+                <TextBlock Classes="secondary" Text="Nothing waits. New words land here." IsVisible="{Binding !HasPending}" />
+                <ItemsControl ItemsSource="{Binding PendingWords}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VocabWordRow">
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Text}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Note}" Classes="secondary" IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="chip" Command="{Binding Remove}" IsVisible="{Binding CanRemove}" ToolTip.Tip="Remove (a typo, or not worth learning)"
+                                        AutomationProperties.Name="{Binding Text, StringFormat='Remove {0}'}">
+                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- What else is on its list -->
+        <Border x:Name="OthersCard" Classes="glass">
+            <StackPanel Spacing="6">
+                <TextBlock Classes="head" Text="Also on its list" />
+                <ItemsControl x:Name="OthersList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Grid ColumnDefinitions="Auto,*" Margin="0,2">
+                                <Ellipse Width="5" Height="5" Margin="2,8,10,0" Fill="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                                <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Every step of the run in progress (or the last one), the newest at the bottom -->
+        <Border Classes="glass" IsVisible="{Binding Agent.HasLog}">
+            <StackPanel Spacing="8">
+                <TextBlock Classes="head" Text="Activity" />
+                <ItemsControl ItemsSource="{Binding Agent.Log}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VocabAgentLogLine">
+                            <Grid ColumnDefinitions="Auto,*" Margin="0,1">
+                                <TextBlock Text="{Binding Time}" Classes="secondary" FontFamily="Consolas,Menlo,monospace" Margin="0,1,10,0" VerticalAlignment="Top" />
+                                <TextBlock Grid.Column="1" Text="{Binding Text}" FontSize="13" TextWrapping="Wrap" Classes="logline"
+                                           Classes.result="{Binding IsResult}" Classes.problem="{Binding IsProblem}" Classes.note="{Binding IsNote}" Classes.edge="{Binding IsEdge}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding CopyPromptCommand}" ToolTip.Tip="Paste it into Claude Code yourself"
+                    AutomationProperties.Name="Copy request">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ic:SymbolIcon Symbol="Copy" FontSize="14" />
+                    <TextBlock Text="Copy request" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="DoneButton" Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Done" />
+        </Grid>
+    </StackPanel>
+</UserControl>
