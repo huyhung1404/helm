@@ -111,6 +111,7 @@ internal sealed class WindowsTerminal : NativeControlHost, ISshTerminal
         _window = window;
         _viewModel.PropertyChanged += OnViewModelChanged;
         LayoutUpdated += OnLayoutUpdated;
+        SizeChanged += OnSizeChanged;
         _ = InitializeAsync(window);
         return window;
     }
@@ -119,6 +120,7 @@ internal sealed class WindowsTerminal : NativeControlHost, ISshTerminal
     {
         _viewModel.PropertyChanged -= OnViewModelChanged;
         LayoutUpdated -= OnLayoutUpdated;
+        SizeChanged -= OnSizeChanged;
         Detach();
         _ready = false;
         _window = null;
@@ -144,10 +146,19 @@ internal sealed class WindowsTerminal : NativeControlHost, ISshTerminal
     /// <summary>Avalonia moved or resized its child window: the web view takes the new size.</summary>
     private void OnLayoutUpdated(object? sender, EventArgs e) => Fit();
 
+    private void OnSizeChanged(object? sender, SizeChangedEventArgs e) => Dispatcher.UIThread.Post(Fit, DispatcherPriority.Loaded);
+
+    /// <summary>
+    /// Sizes the web view to this control. The size comes from the control's own bounds (in pixels): on a layout pass
+    /// Avalonia's child window may not have its new size yet, and a web view left at 0×0 shows only black.
+    /// </summary>
     private void Fit()
     {
-        if (_controller is not { } controller || _window is not { } window || !GetClientRect(window.Handle, out var rect)) return;
-        var size = (rect.Right - rect.Left, rect.Bottom - rect.Top);
+        if (_controller is not { } controller) return;
+        var scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
+        var size = ((int)Math.Round(Bounds.Width * scale), (int)Math.Round(Bounds.Height * scale));
+        if ((size.Item1 <= 0 || size.Item2 <= 0) && _window is { } window && GetClientRect(window.Handle, out var rect))
+            size = (rect.Right - rect.Left, rect.Bottom - rect.Top);
         if (size == _size || size.Item1 <= 0 || size.Item2 <= 0) return;
         _size = size;
         try
@@ -178,8 +189,13 @@ internal sealed class WindowsTerminal : NativeControlHost, ISshTerminal
             _controller = controller;
             // The terminal's own background (terminal.html), so nothing flashes white while it loads.
             controller.DefaultBackgroundColor = System.Drawing.Color.FromArgb(0x0C, 0x0C, 0x0C);
+            controller.IsVisible = true;
             _size = default;
             Fit();
+            // And again once the child window has its size (the first layout may have run before it had one).
+            Dispatcher.UIThread.Post(Fit, DispatcherPriority.Loaded);
+            DispatcherTimer.RunOnce(Fit, TimeSpan.FromMilliseconds(300));
+            _logger.LogInformation("Terminal web view ready ({Width}×{Height} px)", _size.Width, _size.Height);
             var core = controller.CoreWebView2;
             var settings = core.Settings;
             settings.AreDevToolsEnabled = false;
@@ -243,6 +259,8 @@ internal sealed class WindowsTerminal : NativeControlHost, ISshTerminal
             switch (root.GetProperty("t").GetString())
             {
                 case "ready":
+                    _logger.LogInformation("Terminal page ready ({Columns}×{Rows}, web view {Width}×{Height} px)",
+                        root.GetProperty("c").GetInt32(), root.GetProperty("r").GetInt32(), _size.Width, _size.Height);
                     _ready = true;
                     ShowProblem(null);
                     Post(new { t = "font", s = vm.FontSize });
