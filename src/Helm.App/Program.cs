@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Controls;
 using Helm.App.Updates;
 using Helm.Core.Services;
 using Velopack;
@@ -41,8 +43,12 @@ public static class Program
             return 0;
         }
 
-        var app = new App(instance, args);
-        app.InitializeComponent();
-        return app.Run();
+        // 4. Avalonia. Closing the main window only hides it (Helm stays in the tray), so the app ends on Exit alone.
+        App.Instance = instance;
+        App.Args = args;
+        return AppBuilder.Configure<App>()
+            .UsePlatformDetect()
+            .LogToTrace()
+            .StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
     }
 }

@@ -1,183 +1,157 @@
 using System.Runtime.CompilerServices;
-using System.Windows;
-using System.Windows.Automation;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
-using System.Windows.Media;
+using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using Helm.Core.Diagnostics;
 
 namespace Helm.App.BugReports;
 
 /// <summary>
 /// What the user does in Helm's windows, into the black box: clicks (and clicks on disabled buttons), shortcuts, picks in
-/// drop-downs, pages and windows shown, and how much was typed in which field — never what. Class handlers, so every
-/// WPF window of Helm (tools' panels too) is covered with no change to them.
+/// drop-downs, windows shown, and how much was typed in which field — never what. Class handlers, so every Avalonia
+/// window of Helm (the tools' too) is covered with no change to them.
 /// </summary>
 internal static class PcBlackBoxHooks
 {
     private const int MaxLabel = 60;
-    private static readonly ConditionalWeakTable<TextBoxBase, StrongBox<int>> Typing = new();
+    private static readonly ConditionalWeakTable<TextBox, StrongBox<int>> Typing = new();
     private static BlackBox? _box;
+    private static Func<string?>? _where;
+    private static WeakReference<TextBox>? _typingIn;
 
-    public static void Install(BlackBox box)
+    /// <param name="where">The page in front (the active tab's title), for "where" in each entry.</param>
+    public static void Install(BlackBox box, Func<string?> where)
     {
         if (_box is not null) return;
         _box = box;
-        EventManager.RegisterClassHandler(typeof(ButtonBase), ButtonBase.ClickEvent, new RoutedEventHandler(OnClick), handledEventsToo: true);
-        EventManager.RegisterClassHandler(typeof(MenuItem), MenuItem.ClickEvent, new RoutedEventHandler(OnClick), handledEventsToo: true);
-        EventManager.RegisterClassHandler(typeof(Window), UIElement.PreviewMouseDownEvent, new MouseButtonEventHandler(OnMouseDown), handledEventsToo: true);
-        EventManager.RegisterClassHandler(typeof(Window), UIElement.PreviewKeyDownEvent, new KeyEventHandler(OnKeyDown), handledEventsToo: true);
-        EventManager.RegisterClassHandler(typeof(TextBoxBase), TextBoxBase.TextChangedEvent, new TextChangedEventHandler(OnTextChanged), handledEventsToo: true);
-        EventManager.RegisterClassHandler(typeof(TextBoxBase), UIElement.LostKeyboardFocusEvent, new KeyboardFocusChangedEventHandler(OnLostFocus), handledEventsToo: true);
-        EventManager.RegisterClassHandler(typeof(ComboBox), Selector.SelectionChangedEvent, new SelectionChangedEventHandler(OnPicked), handledEventsToo: true);
-        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(OnWindowLoaded), handledEventsToo: true);
-        EventManager.RegisterClassHandler(typeof(Page), FrameworkElement.LoadedEvent, new RoutedEventHandler(OnPageLoaded), handledEventsToo: true);
+        _where = where;
+        Button.ClickEvent.AddClassHandler<Button>((b, e) => OnClick(b, e), handledEventsToo: true);
+        MenuItem.ClickEvent.AddClassHandler<MenuItem>((m, e) => OnClick(m, e), handledEventsToo: true);
+        InputElement.PointerPressedEvent.AddClassHandler<TopLevel>((t, e) => OnPointerPressed(t, e), RoutingStrategies.Tunnel, handledEventsToo: true);
+        InputElement.KeyDownEvent.AddClassHandler<TopLevel>((t, e) => OnKeyDown(e), RoutingStrategies.Tunnel, handledEventsToo: true);
+        TextBox.TextChangedEvent.AddClassHandler<TextBox>((t, _) => OnTextChanged(t), handledEventsToo: true);
+        InputElement.LostFocusEvent.AddClassHandler<TextBox>((t, e) => { if (ReferenceEquals(e.Source, t)) FlushTyping(t); }, handledEventsToo: true);
+        SelectingItemsControl.SelectionChangedEvent.AddClassHandler<ComboBox>((c, e) => OnPicked(c, e), handledEventsToo: true);
+        Window.WindowOpenedEvent.AddClassHandler<Window>((w, _) =>
+            _box?.Navigation($"Opened window \"{Clip(w.Title is { Length: > 0 } t ? t : w.GetType().Name)}\"", w.GetType().Name));
     }
 
     /// <summary>Records the typing still pending in the focused field (before the box freezes).</summary>
     public static void Flush()
     {
-        if (Keyboard.FocusedElement is TextBoxBase box) FlushTyping(box);
+        if (_typingIn is { } weak && weak.TryGetTarget(out var box)) FlushTyping(box);
     }
 
-    private static void OnClick(object sender, RoutedEventArgs e)
+    private static void OnClick(Control control, RoutedEventArgs e)
     {
-        if (!ReferenceEquals(e.OriginalSource, sender)) return;
-        var what = sender switch
+        if (!ReferenceEquals(e.Source, control)) return;
+        var what = control switch
         {
-            CheckBox c => $"{(c.IsChecked == true ? "Ticked" : "Unticked")} {Label(sender)}",
-            ToggleButton t => $"Switched {Label(sender)} {(t.IsChecked == true ? "on" : "off")}",
-            _ => $"Clicked {Label(sender)}",
+            CheckBox c => $"{(c.IsChecked == true ? "Ticked" : "Unticked")} {Label(control)}",
+            ToggleButton t => $"Switched {Label(control)} {(t.IsChecked == true ? "on" : "off")}",
+            _ => $"Clicked {Label(control)}",
         };
-        _box?.Input(what, Where(sender));
+        _box?.Input(what, Where());
     }
 
-    private static void OnMouseDown(object sender, MouseButtonEventArgs e)
+    private static void OnPointerPressed(TopLevel top, PointerPressedEventArgs e)
     {
-        if (sender is not Window window) return;
         try
         {
-            if (VisualTreeHelper.HitTest(window, e.GetPosition(window))?.VisualHit is not DependencyObject hit) return;
-            for (var d = hit; d is not null; d = Parent(d))
+            foreach (var visual in top.GetVisualsAt(e.GetPosition(top)))
             {
-                if (d is not (ButtonBase or MenuItem)) continue;
-                if (d is UIElement { IsEnabled: false } disabled)
-                    _box?.Record(BlackBoxKind.DisabledClick, $"Clicked {Label(disabled)} while it was disabled", Where(disabled));
-                return;
+                for (var v = visual; v is not null; v = v.GetVisualParent())
+                {
+                    if (v is not Button button) continue;
+                    if (!button.IsEffectivelyEnabled)
+                        _box?.Record(BlackBoxKind.DisabledClick, $"Clicked {Label(button)} while it was disabled", Where());
+                    return;
+                }
             }
         }
         catch (InvalidOperationException)
         {
-            // Hit testing a window being torn down.
+            // Hit testing while the tree changes.
         }
     }
 
-    private static void OnKeyDown(object sender, KeyEventArgs e)
+    private static void OnKeyDown(KeyEventArgs e)
     {
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin
             or Key.ImeProcessed or Key.DeadCharProcessed) return;
-        var mods = Keyboard.Modifiers;
-        var command = mods.HasFlag(ModifierKeys.Control) || mods.HasFlag(ModifierKeys.Alt) || mods.HasFlag(ModifierKeys.Windows);
-        var special = key is Key.Enter or Key.Escape or Key.Delete || key is >= Key.F1 and <= Key.F24;
+        var mods = e.KeyModifiers;
+        var command = mods.HasFlag(KeyModifiers.Control) || mods.HasFlag(KeyModifiers.Alt) || mods.HasFlag(KeyModifiers.Meta);
+        var special = e.Key is Key.Enter or Key.Escape or Key.Delete || e.Key is >= Key.F1 and <= Key.F24;
         // Plain typing is never recorded, only shortcuts and the keys that do something by themselves.
         if (!command && !special) return;
         var parts = new List<string>(4);
-        if (mods.HasFlag(ModifierKeys.Control)) parts.Add("Ctrl");
-        if (mods.HasFlag(ModifierKeys.Alt)) parts.Add("Alt");
-        if (mods.HasFlag(ModifierKeys.Shift)) parts.Add("Shift");
-        if (mods.HasFlag(ModifierKeys.Windows)) parts.Add("Win");
-        parts.Add(key == Key.Return ? "Enter" : key.ToString());
-        _box?.Input($"Pressed {string.Join("+", parts)}", Where(Keyboard.FocusedElement as DependencyObject ?? (DependencyObject)sender));
+        if (mods.HasFlag(KeyModifiers.Control)) parts.Add("Ctrl");
+        if (mods.HasFlag(KeyModifiers.Alt)) parts.Add("Alt");
+        if (mods.HasFlag(KeyModifiers.Shift)) parts.Add("Shift");
+        if (mods.HasFlag(KeyModifiers.Meta)) parts.Add("Win");
+        parts.Add(e.Key.ToString());
+        _box?.Input($"Pressed {string.Join("+", parts)}", Where());
     }
 
-    private static void OnTextChanged(object sender, TextChangedEventArgs e)
+    private static void OnTextChanged(TextBox box)
     {
-        if (sender is not TextBoxBase box || !box.IsKeyboardFocusWithin) return;
+        if (!box.IsFocused) return;
+        _typingIn = new WeakReference<TextBox>(box);
         Typing.GetOrCreateValue(box).Value++;
     }
 
-    private static void OnLostFocus(object sender, KeyboardFocusChangedEventArgs e)
-    {
-        if (sender is TextBoxBase box && ReferenceEquals(e.OriginalSource, sender)) FlushTyping(box);
-    }
-
-    private static void FlushTyping(TextBoxBase box)
+    private static void FlushTyping(TextBox box)
     {
         if (!Typing.TryGetValue(box, out var count) || count.Value == 0) return;
         var changes = count.Value;
         count.Value = 0;
-        _box?.Input($"Typed in {Label(box)} ({changes} change{(changes == 1 ? "" : "s")}, text not recorded)", Where(box));
+        _box?.Input($"Typed in {Label(box)} ({changes} change{(changes == 1 ? "" : "s")}, text not recorded)", Where());
     }
 
-    private static void OnPicked(object sender, SelectionChangedEventArgs e)
+    private static void OnPicked(ComboBox combo, SelectionChangedEventArgs e)
     {
-        if (!ReferenceEquals(e.OriginalSource, sender) || sender is not ComboBox { IsLoaded: true } combo || e.AddedItems.Count == 0) return;
-        if (!combo.IsKeyboardFocusWithin && !combo.IsDropDownOpen && !combo.IsMouseOver) return; // set by code, not picked
+        if (!ReferenceEquals(e.Source, combo) || e.AddedItems.Count == 0 || !combo.IsDropDownOpen && !combo.IsFocused) return;
         var item = e.AddedItems[0] switch
         {
             ComboBoxItem { Content: string s } => s,
             string s => s,
-            _ => combo.Text,
+            var other => other?.ToString() ?? "",
         };
-        _box?.Input($"Picked \"{Clip(item)}\" in {Label(combo)}", Where(combo));
+        _box?.Input($"Picked \"{Clip(item)}\" in {Label(combo)}", Where());
     }
 
-    private static void OnWindowLoaded(object sender, RoutedEventArgs e)
-    {
-        if (sender is Window w && ReferenceEquals(e.OriginalSource, sender))
-            _box?.Navigation($"Opened window \"{Clip(w.Title is { Length: > 0 } t ? t : w.GetType().Name)}\"", w.GetType().Name);
-    }
-
-    private static void OnPageLoaded(object sender, RoutedEventArgs e)
-    {
-        if (sender is Page p && ReferenceEquals(e.OriginalSource, sender))
-            _box?.Navigation($"Showed {Clip(p.Title is { Length: > 0 } t ? t : p.GetType().Name)}", p.GetType().Name);
-    }
+    private static string? Where() => _where?.Invoke();
 
     /// <summary>What a person would call the control: its accessible name, its text, its tooltip, or its kind.</summary>
-    internal static string Label(object element)
+    internal static string Label(Control control)
     {
-        if (element is DependencyObject d && AutomationProperties.GetName(d) is { Length: > 0 } name) return Quote(name);
-        var text = element switch
+        if (AutomationProperties.GetName(control) is { Length: > 0 } name) return Quote(name);
+        var text = control switch
         {
-            HeaderedItemsControl { Header: string h } => h,
+            MenuItem { Header: string h } => h,
             ContentControl { Content: string s } => s,
             ContentControl { Content: TextBlock tb } => tb.Text,
-            ContentControl { Content: DependencyObject content } => FirstText(content),
+            ContentControl { Content: Visual v } => FirstText(v),
             _ => null,
         };
         if (!string.IsNullOrWhiteSpace(text)) return Quote(text);
-        if (element is FrameworkElement { ToolTip: string tip } && tip.Length > 0) return Quote(tip);
-        if (element is Wpf.Ui.Controls.TextBox { PlaceholderText: { Length: > 0 } placeholder }) return Quote(placeholder);
-        if (element is FrameworkElement { Name: { Length: > 0 } n }) return n;
-        return "a " + element.GetType().Name;
+        if (ToolTip.GetTip(control) is string { Length: > 0 } tip) return Quote(tip);
+        if (control is TextBox { PlaceholderText: { Length: > 0 } placeholder }) return Quote(placeholder);
+        if (control.Name is { Length: > 0 } n) return n;
+        return "a " + control.GetType().Name;
     }
 
-    /// <summary>The page (or window) the control is on.</summary>
-    internal static string? Where(object element)
-    {
-        for (var d = element as DependencyObject; d is not null; d = Parent(d))
-        {
-            if (d is Page { Title: { Length: > 0 } page }) return page;
-            if (d is Window { Title: { Length: > 0 } window }) return window;
-            if (d is Window w) return w.GetType().Name;
-        }
-        return null;
-    }
-
-    private static string? FirstText(DependencyObject root)
+    private static string? FirstText(Visual root)
     {
         if (root is TextBlock { Text: { Length: > 0 } t }) return t;
-        var count = root is Visual ? VisualTreeHelper.GetChildrenCount(root) : 0;
-        for (var i = 0; i < count; i++)
-            if (FirstText(VisualTreeHelper.GetChild(root, i)) is { } found) return found;
+        foreach (var child in root.GetVisualChildren())
+            if (FirstText(child) is { } found) return found;
         return null;
     }
-
-    private static DependencyObject? Parent(DependencyObject d) =>
-        d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) ?? LogicalTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
 
     private static string Quote(string text) => $"\"{Clip(text.ReplaceLineEndings(" ").Trim())}\"";
 

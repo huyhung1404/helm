@@ -1,5 +1,5 @@
-using System.Windows;
-using Helm.App.Views;
+using Avalonia.Threading;
+using Helm.App.Shell;
 using Helm.Core.Desktop;
 using Helm.Core.Mcp;
 using Helm.Core.Services;
@@ -21,7 +21,6 @@ internal sealed class McpConsentService(IServiceProvider services, IUserNotifica
     public async Task<McpConsentAnswer> AskAsync(McpConsentPrompt prompt, CancellationToken ct)
     {
         var answer = new TaskCompletionSource<McpConsentAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var dispatcher = Application.Current.Dispatcher;
         McpConsentWindow? window = null;
 
         void Open()
@@ -37,7 +36,7 @@ internal sealed class McpConsentService(IServiceProvider services, IUserNotifica
             window.Show();
         }
 
-        await dispatcher.InvokeAsync(() =>
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
             try
             {
@@ -50,13 +49,13 @@ internal sealed class McpConsentService(IServiceProvider services, IUserNotifica
                 answer.TrySetResult(McpConsentAnswer.Deny);
                 return;
             }
-            if (!services.GetRequiredService<MainWindow>().IsVisible)
+            if (!services.GetRequiredService<ShellController>().IsMainWindowShown)
                 notifications.Show($"{prompt.Client.Name} asks for your OK", $"{prompt.Request.Title}. Click to answer; no answer in 2 minutes means no.", Open);
         });
         logger.LogInformation("MCP {Client} asks: {Tool} ({Risk})", prompt.Client.Name, prompt.Request.Tool, prompt.Request.Risk);
 
         // Out of time, or the client left: close the question unanswered (the policy counts it as Deny).
-        await using var registration = ct.Register(() => dispatcher.BeginInvoke(() =>
+        await using var registration = ct.Register(() => Dispatcher.UIThread.Post(() =>
         {
             answer.TrySetCanceled(ct);
             window?.Close();

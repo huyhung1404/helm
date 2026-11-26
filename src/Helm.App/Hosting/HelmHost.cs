@@ -1,9 +1,6 @@
 using Helm.Shell.Windows;
 using Helm.Ai.Agents;
-using Helm.App.Services;
-using Helm.App.ViewModels;
-using Helm.App.Views;
-using Helm.App.Views.Pages;
+using Helm.App.Shell;
 using Helm.Core;
 using Helm.Core.Services;
 using Helm.Core.Settings;
@@ -68,16 +65,14 @@ internal static class HelmHost
         // Shell services
         builder.Services.AddSingleton<Core.Services.IUiDispatcher, UiDispatcher>();
         builder.Services.AddSingleton<ThemeService>();
-        builder.Services.AddSingleton<TabManager>();
-        builder.Services.AddSingleton<ShellNavigator>();
-        builder.Services.AddSingleton<IShellNavigator>(sp => sp.GetRequiredService<ShellNavigator>());
-        builder.Services.AddSingleton<IShellNavigation>(sp => sp.GetRequiredService<ShellNavigator>());
+        builder.Services.AddSingleton<AppShellHost>();
+        builder.Services.AddSingleton<IShellNavigation>(sp => sp.GetRequiredService<AppShellHost>());
+        builder.Services.AddSingleton<Helm.Shell.Windows.IShellWindowsHost>(sp => sp.GetRequiredService<AppShellHost>());
         builder.Services.AddSingleton<IDialogService, DialogService>();
         builder.Services.AddSingleton<IClipboardService, ClipboardService>();
         builder.Services.AddSingleton<IDeviceInfo, DeviceInfo>();
         builder.Services.AddSingleton<TrayService>();
         builder.Services.AddSingleton<IUserNotifications>(sp => sp.GetRequiredService<TrayService>());
-        builder.Services.AddSingleton<SearchService>();
         builder.Services.AddSingleton<ShellController>();
         builder.Services.AddSingleton<Updates.VelopackUpdateService>();
         builder.Services.AddSingleton<Core.Services.IUpdateService>(sp => sp.GetRequiredService<Updates.VelopackUpdateService>());
@@ -103,7 +98,7 @@ internal static class HelmHost
                     .Where(p => p.ModuleId is not { } id || modules.Find(id)?.IsEnabled == true)
                     .SelectMany(p => p.Tools)
                     .Where(t => settings.AllowChanges || t.ReadOnly);
-                return new Core.Mcp.McpServer(tools, Shell.Services.AppInfo.Version, Core.Mcp.McpEndpoint.Instructions,
+                return new Core.Mcp.McpServer(tools, Helm.Shell.Services.AppInfo.Version, Core.Mcp.McpEndpoint.Instructions,
                     sp.GetRequiredService<ILoggerFactory>().CreateLogger<Core.Mcp.McpServer>(), sp.GetRequiredService<Core.Mcp.IMcpConsent>());
             }, sp.GetRequiredService<ILogger<Core.Mcp.McpPipeHost>>());
             // "Allow for this session" ends with the connection it was given to.
@@ -112,23 +107,18 @@ internal static class HelmHost
             return host;
         });
 
-        // Shell views and view models
-        builder.Services.AddSingleton<MainWindowViewModel>();
-        builder.Services.AddSingleton<MainWindow>();
-        builder.Services.AddSingleton<TabsPage>();
+        // Shell view models (the shell itself is AppShellHost's)
         builder.Services.AddSingleton<UpdatesViewModel>();
         builder.Services.AddSingleton<SyncViewModel>();
         builder.Services.AddSingleton<BackgroundActivitiesViewModel>();
         builder.Services.AddSingleton<SyncIndicatorViewModel>();
-        builder.Services.AddSingleton<Helm.Shell.Windows.IShellWindowsHost, ShellWindowsHost>();
         builder.Services.AddShellWindows();
 
         // Bug reports: the black box, the synced bugs, the AI agents' bug_ tools, the report window and the page
         // (the menu's footer).
-        Shell.BugReports.BugReportsServices.AddBugReports(builder.Services, Shell.BugReports.BugDeviceKind.Pc);
+        Helm.Shell.BugReports.BugReportsServices.AddBugReports(builder.Services, Helm.Shell.BugReports.BugDeviceKind.Pc);
         builder.Services.AddSingleton<BugReports.PcBugReporter>();
         builder.Services.AddSingleton<Helm.Shell.Windows.IPcBugReporting>(sp => sp.GetRequiredService<BugReports.PcBugReporter>());
-        builder.Services.AddSingleton<Helm.Shell.Windows.BugReportsPage>();
 
         return builder.Build();
     }

@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Helm.App.Services;
+using Helm.App.Shell;
 using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;

@@ -1,8 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Helm on Windows: an Avalonia desktop app. The shell (menu, tabs, title bar) is Helm.Shell.UI's ShellView, every
+       tool's page is its shared view from Helm.Modules.<X>.UI. Velopack updates, elevation, single instance, the tray
+       and the black box live here. No WPF. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <UseWPF>true</UseWPF>
     <AssemblyName>Helm</AssemblyName>
     <RootNamespace>Helm.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -10,15 +12,15 @@
     <StartupObject>Helm.App.Program</StartupObject>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="Velopack" Version="1.2.158" />
-    <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,21 +29,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\helm.ico" />
-    <Resource Include="Assets\helm.png" />
+    <AvaloniaResource Include="Assets\helm.ico" />
+    <AvaloniaResource Include="Assets\helm.png" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+    <ProjectReference Include="..\Helm.Shell.UI\Helm.Shell.UI.csproj" />
     <ProjectReference Include="..\Helm.Shell.Windows\Helm.Shell.Windows.csproj" />
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
     <ProjectReference Include="..\Helm.Ai.Core\Helm.Ai.Core.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vault\Helm.Modules.Vault.csproj" />
     <ProjectReference Include="..\Helm.Modules.Tracker\Helm.Modules.Tracker.csproj" />
-    <!-- The shared Avalonia base comes in with the tools that show Avalonia pages. Its controls share names with the
-         WPF ones in Helm.Core.Windows (ModuleIcon, DateTimeBox...), so it sits behind an alias here: the WPF app's code
-         never sees it unless it says "extern alias avalonia". -->
-    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" Aliases="avalonia" />
     <ProjectReference Include="..\Helm.Modules.Notes\Helm.Modules.Notes.csproj" />
     <ProjectReference Include="..\Helm.Modules.QuickCapture\Helm.Modules.QuickCapture.csproj" />
     <ProjectReference Include="..\Helm.Modules.Missions\Helm.Modules.Missions.csproj" />

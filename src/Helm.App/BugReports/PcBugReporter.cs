@@ -1,5 +1,5 @@
-using System.Windows;
-using Helm.App.Services;
+using Avalonia.Threading;
+using Helm.App.Shell;
 using Helm.Core.Desktop;
 using Helm.Core.Diagnostics;
 using Helm.Core.Hotkeys;
@@ -23,7 +23,7 @@ internal sealed class PcBugReporter(
     BlackBox box,
     IHotkeyManager hotkeys,
     IModuleHost modules,
-    TabManager tabs,
+    AppShellHost shell,
     IWindowService windows,
     IMonitorService monitors,
     TrayService tray,
@@ -42,9 +42,9 @@ internal sealed class PcBugReporter(
     /// <summary>Hooks the black box and listens (call once, on the UI thread, after the host started).</summary>
     public async Task StartAsync()
     {
-        PcBlackBoxHooks.Install(box);
-        BugReportsServices.StartBlackBox(services, () => tabs.ActivePageTitle);
-        tray.ReportBug = () => Application.Current.Dispatcher.BeginInvoke(() => Report());
+        PcBlackBoxHooks.Install(box, () => shell.Shell.Tabs.ActivePageTitle);
+        BugReportsServices.StartBlackBox(services, () => shell.Shell.Tabs.ActivePageTitle);
+        tray.ReportBug = () => Dispatcher.UIThread.Post(() => Report());
 
         foreach (var bug in store.All().Where(b => b.Value.PendingQuestion is not null)) _notifiedQuestions.Add(bug.Value.PendingQuestion!);
         store.Changed += (_, _) => QueueCheck();
@@ -55,7 +55,7 @@ internal sealed class PcBugReporter(
         Check();
 
         var registration = await hotkeys.TryRegisterAsync(new HotkeyDefinition("helm", "report-bug", "Report a bug", Hotkey),
-            () => Application.Current.Dispatcher.BeginInvoke(() => Report())).ConfigureAwait(true);
+            () => Dispatcher.UIThread.Post(() => Report())).ConfigureAwait(true);
         if (!registration.IsRegistered) logger.LogWarning("Ctrl+Alt+F12 for bug reports is taken: {Error}", registration.Error);
     }
 
@@ -73,7 +73,7 @@ internal sealed class PcBugReporter(
         var snapshot = crash ?? frozen;
         if (fromCrash) _crash = null;
         var tools = modules.Modules.Select(m => m.DisplayName).OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase).ToList();
-        var page = tabs.ActivePageTitle;
+        var page = shell.Shell.Tabs.ActivePageTitle;
         var tool = fromCrash ? null : tools.FirstOrDefault(t => page is not null && page.StartsWith(t, StringComparison.OrdinalIgnoreCase));
         var form = new BugReportFormViewModel(store, box, snapshot, tool, tools, fromCrash);
         try
@@ -101,14 +101,14 @@ internal sealed class PcBugReporter(
     public void ShowPage(string? id = null)
     {
         services.GetRequiredService<ShellController>().ShowMainWindow();
-        services.GetRequiredService<IShellNavigation>().ShowPage(typeof(BugReportsPage));
+        services.GetRequiredService<IShellNavigation>().ShowTool(Helm.Shell.Tabs.ShellPages.BugReports);
         if (id is not null) services.GetRequiredService<BugReportsViewModel>().Open(id);
     }
 
     private void QueueCheck()
     {
         if (Interlocked.Exchange(ref _checkQueued, 1) == 1) return;
-        Application.Current?.Dispatcher.BeginInvoke(() =>
+        Dispatcher.UIThread.Post(() =>
         {
             Volatile.Write(ref _checkQueued, 0);
             Check();
