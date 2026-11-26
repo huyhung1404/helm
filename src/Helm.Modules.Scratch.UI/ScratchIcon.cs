@@ -1,9 +1,9 @@
 using Avalonia;
 using Avalonia.Media;
 
-namespace Helm.Modules.Scratch;
+namespace Helm.Modules.Scratch.Ui;
 
-/// <summary>The Scratch icon as an Avalonia vector image, drawn from the same shapes as on Windows.</summary>
+/// <summary>The Scratch icon as an Avalonia vector image, drawn from ScratchIconShape (the same picture on every platform).</summary>
 public static class ScratchIcon
 {
     public static IImage Image { get; } = Create();

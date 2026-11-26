@@ -1,26 +1,30 @@
-using System.Windows.Media;
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
-using Wpf.Ui.Controls;
+using Helm.Modules.Scratch.Ui;
+using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.Scratch;
 
 /// <summary>
 /// Scratch on Windows. The things live in Helm Sync (files as encrypted blobs) and the pages work directly on
-/// <see cref="ScratchStore"/>; the only background work is following Send to clipboard from the other devices. The menu, Quick access and Home → Utilities open <see cref="ScratchContentPage"/>;
+/// <see cref="ScratchStore"/>; the only background work is following Send to clipboard from the other devices. The menu, Quick access and Home → Utilities open its page, the shared <see cref="ScratchView"/>;
 /// its settings are a sheet inside it.
 /// </summary>
-public sealed class ScratchModule(ScratchViewModel viewModel, ScratchClipboardRelay relay) : HelmModuleBase, IModuleContent
+public sealed class ScratchModule(ScratchViewModel viewModel, ScratchClipboardRelay relay, ILoggerFactory loggers) : HelmModuleBase
 {
     public override string Id => ScratchIds.ModuleId;
     public override string DisplayName => ScratchIds.DisplayName;
     public override string Description => ScratchIds.Description;
     public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
-    public override SymbolRegular Icon => SymbolRegular.Note24;
-    public override ImageSource IconImage => ScratchLogo.Image;
-    public override Type SettingsPageType => typeof(ScratchContentPage);
-    public Type ContentPageType => typeof(ScratchContentPage);
+    public override Symbol Icon => Symbol.Note;
+    public override IImage IconImage => ScratchIcon.Image;
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
+
+    public override Control CreatePage() =>
+        new ScratchView(this, viewModel, new WindowsScratchPageHost(viewModel, loggers.CreateLogger<WindowsScratchPageHost>()));
 
     public override Task EnableAsync(CancellationToken ct)
     {

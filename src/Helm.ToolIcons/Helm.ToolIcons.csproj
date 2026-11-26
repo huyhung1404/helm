@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Helm.Modules.Habits.UI\Helm.Modules.Habits.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Missions.UI\Helm.Modules.Missions.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Notes.UI\Helm.Modules.Notes.UI.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Scratch.UI\Helm.Modules.Scratch.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vocab.UI\Helm.Modules.Vocab.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.NovelReader.UI\Helm.Modules.NovelReader.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Ssh.UI\Helm.Modules.Ssh.UI.csproj" />

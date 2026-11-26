@@ -3,13 +3,11 @@
   <!-- Every tool's own icon, drawn from the same shapes as in Helm (the Avalonia builders of the phone app, and the
        Windows-only tools' shapes drawn by ToolIcons.cs), so pages that list tools look as they do in Helm. -->
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Scratch.Core\ScratchIconShape.cs" Link="ToolIcons\ScratchIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.QuickCapture\QuickCaptureIconShape.cs" Link="ToolIcons\QuickCaptureIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Keyboard\KeyboardIconShape.cs" Link="ToolIcons\KeyboardIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.WindowZones\WindowZonesIconShape.cs" Link="ToolIcons\WindowZonesIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.SlackBot\SlackBotIconShape.cs" Link="ToolIcons\SlackBotIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.QuickCapture.Android\QuickCaptureIcon.cs" Link="ToolIcons\QuickCaptureIcon.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Scratch.Android\ScratchIcon.cs" Link="ToolIcons\ScratchIcon.cs" />
   </ItemGroup>
 
 </Project>
