@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Missions.Ui.MissionOverview"
+             x:DataType="vm:MissionsViewModel">
+
+    <!-- The mission shown: its title and goal, then one card with the progress, pace, deadline, reward, its notes, the
+         one thing to do with it now (start, resume, take the reward) and the rest as small actions -->
+    <UserControl.Styles>
+        <Style Selector="WrapPanel.tags > Border.tag">
+            <Setter Property="Margin" Value="0,0,6,6" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel>
+        <StackPanel Margin="0,22,0,16">
+            <TextBlock Classes="display" Text="{Binding Title}" TextWrapping="Wrap" />
+            <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="{Binding Goal}" TextWrapping="Wrap" IsVisible="{Binding HasGoal}" />
+        </StackPanel>
+
+        <Border x:Name="Card" Classes="glass" Padding="18,16">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding ProgressText}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="eyebrow" Margin="12,0,0,0" VerticalAlignment="Center"
+                               Text="{Binding ProgressPercent, StringFormat={}{0:0}%}" />
+                </Grid>
+                <ProgressBar Classes="mission" Minimum="0" Maximum="100" Value="{Binding ProgressPercent, Mode=OneWay}" AutomationProperties.Name="Progress" />
+                <WrapPanel Classes="tags">
+                    <Border Classes="tag"><TextBlock Text="{Binding StatusText}" /></Border>
+                    <Border Classes="tag" IsVisible="{Binding HasPace}">
+                        <TextBlock Text="{Binding PaceText}" Classes.late="{Binding IsBehind}" />
+                    </Border>
+                    <Border Classes="tag" IsVisible="{Binding HasDeadline}"><TextBlock Text="{Binding DeadlineText}" /></Border>
+                    <Border Classes="tag" IsVisible="{Binding HasStreak}"><TextBlock Text="{Binding StreakText}" Foreground="{DynamicResource HelmSuccess}" /></Border>
+                </WrapPanel>
+                <TextBlock Text="{Binding ProjectionText}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasProjection}" />
+                <TextBlock Text="{Binding Note}" Classes="muted" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
+                <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasReward}">
+                    <ic:SymbolIcon Symbol="Gift" FontSize="16" Margin="0,1,8,0" VerticalAlignment="Top" Foreground="{DynamicResource HelmEyebrow}" />
+                    <TextBlock Grid.Column="1" TextWrapping="Wrap">
+                        <Run Text="Reward: " FontWeight="SemiBold" /><Run Text="{Binding RewardText}" />
+                    </TextBlock>
+                </Grid>
+                <TextBlock Text="{Binding FinishedText}" TextWrapping="Wrap" IsVisible="{Binding IsCompleted}" />
+                <TextBlock Text="{Binding PlannedText}" TextWrapping="Wrap" IsVisible="{Binding IsPlanned}" />
+
+                <!-- Notes linked to this mission: open one, link another, or write a new one -->
+                <core:LinksPanel DataContext="{Binding MissionLinks}" ShowActions="True"
+                                 IsVisible="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).MissionLinks, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                <!-- The one thing to do with the mission now (at most one shows) -->
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding StartMissionCommand}" IsVisible="{Binding IsPlanned}"
+                        AutomationProperties.Name="Start mission">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <ic:SymbolIcon Symbol="Play" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Text="Start mission" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ResumeCommand}" IsVisible="{Binding IsPaused}"
+                        AutomationProperties.Name="Resume">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <ic:SymbolIcon Symbol="Play" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Text="Resume" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ResumeCommand}" IsVisible="{Binding IsAbandoned}"
+                        AutomationProperties.Name="Take it up again">
+                    <TextBlock Text="Take it up again" Foreground="{DynamicResource HelmPillForeground}" />
+                </Button>
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ClaimRewardCommand}" IsVisible="{Binding CanClaimReward}"
+                        AutomationProperties.Name="I took my reward">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <ic:SymbolIcon Symbol="Gift" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Text="I took my reward" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+
+                <!-- The rest, as small actions (icons only on a phone) -->
+                <WrapPanel Margin="-4,0,0,0">
+                    <Button Classes="act" Command="{Binding OpenReplanCommand}" IsVisible="{Binding IsOpenForChanges}"
+                            ToolTip.Tip="Behind or something changed: let an AI plan the steps not done yet again" AutomationProperties.Name="Re-plan with an AI">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="14" Foreground="{DynamicResource HelmEyebrow}" />
+                            <TextBlock Classes="label" Text="Re-plan" Foreground="{DynamicResource HelmEyebrow}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding UndoStepCommand}" IsVisible="{Binding IsCompleted}" ToolTip.Tip="Open the last step again"
+                            AutomationProperties.Name="Undo last step">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="ArrowUndo" FontSize="14" /><TextBlock Classes="label" Text="Undo last step" /></StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding PauseCommand}" IsVisible="{Binding IsActive}"
+                            ToolTip.Tip="Pause: the time it is paused does not count against your pace" AutomationProperties.Name="Pause">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Pause" FontSize="14" /><TextBlock Classes="label" Text="Pause" /></StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding SaveSummaryToNotesCommand}" IsVisible="{Binding CanSaveToNotes}" ToolTip.Tip="The summary as a new note"
+                            AutomationProperties.Name="Save summary to Notes">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Note" FontSize="14" /><TextBlock Classes="label" Text="Save to Notes" /></StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding CopySummaryCommand}" ToolTip.Tip="Copy a summary of the mission" AutomationProperties.Name="Copy summary">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="DocumentText" FontSize="14" /><TextBlock Classes="label" Text="Copy summary" /></StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding CopyJsonCommand}" ToolTip.Tip="Copy the mission as JSON (to import elsewhere or give to an AI)"
+                            AutomationProperties.Name="Copy as JSON">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Code" FontSize="14" /><TextBlock Classes="label" Text="Copy JSON" /></StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding AbandonCommand}" IsVisible="{Binding IsOpenForChanges}"
+                            ToolTip.Tip="Abandon: stop here; the steps and history are kept" AutomationProperties.Name="Abandon">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Dismiss" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                            <TextBlock Classes="label" Text="Abandon" Foreground="{DynamicResource HelmDanger}" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

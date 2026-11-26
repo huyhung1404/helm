@@ -1,0 +1,188 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Missions.Ui.MissionsSettingsView"
+             x:DataType="vm:MissionsViewModel">
+
+    <!-- Missions' settings as a sheet over the page (the gear): on/off, the mission (rename, goal, reward, deadline, order,
+         delete), display, reminders, data, new missions. One card per subject. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="MISSIONS" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- On or off: off keeps the missions (read only) and stops the reminder -->
+        <Border Classes="glass">
+            <DockPanel>
+                <ToggleSwitch x:Name="EnableSwitch" DockPanel.Dock="Right" OnContent="" OffContent="" AutomationProperties.Name="Missions on or off" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Missions is on" Classes="head" />
+                    <TextBlock Text="Off keeps your missions but makes them read only, and stops the daily reminder." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- The mission: which one, then its own fields; saved when a field is left -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Mission" Classes="head" />
+                    <TextBlock Text="Rename it, change its goal, reward or deadline, move it in the list, or delete it. Saved when you leave a field."
+                               Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Spacing="12" IsVisible="{Binding HasMissions}">
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Missions}" SelectedItem="{Binding SelectedMission}"
+                              AutomationProperties.Name="Mission to edit">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate DataType="vm:MissionChoice">
+                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="eyebrow" Text="TITLE" />
+                        <TextBox Classes="glass" Text="{Binding EditTitle, UpdateSourceTrigger=LostFocus}" KeyDown="Field_KeyDown" AutomationProperties.Name="Mission title" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="eyebrow" Text="GOAL" />
+                        <TextBox Classes="glass" Text="{Binding EditGoal, UpdateSourceTrigger=LostFocus}" AcceptsReturn="True" TextWrapping="Wrap"
+                                 AutomationProperties.Name="Goal" />
+                        <TextBlock Text="The measurable end result." Classes="secondary" />
+                    </StackPanel>
+                    <Grid x:Name="RewardGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="12">
+                        <StackPanel x:Name="RewardField" Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="REWARD" />
+                            <TextBox Classes="glass" Text="{Binding EditReward, UpdateSourceTrigger=LostFocus}" KeyDown="Field_KeyDown" AutomationProperties.Name="Reward" />
+                        </StackPanel>
+                        <StackPanel x:Name="DeadlineField" Grid.Column="1" Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="DEADLINE" />
+                            <core:DateTimeBox Classes="glass" Date="{Binding EditDeadline}" ShowTime="False" Lean="Future" AllowEmpty="True" PlaceholderText="No deadline"
+                                              AutomationProperties.Name="Deadline" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="The reward is what you treat yourself to at the end. The pace shows how far ahead of the deadline or behind it you are; clear it for none."
+                               Classes="secondary" TextWrapping="Wrap" />
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="eyebrow" Text="POSITION IN THE LIST" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding MoveUpCommand}" AutomationProperties.Name="Move up">
+                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center"><ic:SymbolIcon Symbol="ArrowUp" FontSize="14" /><TextBlock Text="Up" /></StackPanel>
+                            </Button>
+                            <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding MoveDownCommand}"
+                                    AutomationProperties.Name="Move down">
+                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center"><ic:SymbolIcon Symbol="ArrowDown" FontSize="14" /><TextBlock Text="Down" /></StackPanel>
+                            </Button>
+                        </Grid>
+                        <TextBlock Text="Missions in progress come first; this orders them within that." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding DeleteMissionCommand}"
+                                AutomationProperties.Name="Delete this mission">
+                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                                <TextBlock Text="Delete this mission" Foreground="{DynamicResource HelmDanger}" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="Removes it and its steps from all your devices. To stop for now, pause or abandon it instead." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock Text="No missions yet. Close the settings and start one on the page." Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !HasMissions}" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Display" Classes="head" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding PlayCelebrations}" OnContent="" OffContent="" AutomationProperties.Name="Play celebrations" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Play celebrations" />
+                        <TextBlock Text="Confetti when you finish a phase or a whole mission. The summary and your reward show either way." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ConfirmUntickedChecklist}" OnContent="" OffContent=""
+                                  AutomationProperties.Name="Ask before completing an unfinished checklist" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Ask before completing an unfinished checklist" TextWrapping="Wrap" />
+                        <TextBlock Text="When a step's checklist is not all ticked, ask before completing it." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ShowFinishedMissions}" OnContent="" OffContent="" AutomationProperties.Name="Show finished missions" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Show finished missions" />
+                        <TextBlock Text="List completed and abandoned missions after the ones in progress." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Reminders" Classes="head" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RemindersEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Daily step reminder" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Daily step reminder" />
+                        <TextBlock Text="Once a day, the step each mission in progress is on. Missions you already moved on today are left out." Classes="secondary"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Spacing="6" IsEnabled="{Binding RemindersEnabled}">
+                    <TextBlock Text="Reminder time" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}"
+                              AutomationProperties.Name="Reminder time" />
+                    <TextBlock Text="The day's reminder comes at this hour, or when Helm next checks after it." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Remind me now" Command="{Binding RemindNowCommand}"
+                        IsEnabled="{Binding RemindersEnabled}" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Data" Classes="head" />
+                <TextBlock Text="Every step of every mission, with its status, planned and actual days, dates and note, for a spreadsheet." Classes="secondary"
+                           TextWrapping="Wrap" />
+                <Button x:Name="ExportButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Export CSV…" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <TextBlock Text="New missions" Classes="head" />
+                <TextBlock Text="The prompt Helm fills in on the page, with blanks to fill in yourself; any AI answers it with a mission to import." Classes="secondary"
+                           TextWrapping="Wrap" />
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Copy the prompt template" Command="{Binding CopyTemplateCommand}" />
+                <Grid ColumnDefinitions="Auto,*">
+                    <ic:SymbolIcon Symbol="Share" FontSize="16" Margin="0,1,10,0" VerticalAlignment="Top" Foreground="{DynamicResource HelmEyebrow}" />
+                    <TextBlock Grid.Column="1" Classes="secondary" TextWrapping="Wrap"
+                               Text="Save an AI's answer from anywhere: on the PC paste it into Quick Capture (Win+Alt+N) or start it with /m; on the phone share the AI app's answer to Helm. The mission in it is saved, ready to start." />
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*">
+                    <ic:SymbolIcon Symbol="Chat" FontSize="16" Margin="0,1,10,0" VerticalAlignment="Top" Foreground="{DynamicResource HelmEyebrow}" />
+                    <TextBlock Grid.Column="1" Classes="secondary" TextWrapping="Wrap"
+                               Text="Or ask an AI agent: with Helm tools for AI agents on (General › MCP), an agent such as Claude Code can make a mission for you, read your progress and complete the current step." />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- What only this platform has -->
+        <ContentControl x:Name="PlatformCards" />
+
+        <Border Classes="glass" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" />
+    </StackPanel>
+</UserControl>

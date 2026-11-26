@@ -8,7 +8,24 @@ public sealed partial class MissionChoice(string id) : ObservableObject
 {
     [ObservableProperty] private string _name = "";
 
+    /// <summary>The mission's own title, without the progress <see cref="Name"/> adds (the picker's cards).</summary>
+    [ObservableProperty] private string _title = "";
+
+    /// <summary>"3 of 12 steps", or its status for one not in progress (the picker's cards).</summary>
+    [ObservableProperty] private string _summary = "";
+
+    /// <summary>In progress.</summary>
+    [ObservableProperty] private bool _isActive;
+
+    /// <summary>The mission shown on the page (its card has the strong stroke).</summary>
+    [ObservableProperty] private bool _isSelected;
+
     public string Id { get; } = id;
+
+    /// <summary>The first letter of the title, for the card's tile.</summary>
+    public string Initial => Title.Length > 0 ? char.ToUpper(Title[0], System.Globalization.CultureInfo.CurrentCulture).ToString() : "?";
+
+    partial void OnTitleChanged(string value) => OnPropertyChanged(nameof(Initial));
 
     public override string ToString() => Name;
 }

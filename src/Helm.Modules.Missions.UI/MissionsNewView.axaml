@@ -1,0 +1,192 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Missions.Ui.MissionsNewView"
+             x:DataType="vm:MissionsViewModel">
+
+    <!-- A new mission or a new plan, as ONE sheet that follows the view model: 1. the goal (or what changed) and the
+         prompt to copy, 2. the AI's answer pasted back, with a preview to edit before it is created. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="NEW MISSION" IsVisible="{Binding IsNewMission}" />
+                <TextBlock Classes="eyebrow" Text="NEW PLAN" IsVisible="{Binding IsReplan}" />
+                <TextBlock Text="Describe your goal" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding IsPromptOpen}" />
+                <TextBlock FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding IsReplanOpen}">
+                    <Run Text="Plan the rest of " /><Run Text="{Binding Title}" /><Run Text=" again" />
+                </TextBlock>
+                <TextBlock Text="{Binding ImportHeading}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding IsImportOpen}" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Margin="12,0,0,0" Command="{Binding CloseNewCommand}" ToolTip.Tip="Close"
+                    AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- 1. The goal and the prompt -->
+        <StackPanel x:Name="PromptPanel" Spacing="12" IsVisible="{Binding IsPromptOpen}" core:Motion.EnterOnShow="True">
+            <TextBlock Classes="secondary" TextWrapping="Wrap"
+                       Text="Helm turns this into a prompt for any AI. The more you say, the better the steps fit you. Write in your own language." />
+            <StackPanel Spacing="6">
+                <TextBlock Classes="eyebrow" Text="GOAL" />
+                <TextBox x:Name="GoalBox" Classes="glass" PlaceholderText="e.g. Pass HSK3 with 210 points or more" Text="{Binding PromptGoal}" AcceptsReturn="True"
+                         TextWrapping="Wrap" AutomationProperties.Name="Goal" />
+            </StackPanel>
+            <Grid x:Name="PromptGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="12">
+                <StackPanel x:Name="LevelField" Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="WHERE YOU ARE NOW" />
+                    <TextBox Classes="glass" PlaceholderText="e.g. I know about 300 words" Text="{Binding PromptLevel}" AutomationProperties.Name="Where you are now" />
+                </StackPanel>
+                <StackPanel x:Name="TimeField" Grid.Column="1" Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="TIME YOU CAN SPEND" />
+                    <TextBox Classes="glass" PlaceholderText="e.g. 1 hour a day" Text="{Binding PromptTime}" AutomationProperties.Name="Time you can spend" />
+                </StackPanel>
+                <StackPanel x:Name="DeadlineField" Grid.Row="1" Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="DEADLINE (OPTIONAL)" />
+                    <core:DateTimeBox Classes="glass" Date="{Binding PromptDeadline}" ShowTime="False" Lean="Future" AllowEmpty="True" PlaceholderText="No deadline" />
+                </StackPanel>
+                <StackPanel x:Name="NotesField" Grid.Row="1" Grid.Column="1" Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="ANYTHING ELSE" />
+                    <TextBox Classes="glass" PlaceholderText="e.g. I learn best with videos" Text="{Binding PromptNotes}" AutomationProperties.Name="Anything else" />
+                </StackPanel>
+            </Grid>
+            <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CopyPromptCommand}" IsEnabled="{Binding CanCopyPrompt}"
+                    AutomationProperties.Name="Copy prompt">
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                    <ic:SymbolIcon Symbol="Copy" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                    <TextBlock Text="Copy prompt" Foreground="{DynamicResource HelmPillForeground}" />
+                </StackPanel>
+            </Button>
+            <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding PromptCopied}" core:Motion.EnterOnShow="True"
+                       Text="Copied. Paste it into any AI app, then come back with I have the JSON and paste its answer." />
+            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding OpenImportCommand}" AutomationProperties.Name="I have the JSON">
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <ic:SymbolIcon Symbol="ArrowImport" FontSize="14" /><TextBlock Text="I have the JSON" />
+                </StackPanel>
+            </Button>
+
+            <!-- No AI at hand: a ready-made mission -->
+            <TextBlock Text="No AI at hand? Start from a ready-made mission:" Classes="secondary" Margin="0,6,0,0" TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding Templates}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:MissionTemplate">
+                        <Border Classes="glass lift" Padding="0" Margin="0,0,0,8">
+                            <Button Classes="rowhit" Padding="14,10" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Name}"
+                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).UseTemplateCommand}" CommandParameter="{Binding}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <ic:SymbolIcon Grid.Column="1" Symbol="ChevronRight" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource HelmSecondaryText}" />
+                                </Grid>
+                            </Button>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- 1. A new plan: what changed, and the prompt with the progress in it -->
+        <StackPanel x:Name="ReplanPanel" Spacing="12" IsVisible="{Binding IsReplanOpen}" core:Motion.EnterOnShow="True">
+            <TextBlock Classes="secondary" TextWrapping="Wrap"
+                       Text="Behind, ahead, or something changed? Helm writes a prompt with what you have done and what is left; the AI answers with a new plan for the steps not done yet. Done steps stay." />
+            <StackPanel Spacing="6">
+                <TextBlock Classes="eyebrow" Text="WHAT CHANGED, OR WHAT YOU WANT (OPTIONAL)" TextWrapping="Wrap" />
+                <TextBox x:Name="ReasonBox" Classes="glass" PlaceholderText="e.g. I can only do 30 minutes a day now" Text="{Binding ReplanReason}" AcceptsReturn="True"
+                         TextWrapping="Wrap" AutomationProperties.Name="What changed" />
+            </StackPanel>
+            <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CopyReplanPromptCommand}" AutomationProperties.Name="Copy prompt">
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                    <ic:SymbolIcon Symbol="Copy" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                    <TextBlock Text="Copy prompt" Foreground="{DynamicResource HelmPillForeground}" />
+                </StackPanel>
+            </Button>
+            <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding PromptCopied}" core:Motion.EnterOnShow="True"
+                       Text="Copied. Paste it into any AI app, then come back with I have the new plan and paste its answer." />
+            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding OpenReplanImportCommand}"
+                    AutomationProperties.Name="I have the new plan">
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <ic:SymbolIcon Symbol="ArrowImport" FontSize="14" /><TextBlock Text="I have the new plan" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
+        <!-- 2. The AI's answer, and its preview -->
+        <StackPanel x:Name="ImportPanel" Spacing="12" IsVisible="{Binding IsImportOpen}" core:Motion.EnterOnShow="True">
+            <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Paste the whole answer: Helm finds the JSON in it." />
+            <TextBox x:Name="ImportBox" Classes="glass mono" PlaceholderText="Paste the whole answer here" Text="{Binding ImportText}" AcceptsReturn="True"
+                     TextWrapping="Wrap" Height="140" VerticalContentAlignment="Top" AutomationProperties.Name="Mission JSON" />
+            <TextBlock Text="{Binding ImportErrors}" Classes="late" TextWrapping="Wrap" IsVisible="{Binding HasImportErrors}" />
+            <TextBlock Text="{Binding ImportWarnings}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasImportWarnings}" />
+
+            <!-- Preview: edit the mission's own fields and leave out steps before creating it -->
+            <StackPanel Spacing="12" IsVisible="{Binding HasPreview}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                <Border Background="{DynamicResource HelmWarningBackground}" CornerRadius="10" Padding="12,10" IsVisible="{Binding HasPreviewNote}">
+                    <TextBlock Text="{Binding PreviewNote}" TextWrapping="Wrap" />
+                </Border>
+                <StackPanel Spacing="12" IsVisible="{Binding IsNewMission}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="eyebrow" Text="TITLE" />
+                        <TextBox Classes="glass" Text="{Binding PreviewTitle}" AutomationProperties.Name="Mission title" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="eyebrow" Text="GOAL" />
+                        <TextBox Classes="glass" Text="{Binding PreviewGoal}" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Mission goal" />
+                    </StackPanel>
+                </StackPanel>
+                <Grid x:Name="PreviewGrid" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="12">
+                    <StackPanel x:Name="RewardField" Spacing="6" IsVisible="{Binding IsNewMission}">
+                        <TextBlock Classes="eyebrow" Text="REWARD FOR FINISHING" />
+                        <TextBox Classes="glass" Text="{Binding PreviewReward}" AutomationProperties.Name="Mission reward" />
+                    </StackPanel>
+                    <StackPanel x:Name="PreviewDeadlineField" Grid.Column="1" Spacing="6">
+                        <TextBlock Classes="eyebrow" Text="DEADLINE" />
+                        <core:DateTimeBox Classes="glass" Date="{Binding PreviewDeadline}" ShowTime="False" Lean="Future" AllowEmpty="True" PlaceholderText="No deadline" />
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="{Binding PreviewSummary}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="Untick a step to leave it out." Classes="secondary" />
+                <ItemsControl ItemsSource="{Binding PreviewPhases}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:PreviewPhase">
+                            <Border Classes="glass" Padding="14,12" Margin="0,0,0,8" BoxShadow="">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Reward}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasReward}" />
+                                    <ItemsControl ItemsSource="{Binding Steps}" Margin="0,4,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="vm:PreviewStep">
+                                                <CheckBox IsChecked="{Binding Include}" AutomationProperties.Name="{Binding Title}" Margin="0,2">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding Details}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </CheckBox>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Back" Command="{Binding BackToPromptCommand}"
+                        AutomationProperties.Name="Back to the prompt" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CreateMissionCommand}"
+                        IsEnabled="{Binding CanCreate}" AutomationProperties.Name="{Binding CreateLabel}">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <ic:SymbolIcon Symbol="Flag" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Text="{Binding CreateLabel}" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

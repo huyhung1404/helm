@@ -1,0 +1,51 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             xmlns:ui="using:Helm.Modules.Missions.Ui"
+             x:Class="Helm.Modules.Missions.Ui.MissionsCelebrationView"
+             x:DataType="vm:MissionsViewModel">
+
+    <!-- A phase or the whole mission is done: what was reached, a few numbers, the reward to take, the summary -->
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="eyebrow" Text="PHASE DONE" IsVisible="{Binding !IsMissionCelebration}" VerticalAlignment="Center" />
+            <TextBlock Classes="eyebrow" Text="MISSION COMPLETE" IsVisible="{Binding IsMissionCelebration}" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="chip" Command="{Binding DismissCelebrationCommand}" ToolTip.Tip="Close" AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+        <Image Source="{x:Static ui:MissionsIcon.Image}" Width="56" Height="56" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding Celebration.Title}" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Celebration.Message}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+        <ItemsControl ItemsSource="{Binding Celebration.Stats}" HorizontalAlignment="Center">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                    <TextBlock Text="{Binding}" Classes="muted" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,1" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Border Classes="glass" BoxShadow="" BorderBrush="{DynamicResource HelmGlassStrokeStrong}" IsVisible="{Binding Celebration.HasReward}">
+            <Grid ColumnDefinitions="Auto,*">
+                <ic:SymbolIcon Symbol="Gift" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="{DynamicResource HelmEyebrow}" />
+                <TextBlock Grid.Column="1" Text="{Binding Celebration.RewardText}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ClaimCelebrationRewardCommand}"
+                IsVisible="{Binding Celebration.HasReward}" AutomationProperties.Name="I took my reward">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                <ic:SymbolIcon Symbol="Gift" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                <TextBlock Text="I took my reward" Foreground="{DynamicResource HelmPillForeground}" />
+            </StackPanel>
+        </Button>
+        <Grid x:Name="SummaryRow" ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding IsMissionCelebration}">
+            <Button x:Name="CopyButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Copy summary"
+                    Command="{Binding CopySummaryCommand}" />
+            <Button x:Name="NotesButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save to Notes"
+                    Command="{Binding SaveSummaryToNotesCommand}" IsVisible="{Binding CanSaveToNotes}" />
+        </Grid>
+        <Button x:Name="CloseButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Close"
+                Command="{Binding DismissCelebrationCommand}" />
+    </StackPanel>
+</UserControl>

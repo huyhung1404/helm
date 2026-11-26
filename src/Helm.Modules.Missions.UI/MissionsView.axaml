@@ -1,0 +1,179 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             xmlns:ui="using:Helm.Modules.Missions.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Missions.Ui.MissionsView"
+             x:DataType="vm:MissionsViewModel">
+
+    <!-- Missions itself, the same view on every platform. Read top to bottom: which mission (its cards, "New mission" at
+         the end) → the step each running mission is on (Today) → the mission: its overview, the current step, the
+         roadmap. Insights (statistics, badges) sit under their tab; a new mission or a new plan, the celebration and the
+         settings open as sheets. -->
+    <UserControl.Styles>
+        <Style Selector="ProgressBar.mission">
+            <Setter Property="Height" Value="6" />
+            <Setter Property="MinHeight" Value="6" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+        </Style>
+        <!-- A mission card of one that is not running (planned, paused, finished): a little faded -->
+        <Style Selector="Button.mission.idle">
+            <Setter Property="Opacity" Value="0.7" />
+        </Style>
+        <Style Selector="Button.mission.idle.selected">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Border.tile">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="Page" Margin="40,28,40,40">
+
+                <!-- A phone's page has no app bar: the menu button opens the drawer -->
+                <StackPanel x:Name="MenuRow" IsVisible="False" Margin="0,0,0,12">
+                    <Button Classes="chip" HorizontalAlignment="Left" Click="Menu_Click" ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                        <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                    </Button>
+                </StackPanel>
+
+                <!-- Today, and which view -->
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                    <TextBlock Classes="eyebrow" Text="{Binding TodayLine, Converter={x:Static core:UpperCase.Instance}}" VerticalAlignment="Center"
+                               TextWrapping="Wrap" Margin="0,0,12,0" />
+                    <StackPanel x:Name="Tabs" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Border Classes="glass" Padding="3" CornerRadius="10" BoxShadow="" IsVisible="{Binding HasMissions}">
+                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                <RadioButton x:Name="MissionTab" Classes="seg" GroupName="MissionsTab" IsChecked="True" Content="Missions" IsCheckedChanged="Tab_Changed" />
+                                <RadioButton x:Name="InsightsTab" Classes="seg" GroupName="MissionsTab" Content="Insights" IsCheckedChanged="Tab_Changed" />
+                            </StackPanel>
+                        </Border>
+                        <Button Classes="chip" Click="Settings_Click" ToolTip.Tip="Missions settings" AutomationProperties.Name="Missions settings">
+                            <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Border x:Name="OffBar" Classes="glass" Margin="0,16,0,0" IsVisible="False">
+                    <StackPanel>
+                        <TextBlock Text="Missions is turned off" Classes="head" />
+                        <TextBlock Text="Your missions are kept. Turn Missions on in its settings (the gear) to work on them." Classes="muted" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel x:Name="Body">
+                    <!-- What happened: copied, created, a step done, a problem -->
+                    <Border Classes="glass" core:Motion.EnterOnShow="True" Margin="0,16,0,0" IsVisible="{Binding HasMessage}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="flat" Width="36" Height="36" Padding="0" Command="{Binding DismissMessageCommand}"
+                                    ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- First run: no mission yet -->
+                    <ui:MissionsFirstRun IsVisible="{Binding HasNoMissions}" />
+
+                    <!-- MISSIONS, read top to bottom: which mission → today → the mission -->
+                    <StackPanel IsVisible="{Binding HasMissions}">
+                    <StackPanel x:Name="MissionPanel" Classes="enter" core:Motion.EnterOnShow="True">
+                        <!-- 1. Which mission: all of them in one row, the one shown highlighted -->
+                        <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Margin="0,22,0,0">
+                            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
+                                <ItemsControl ItemsSource="{Binding Missions}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="10" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:MissionChoice">
+                                            <Button Classes="glass mission" Classes.selected="{Binding IsSelected}" Classes.idle="{Binding !IsActive}"
+                                                    MinWidth="170" MaxWidth="240" Padding="12,10" Click="Mission_Click"
+                                                    AutomationProperties.Name="{Binding Title}" ToolTip.Tip="{Binding Title}">
+                                                <Grid ColumnDefinitions="Auto,*">
+                                                    <Border Classes="tile">
+                                                        <TextBlock Text="{Binding Initial}" FontWeight="Bold" FontSize="15" Foreground="{DynamicResource HelmEyebrow}"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Summary}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button x:Name="NewMissionButton" Classes="ghost" MinHeight="56" Command="{Binding OpenPromptCommand}" AutomationProperties.Name="New mission">
+                                    <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Add" FontSize="14" /><TextBlock Text="New mission" /></StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- 2. Today: the step each running mission is on, when more than one runs -->
+                        <StackPanel Margin="0,16,0,0" Spacing="8">
+                            <StackPanel.IsVisible>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="HasToday" />
+                                    <Binding Path="ShowMission" />
+                                </MultiBinding>
+                            </StackPanel.IsVisible>
+                            <TextBlock Text="Today" Classes="head" Margin="2,0,0,0" />
+                            <ItemsControl x:Name="TodayList" ItemsSource="{Binding Today}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:TodayRow">
+                                        <Border Classes="glass lift" Padding="14,12" Margin="0,0,10,10">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                <Button Classes="rowhit" Padding="0" Margin="0,-4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                        Command="{Binding $parent[ui:MissionsView].((vm:MissionsViewModel)DataContext).OpenTodayCommand}" CommandParameter="{Binding}"
+                                                        ToolTip.Tip="Open the mission" AutomationProperties.Name="{Binding Mission, StringFormat='Open {0}'}">
+                                                    <StackPanel Margin="0,4" Spacing="2">
+                                                        <TextBlock Text="{Binding Mission, Converter={x:Static core:UpperCase.Instance}}" Classes="eyebrow" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Step}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding Details}" Classes="muted" Classes.late="{Binding IsBehind}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1" Classes="tick" VerticalAlignment="Center"
+                                                        Command="{Binding $parent[ui:MissionsView].((vm:MissionsViewModel)DataContext).CompleteTodayCommand}" CommandParameter="{Binding}"
+                                                        ToolTip.Tip="Complete this step" AutomationProperties.Name="{Binding Step, StringFormat='Complete {0}'}">
+                                                    <Panel><Border Classes="ring" /></Panel>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- 3. The mission: its overview, the step to do now, the roadmap -->
+                        <StackPanel IsVisible="{Binding ShowMission}">
+                            <ui:MissionOverview />
+                            <ui:CurrentStepCard x:Name="CurrentStep" Margin="0,12,0,0" IsVisible="{Binding ShowCurrentStep}" />
+                            <ui:MissionRoadmap Margin="0,26,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- INSIGHTS: across all missions -->
+                    <ui:MissionsInsights x:Name="InsightsPanel" core:Motion.EnterOnShow="True" IsVisible="False" Margin="0,26,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>
