@@ -51,8 +51,6 @@ public sealed class ZonesEditorController(
             var all = monitors.GetMonitors();
             if (all.Count == 0) return;
             var home = monitors.FromPoint(windows.GetCursorPosition()) is { } m ? all.FirstOrDefault(x => x.Id == m.Id) ?? all[0] : all[0];
-            // The editor is Avalonia windows of their own; the WPF app's UI thread pumps them.
-            HelmAvalonia.EnsureStarted();
 
             var session = new EditorSession(data, all, home);
             session.CloseRequested += (_, _) => ui.Post(Close);

@@ -30,7 +30,6 @@ public sealed class ZoneTabStrip(IUiDispatcher ui, IWindowService windows, ILogg
     {
         try
         {
-            HelmAvalonia.EnsureStarted();
             if (_window is null)
             {
                 _window = new TabStripWindow(windows);

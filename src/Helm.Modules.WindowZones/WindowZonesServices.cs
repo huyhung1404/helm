@@ -13,5 +13,5 @@ public static class WindowZonesServices
             .AddSingleton<ZoneTabStrip>()
             .AddSingleton<ZonesEditorController>()
             .AddSingleton<IWindowZones>(sp => sp.GetRequiredService<WindowZonesModule>())
-            .AddHelmModule<WindowZonesModule, WindowZonesContentPage, WindowZonesViewModel>();
+            .AddHelmModule<WindowZonesModule, WindowZonesViewModel>();
 }
