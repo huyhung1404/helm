@@ -72,7 +72,7 @@ public sealed class WindowZonesModule : HelmModuleBase, IModuleContent, IWindowZ
     public override ModuleGroup Group => ModuleGroup.WindowsAndDesktop;
     public override SymbolRegular Icon => SymbolRegular.SlideLayout24;
     public override System.Windows.Media.ImageSource IconImage => WindowZonesLogo.Image;
-    public override Type SettingsPageType => typeof(WindowZonesPage);
+    public override Type SettingsPageType => typeof(WindowZonesContentPage);
     public Type ContentPageType => typeof(WindowZonesContentPage);
 
     public ISettingsStore<WindowZonesSettings> Settings { get; }
