@@ -1,0 +1,191 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:b="using:Helm.BugReports.Ui"
+             xmlns:bugs="using:Helm.Shell.BugReports"
+             x:Class="Helm.BugReports.Ui.BugReportFormView"
+             x:DataType="bugs:BugReportFormViewModel">
+
+    <!-- Reporting a bug, the same form everywhere: the PC's small window (Ctrl+Alt+F12, the title bar, the tray) and the
+         phone's report page (the app bar, a shake, the Quick Settings tile). The black box froze as it opened. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Shell.UI/BugReports/BugTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="Button.wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.severity">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="MinHeight" Value="40" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
+            <Panel x:Name="Body" Margin="28,22,28,24">
+
+                <!-- The form -->
+                <StackPanel x:Name="FormPanel" Spacing="16" IsVisible="{Binding !IsDone}">
+                    <!-- The header: a window without a title bar is moved by it -->
+                    <Grid x:Name="HeaderRow" ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent" PointerPressed="Header_PointerPressed">
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="eyebrow" Text="REPORT A BUG" IsVisible="{Binding !FromCrash}" />
+                            <TextBlock Classes="eyebrow" Text="REPORT THE CRASH" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding FromCrash}" />
+                            <TextBlock Text="What happened?" FontSize="22" FontWeight="SemiBold" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Click="Cancel_Click" ToolTip.Tip="Close" AutomationProperties.Name="Close">
+                            <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                        </Button>
+                    </Grid>
+
+                    <Border Classes="glass" IsVisible="{Binding FromCrash}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <ic:SymbolIcon Symbol="ErrorCircle" FontSize="18" Foreground="{DynamicResource HelmDanger}" VerticalAlignment="Top" />
+                            <TextBlock Grid.Column="1" TextWrapping="Wrap"
+                                       Text="Helm closed unexpectedly last time. Its black box from just before the crash is attached: say what you were doing." />
+                        </Grid>
+                    </Border>
+
+                    <TextBox x:Name="Input" Classes="glass" MinHeight="120" MaxHeight="260" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"
+                             Padding="12,10" FontSize="15" Text="{Binding Text}" AutomationProperties.Name="What happened"
+                             PlaceholderText="What you did, what you expected, what you saw" />
+
+                    <!-- How bad, and where -->
+                    <Grid x:Name="Fields" ColumnDefinitions="3*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="HOW BAD" />
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6" AutomationProperties.Name="How bad">
+                                <Button Classes="chip severity" Classes.selected="{Binding IsBlocking}" Content="Blocks me" Command="{Binding SetSeverityCommand}"
+                                        CommandParameter="{x:Static bugs:BugSeverity.Blocking}" ToolTip.Tip="I cannot do what I wanted" />
+                                <Button Grid.Column="1" Classes="chip severity" Classes.selected="{Binding IsAnnoying}" Content="Annoying" Command="{Binding SetSeverityCommand}"
+                                        CommandParameter="{x:Static bugs:BugSeverity.Annoying}" />
+                                <Button Grid.Column="2" Classes="chip severity" Classes.selected="{Binding IsMinor}" Content="Minor" Command="{Binding SetSeverityCommand}"
+                                        CommandParameter="{x:Static bugs:BugSeverity.Minor}" />
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel x:Name="ToolField" Grid.Column="1" Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="TOOL" />
+                            <ComboBox Classes="glass" ItemsSource="{Binding Tools}" SelectedItem="{Binding Tool}" HorizontalAlignment="Stretch" AutomationProperties.Name="Tool" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Pictures: the user's own; Helm never takes screenshots -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="eyebrow" Text="PICTURES" />
+                        <ItemsControl ItemsSource="{Binding Images}" ItemTemplate="{StaticResource PendingThumb}" IsVisible="{Binding HasImages}" Margin="0,0,0,-8">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <Grid x:Name="PictureButtons" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <Button x:Name="PickButton" Classes="ghost wide" Click="Pick_Click" AutomationProperties.Name="Add a picture">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="ImageAdd" FontSize="16" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="PickText" Text="Add a picture" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="CameraButton" Grid.Column="1" Classes="ghost wide" Click="Camera_Click" AutomationProperties.Name="Take a photo">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="Camera" FontSize="16" VerticalAlignment="Center" />
+                                    <TextBlock Text="Photo" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="PasteButton" Grid.Column="2" Classes="ghost wide" Click="Paste_Click" AutomationProperties.Name="Paste a copied picture">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="ClipboardPaste" FontSize="16" VerticalAlignment="Center" />
+                                    <TextBlock Text="Paste" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <TextBlock x:Name="PictureHint" Classes="muted" Text="Screenshots you take yourself, a photo, or a picture you copied. Helm never takes screenshots." />
+                    </StackPanel>
+
+                    <!-- The black box, frozen when the form opened -->
+                    <Border Classes="glass" Padding="0">
+                        <StackPanel>
+                            <Button Classes="rowhit" Padding="16,12" Click="ToggleBox_Click" AutomationProperties.Name="Black box">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                    <ic:SymbolIcon Symbol="History" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Text="Black box" Classes="head" />
+                                        <TextBlock Text="{Binding BlackBoxText}" Classes="muted" />
+                                        <WrapPanel x:Name="BoxTags">
+                                            <Border Classes="tag" IsVisible="{Binding HasErrors}">
+                                                <TextBlock Text="{Binding ErrorText}" Foreground="{DynamicResource HelmDanger}" />
+                                            </Border>
+                                            <Border Classes="tag" IsVisible="{Binding FreezeText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                <TextBlock Text="{Binding FreezeText}" Foreground="{DynamicResource HelmCaution}" />
+                                            </Border>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                    <Panel x:Name="BoxChevron" Grid.Column="2" Classes="turn" VerticalAlignment="Center">
+                                        <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" />
+                                    </Panel>
+                                </Grid>
+                            </Button>
+                            <Border x:Name="BoxEvents" IsVisible="False" Padding="12,0,8,12" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                                <ScrollViewer MaxHeight="280" HorizontalScrollBarVisibility="Disabled" Padding="0,0,10,0" core:ScrollFade.Enabled="True">
+                                    <ItemsControl ItemsSource="{Binding Events}" ItemTemplate="{StaticResource BlackBoxEvent}" AutomationProperties.Name="Events" />
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,-6,0,0">
+                        <ic:SymbolIcon Symbol="LockClosed" FontSize="13" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                        <TextBlock Grid.Column="1" Classes="muted" Text="Nothing you type is recorded, nor anything of a password box or the Vault." />
+                    </Grid>
+
+                    <TextBlock Text="{Binding Error}" Classes="late" TextWrapping="Wrap" core:Motion.EnterOnShow="True"
+                               IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+                            <Button Classes="ghost wide" Content="Cancel" Click="Cancel_Click" />
+                            <Button Grid.Column="1" Classes="pill wide" Command="{Binding SendCommand}" AutomationProperties.Name="Send">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="Send" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Send" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <TextBlock x:Name="KeyHint" Classes="muted" HorizontalAlignment="Center" IsVisible="False" Text="Ctrl+Enter to send · Esc to close" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Sent -->
+                <StackPanel x:Name="SentPanel" Spacing="16" IsVisible="{Binding IsDone}" core:Motion.EnterOnShow="True">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                        <ic:SymbolIcon Symbol="CheckmarkCircle" IconVariant="Filled" FontSize="40" Foreground="{DynamicResource HelmSuccess}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="eyebrow" Text="SAVED" />
+                            <TextBlock Text="{Binding SentCode, StringFormat='Bug #{0} saved'}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock TextWrapping="Wrap" Text="It syncs to your other devices with its black box and pictures. Claude Code reads it through Helm's tools." />
+                    <Border Classes="glass" BoxShadow="">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <ic:SymbolIcon Symbol="Bot" FontSize="16" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                            <SelectableTextBlock Grid.Column="1" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="13" VerticalAlignment="Center"
+                                                 Text="{Binding SentCode, StringFormat='bug_get {0}'}" />
+                        </Grid>
+                    </Border>
+                    <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+                        <Button Classes="ghost wide" Content="Close" Click="Cancel_Click" />
+                        <Button Grid.Column="1" Classes="pill wide" Click="Open_Click" AutomationProperties.Name="Open the bug">
+                            <TextBlock Text="Open the bug" Foreground="{DynamicResource HelmPillForeground}" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Panel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

@@ -1,0 +1,61 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ic="using:FluentIcons.Avalonia"
+                    xmlns:b="using:Helm.BugReports.Ui"
+                    xmlns:bugs="using:Helm.Shell.BugReports">
+
+    <!-- Shared by the Bug reports page, the report form and the black box sheet. A thumbnail is a Button.thumb (or a
+         Button.unpick inside a pending one): the view around it handles their clicks in one place. -->
+
+    <!-- One event of a black box: "-37.9 s", its kind, what happened, and an error's stack on demand -->
+    <DataTemplate x:Key="BlackBoxEvent" x:DataType="bugs:BlackBoxEventItem">
+        <Grid ColumnDefinitions="58,26,*" Margin="0,3">
+            <TextBlock Text="{Binding Time}" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="11.5" HorizontalAlignment="Right" Margin="0,2,8,0"
+                       Foreground="{DynamicResource HelmSecondaryText}" />
+            <ic:SymbolIcon Grid.Column="1" Symbol="{Binding Kind, Converter={x:Static b:BugLook.Icon}}" FontSize="14" VerticalAlignment="Top" Margin="0,2,0,0"
+                           b:BugLook.Tone="{Binding Kind}" ToolTip.Tip="{Binding KindName}" />
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="13" Classes.late="{Binding IsError}" />
+                <TextBlock Text="{Binding Source}" Classes="muted" FontSize="11.5"
+                           IsVisible="{Binding Source, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Button Classes="act" HorizontalAlignment="Left" Margin="0,4,0,2" MinHeight="28" Padding="8,3" Command="{Binding ToggleDetailCommand}"
+                        IsVisible="{Binding HasDetail}" AutomationProperties.Name="Show or hide the stack">
+                    <TextBlock FontSize="12" Foreground="{DynamicResource HelmEyebrow}" Text="Stack" />
+                </Button>
+                <Border Classes="glass" BoxShadow="" Padding="10,8" Margin="0,4,0,4" IsVisible="{Binding ShowDetail}">
+                    <SelectableTextBlock Text="{Binding Detail}" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="11" TextWrapping="Wrap" />
+                </Border>
+            </StackPanel>
+        </Grid>
+    </DataTemplate>
+
+    <!-- A saved picture: tap to see it big -->
+    <DataTemplate x:Key="BugThumb" x:DataType="bugs:BugImageItem">
+        <Button Classes="thumb" Padding="0" Margin="0,0,8,8" Background="Transparent" BorderThickness="0" Cursor="Hand"
+                ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name, StringFormat='Open {0}'}">
+            <Border Width="104" Height="76" CornerRadius="10" ClipToBounds="True" BorderThickness="1"
+                    BorderBrush="{DynamicResource HelmGlassStroke}" Background="{DynamicResource HelmSubtleFill}">
+                <Image b:BugImageLoader.Item="{Binding}" Stretch="UniformToFill" />
+            </Border>
+        </Button>
+    </DataTemplate>
+
+    <!-- A picture being added (a report, details, an answer): tap to see it, X to take it out -->
+    <DataTemplate x:Key="PendingThumb" x:DataType="bugs:BugImageItem">
+        <Panel Margin="0,0,8,8">
+            <Button Classes="thumb" Padding="0" Background="Transparent" BorderThickness="0" Cursor="Hand"
+                    ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name, StringFormat='Open {0}'}">
+                <Border Width="104" Height="76" CornerRadius="10" ClipToBounds="True" BorderThickness="1"
+                        BorderBrush="{DynamicResource HelmGlassStroke}" Background="{DynamicResource HelmSubtleFill}">
+                    <Image b:BugImageLoader.Item="{Binding}" Stretch="UniformToFill" />
+                </Border>
+            </Button>
+            <Button Classes="unpick" HorizontalAlignment="Right" VerticalAlignment="Top" Width="26" Height="26" Margin="0,4,4,0" Padding="0"
+                    CornerRadius="13" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Background="{DynamicResource HelmSheetBackground}" BorderBrush="{DynamicResource HelmGlassStroke}" BorderThickness="1"
+                    ToolTip.Tip="Take it out" AutomationProperties.Name="Remove picture">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
+            </Button>
+        </Panel>
+    </DataTemplate>
+</ResourceDictionary>

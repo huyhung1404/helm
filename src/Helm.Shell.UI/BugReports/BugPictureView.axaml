@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:b="using:Helm.BugReports.Ui"
+             xmlns:bugs="using:Helm.Shell.BugReports"
+             x:Class="Helm.BugReports.Ui.BugPictureView"
+             x:DataType="bugs:BugImageItem">
+
+    <!-- A picture of a bug, big, in a sheet (tap a thumbnail). Where the system has a picture viewer it opens there too. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="chip" Click="Close_Click" ToolTip.Tip="Close" AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+            </Button>
+        </Grid>
+        <Border CornerRadius="12" ClipToBounds="True" BorderThickness="1" BorderBrush="{DynamicResource HelmGlassStroke}"
+                Background="{DynamicResource HelmSubtleFill}" MinHeight="160">
+            <Image x:Name="Picture" b:BugImageLoader.DecodeWidth="1600" b:BugImageLoader.Item="{Binding}" Stretch="Uniform" MaxHeight="560" />
+        </Border>
+        <Grid x:Name="Buttons" ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button x:Name="OpenButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="Open_Click"
+                    AutomationProperties.Name="Open full size">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Open" FontSize="16" VerticalAlignment="Center" />
+                    <TextBlock Text="Open full size" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="DoneButton" Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" Click="Close_Click" />
+        </Grid>
+        <TextBlock x:Name="Problem" Classes="late" TextWrapping="Wrap" IsVisible="False" />
+    </StackPanel>
+</UserControl>

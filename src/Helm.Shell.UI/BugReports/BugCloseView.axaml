@@ -1,0 +1,88 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             x:Class="Helm.BugReports.Ui.BugCloseView">
+
+    <!-- "Close #B12?" as a sheet: why (fixed, not a bug, a duplicate of which), a note, then Close bug. Only the user
+         closes a bug; an agent's fix waits for "It is fixed". -->
+    <UserControl.Styles>
+        <Style Selector="Button.reason">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="14,10" />
+        </Style>
+        <Style Selector="Button.reason Border.dot">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.reason.selected Border.dot">
+            <Setter Property="BorderThickness" Value="5" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+        <Style Selector="Button.wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <StackPanel Spacing="4">
+            <TextBlock x:Name="Heading" Text="Close this bug?" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Classes="secondary" TextWrapping="Wrap"
+                       Text="It leaves the open list; its conversation and black box stay. You can reopen it at any time." />
+        </StackPanel>
+
+        <StackPanel Spacing="8">
+            <Button x:Name="FixedOption" Classes="glass reason selected" Click="Reason_Click" Tag="Fixed" AutomationProperties.Name="Fixed">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Border Classes="dot" />
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Fixed" FontWeight="SemiBold" />
+                        <TextBlock Text="You checked: it no longer happens" Classes="muted" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button x:Name="NotABugOption" Classes="glass reason" Click="Reason_Click" Tag="NotABug" AutomationProperties.Name="Not a bug">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Border Classes="dot" />
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Not a bug" FontWeight="SemiBold" />
+                        <TextBlock Text="Helm works as designed" Classes="muted" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button x:Name="DuplicateOption" Classes="glass reason" Click="Reason_Click" Tag="Duplicate" AutomationProperties.Name="Duplicate">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Border Classes="dot" />
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Duplicate" FontWeight="SemiBold" />
+                        <TextBlock Text="Another bug says the same" Classes="muted" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+        </StackPanel>
+
+        <StackPanel x:Name="OriginalRow" Spacing="6" IsVisible="False">
+            <TextBlock Classes="eyebrow" Text="THE ORIGINAL BUG" />
+            <TextBox x:Name="Original" Classes="glass" PlaceholderText="Its number, e.g. #B7" AutomationProperties.Name="The original bug" />
+        </StackPanel>
+        <StackPanel Spacing="6">
+            <TextBlock Classes="eyebrow" Text="NOTE" />
+            <TextBox x:Name="Note" Classes="glass" PlaceholderText="Optional: what you checked" AutomationProperties.Name="Note" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+            <Button Classes="ghost wide" Content="Cancel" Click="Cancel_Click" />
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="pill wide" Click="Confirm_Click" AutomationProperties.Name="Close bug">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Checkmark" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                    <TextBlock Text="Close bug" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </StackPanel>
+</UserControl>
