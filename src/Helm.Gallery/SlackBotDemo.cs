@@ -94,18 +94,18 @@ internal static class SlackBotDemo
                 view.ShowKnowing();
                 break;
             case SlackBotStage.Handled:
-                view.AttachedToVisualTree += (_, _) => Dispatcher.UIThread.Post(view.ShowHandled, DispatcherPriority.Background);
+                view.AttachedToVisualTree += (_, _) => DispatcherTimer.RunOnce(view.ShowHandled, TimeSpan.FromMilliseconds(250));
                 break;
             case SlackBotStage.Reply:
                 inbox.StartReplyCommand.Execute(inbox.ToDo[0]);
                 inbox.ReplyText = "Ok em, để anh xem log rồi báo lại trước 3h nhé.";
                 break;
             case SlackBotStage.Settings or SlackBotStage.SettingsEnd or SlackBotStage.SettingsConnect:
-                view.AttachedToVisualTree += (_, _) => Dispatcher.UIThread.Post(() =>
+                view.AttachedToVisualTree += (_, _) => DispatcherTimer.RunOnce(() =>
                 {
                     view.OpenSettings(openConnection: stage == SlackBotStage.SettingsConnect);
                     if (stage == SlackBotStage.SettingsEnd) Dispatcher.UIThread.Post(() => ScrollSheetToEnd(view), DispatcherPriority.Background);
-                }, DispatcherPriority.Background);
+                }, TimeSpan.FromMilliseconds(250));
                 break;
         }
         return (view, inbox, options);

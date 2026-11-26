@@ -10,6 +10,10 @@
          reads, how Claude sorts, the list on screen, and the signature of posts by AI agents. One card per subject; a
          switch or a field on the right, or a label above a full-width field. -->
     <UserControl.Styles>
+        <!-- A switch keeps clear of the text beside it -->
+        <Style Selector="DockPanel > ToggleSwitch">
+            <Setter Property="Margin" Value="12,0,0,0" />
+        </Style>
         <!-- A folded section's title keeps the text colour when open (Fluent paints a checked toggle's text for an accent fill) -->
         <Style Selector="ToggleButton.fold:checked /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
