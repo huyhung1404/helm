@@ -39,18 +39,25 @@ public static class HelmCoreServices
     }
 
     /// <summary>
-    /// Registers a module: the module singleton (as itself and as <see cref="IHelmModule"/>), its settings page and
-    /// the page's view model.
+    /// Registers a module: the module singleton (as itself and as <see cref="IHelmModule"/>) and its page's view model.
+    /// The page itself is <see cref="IHelmModule.CreatePage"/>.
     /// </summary>
-    public static IServiceCollection AddHelmModule<TModule, TPage, TViewModel>(this IServiceCollection services)
+    public static IServiceCollection AddHelmModule<TModule, TViewModel>(this IServiceCollection services)
         where TModule : class, IHelmModule
-        where TPage : class
         where TViewModel : class
     {
         services.AddSingleton<TModule>();
         services.AddSingleton<IHelmModule>(sp => sp.GetRequiredService<TModule>());
-        services.AddSingleton<TPage>();
         services.AddSingleton<TViewModel>();
+        return services;
+    }
+
+    /// <summary>A module whose page needs no view model of its own in DI.</summary>
+    public static IServiceCollection AddHelmModule<TModule>(this IServiceCollection services)
+        where TModule : class, IHelmModule
+    {
+        services.AddSingleton<TModule>();
+        services.AddSingleton<IHelmModule>(sp => sp.GetRequiredService<TModule>());
         return services;
     }
 }

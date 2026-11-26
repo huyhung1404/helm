@@ -1,38 +1,41 @@
-using System.Windows.Media;
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Hotkeys;
 using Helm.Core.Settings;
 using Microsoft.Extensions.Logging;
-using Wpf.Ui.Controls;
 
 namespace Helm.Core.Modules;
 
 public static class ModuleGroupIcons
 {
-    public static SymbolRegular Icon(this ModuleGroup group) => group switch
+    public static Symbol Icon(this ModuleGroup group) => group switch
     {
-        ModuleGroup.Planning => SymbolRegular.CalendarLtr24,
-        ModuleGroup.MoneyAndMedia => SymbolRegular.Money24,
-        ModuleGroup.SecurityAndServers => SymbolRegular.ShieldLock24,
-        ModuleGroup.WindowsAndDesktop => SymbolRegular.WindowMultiple20,
-        ModuleGroup.Learning => SymbolRegular.HatGraduation24,
-        ModuleGroup.Messages => SymbolRegular.Chat24,
-        _ => SymbolRegular.Apps24,
+        ModuleGroup.Planning => Symbol.Calendar,
+        ModuleGroup.MoneyAndMedia => Symbol.Money,
+        ModuleGroup.SecurityAndServers => Symbol.ShieldLock,
+        ModuleGroup.WindowsAndDesktop => Symbol.WindowMultiple,
+        ModuleGroup.Learning => Symbol.HatGraduation,
+        ModuleGroup.Messages => Symbol.Chat,
+        _ => Symbol.Apps,
     };
 }
 
-/// <summary>A Helm tool in the Windows app: <see cref="IModule"/> plus what the WPF shell shows.</summary>
+/// <summary>A Helm tool in the Windows app: <see cref="IModule"/> plus what the shell shows (all Avalonia).</summary>
 public interface IHelmModule : IModule
 {
-    SymbolRegular Icon { get; }
+    /// <summary>The tool's glyph, used where there is no <see cref="IconImage"/>.</summary>
+    Symbol Icon { get; }
+
+    /// <summary>The tool's own picture icon (its .UI project's XIcon.Image); null for a glyph only.</summary>
+    IImage? IconImage => null;
 
     /// <summary>
-    /// Optional picture (e.g. a product logo) shown instead of <see cref="Icon"/> wherever the module appears.
-    /// Null for most modules. Must be frozen: it is shared by several windows.
+    /// The tool's page: its shared view from Helm.Modules.&lt;X&gt;.UI, with the settings as a sheet inside it (the gear).
+    /// The shell calls it once per run, the first time the tool's tab opens, on the UI thread, and keeps the control while
+    /// the tab lives (it may move between windows).
     /// </summary>
-    ImageSource? IconImage => null;
-
-    /// <summary>A WPF Page resolved from DI for the module's settings tab.</summary>
-    Type SettingsPageType { get; }
+    Control CreatePage();
 
     /// <summary>Hotkeys owned by the module (shown on Home and checked for conflicts).</summary>
     IReadOnlyList<HotkeyDefinition> Hotkeys { get; }
