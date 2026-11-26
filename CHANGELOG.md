@@ -22,6 +22,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
   the ring to mark today, the ones done today folded under them, and the Report tab. Marking a day, the celebration and
   the reason for skipped days open as one sheet (the reason still cannot be skipped). The settings are a sheet behind
   the gear; Home → Utilities opens Habits itself.
+- **Novel Reader has the new look on the PC and the phone**, one page for both: the library as cards with covers, the
+  reader with its player, and the word, sentence, chapters, names and wrong-translation sheets. The settings are a sheet
+  behind the gear; Home → Utilities opens Novel Reader itself. Reading, the dictionaries, scraping from the web (PC) and
+  Novel Lens (phone) work as before.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the

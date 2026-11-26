@@ -17,7 +17,7 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         "habits" => Helm.Modules.Habits.Ui.HabitsIcon.Image,
         "missions" => Helm.Modules.Missions.MissionsIcon.Image,
         "notes" => Helm.Modules.Notes.NotesIcon.Image,
-        "novel-reader" => Helm.Modules.NovelReader.NovelReaderIcon.Image,
+        "novel-reader" => Helm.Modules.NovelReader.Ui.NovelReaderIcon.Image,
         "quick-capture" => Helm.Modules.QuickCapture.QuickCaptureIcon.Image,
         "scratch" => Helm.Modules.Scratch.ScratchIcon.Image,
         "ssh" => Helm.Modules.Ssh.SshIcon.Image,

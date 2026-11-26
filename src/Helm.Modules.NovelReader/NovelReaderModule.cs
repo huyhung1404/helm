@@ -10,8 +10,7 @@ namespace Helm.Modules.NovelReader;
 /// <summary>
 /// Novel Reader on Windows. The dictionaries load when a novel is opened and are freed when the tool is turned off; in
 /// the background only <see cref="NovelSourceWatcher"/> runs, looking for new chapters of the web novels that ask for it.
-/// The menu and Quick access open <see cref="NovelReaderContentPage"/>; Home → Utilities
-/// opens the settings (<see cref="NovelReaderPage"/>).
+/// The menu, Quick access and Home → Utilities open <see cref="NovelReaderContentPage"/>; its settings are a sheet inside it.
 /// </summary>
 public sealed class NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatcher ui, VieNeuSpeechEngine voice,
     NovelSourceWatcher watcher) : HelmModuleBase, IModuleContent
@@ -22,7 +21,7 @@ public sealed class NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatc
     public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
     public override SymbolRegular Icon => SymbolRegular.BookOpen24;
     public override ImageSource IconImage => NovelReaderLogo.Image;
-    public override Type SettingsPageType => typeof(NovelReaderPage);
+    public override Type SettingsPageType => typeof(NovelReaderContentPage);
     public Type ContentPageType => typeof(NovelReaderContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 

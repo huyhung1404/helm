@@ -1,9 +1,9 @@
 using Avalonia;
 using Avalonia.Media;
 
-namespace Helm.Modules.NovelReader;
+namespace Helm.Modules.NovelReader.Ui;
 
-/// <summary>The Novel Reader icon as an Avalonia vector image, drawn from the same shapes as on Windows.</summary>
+/// <summary>The Novel Reader icon as an Avalonia vector image, drawn from NovelReaderIconShape (the same picture on every platform).</summary>
 public static class NovelReaderIcon
 {
     public static IImage Image { get; } = Create();

@@ -73,6 +73,10 @@ src/
   Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
+  Helm.Modules.NovelReader.Core/ net8.0: novels (on Helm Sync), conversion, dictionaries, reading aloud, names, reports, MCP tools, shared view model
+  Helm.Modules.NovelReader.UI/ Avalonia: the Novel Reader page (library, reader, sheets, settings), every platform
+  Helm.Modules.NovelReader/  Windows: the module, scraping the web, Windows voices, the WPF page that hosts the shared view
+  Helm.Modules.NovelReader.Android/ Android: the module, the page that hosts the shared view, the phone's voices, Novel Lens (not in Helm.sln)
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
   Helm.Core.Linux/           net8.0, Linux for the connector: secrets under a host key (0600, optionally sealed by
                              systemd-creds), MCP on a Unix socket, plain child processes; namespaces stay Helm.Core.*

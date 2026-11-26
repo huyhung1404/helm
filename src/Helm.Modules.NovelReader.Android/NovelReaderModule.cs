@@ -11,9 +11,9 @@ namespace Helm.Modules.NovelReader;
 /// <summary>
 /// Novel Reader on Android. Reading aloud keeps going with Helm in the background and the screen off, chapter after
 /// chapter (<see cref="NovelReaderPlaybackService"/>); the place reading stopped is saved when Helm goes to the
-/// background. The drawer and Quick access open <see cref="NovelReaderContentPage"/>; Home → Utilities opens the
-/// settings (<see cref="NovelReaderPage"/>). Back closes an open sheet, then goes from a novel to the library (unless
-/// it is being read aloud: then Back leaves it reading).
+/// background. The drawer, Quick access and Home → Utilities open <see cref="NovelReaderContentPage"/> (its settings are a
+/// sheet inside it). Back closes an open sheet, then goes from a novel to the library (unless it is being read aloud:
+/// then Back leaves it reading).
 /// </summary>
 public sealed class NovelReaderModule : AndroidModuleBase, IModuleContent, IBackHandler
 {
@@ -40,12 +40,12 @@ public sealed class NovelReaderModule : AndroidModuleBase, IModuleContent, IBack
     public override Symbol Icon => Symbol.BookOpen;
 
     /// <summary>The same vector icon as on Windows (<see cref="NovelReaderIconShape"/>).</summary>
-    public override IImage? IconImage => NovelReaderIcon.Image;
+    public override IImage? IconImage => Ui.NovelReaderIcon.Image;
 
-    public override Type PageType => typeof(NovelReaderPage);
+    public override Type PageType => typeof(NovelReaderContentPage);
     public Type ContentPageType => typeof(NovelReaderContentPage);
 
-    /// <summary>The reader page's own back step while it is shown (closing a sheet, leaving a novel).</summary>
+    /// <summary>The reader page's own back step while it is shown (closing a sheet, leaving a novel): the view's HandleBack.</summary>
     internal Func<bool>? PageBack { get; set; }
 
     public override Task EnableAsync(CancellationToken ct)
