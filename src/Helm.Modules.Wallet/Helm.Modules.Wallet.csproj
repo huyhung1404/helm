@@ -1,14 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <UseWPF>true</UseWPF>
     <RootNamespace>Helm.Modules.Wallet</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Shrinks a goal's photo (Avalonia ships it; same version as Avalonia.Skia's). -->
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Modules.Wallet.Core\Helm.Modules.Wallet.Core.csproj" />
-    <!-- The page is the shared Avalonia view, shown through Helm.Ui.Windows. -->
+    <!-- The page is the shared Avalonia view. -->
     <ProjectReference Include="..\Helm.Modules.Wallet.UI\Helm.Modules.Wallet.UI.csproj" />
     <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>

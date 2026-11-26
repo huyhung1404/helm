@@ -8,8 +8,7 @@ public static class WalletServices
     public static IServiceCollection AddWalletModule(this IServiceCollection services) =>
         services
             .AddWalletCore()
-            .AddWalletLinks(typeof(WalletContentPage))
-            .AddHelmModule<WalletModule, WalletContentPage, WalletViewModel>()
-            .AddSingleton<WalletContentPage>()
+            .AddWalletLinks(navigation => navigation.ShowTool(WalletIds.ModuleId))
+            .AddHelmModule<WalletModule, WalletViewModel>()
             .AddSingleton<IGoalPhotos, WalletGoalPhotos>();
 }
