@@ -160,6 +160,9 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Wallet", "Phone settings", "Wallet", m => WalletDemo.Create(m, WalletStage.PhoneSettings), Framed: false),
         new("Wallet", "First run", "Wallet", m => WalletDemo.Create(m, WalletStage.FirstRun), Framed: false),
         new("Wallet", "Goals first run", "Wallet", m => WalletDemo.Create(m, WalletStage.GoalsFirstRun), Framed: false),
+        new("MCP consent", "Root command", "MCP consent", _ => McpConsentDemo.Create(McpConsentStage.RootCommand), Framed: false),
+        new("MCP consent", "A change", "MCP consent", _ => McpConsentDemo.Create(McpConsentStage.Change), Framed: false),
+        new("MCP consent", "Dangerous", "MCP consent", _ => McpConsentDemo.Create(McpConsentStage.Dangerous), Framed: false),
         new("Base", "Controls", "Controls", _ => new ControlsPage()),
     ];
 

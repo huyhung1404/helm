@@ -1,0 +1,96 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:m="using:Helm.Mcp.Ui"
+             x:Class="Helm.Mcp.Ui.McpConsentView"
+             x:DataType="m:McpConsentText">
+
+    <!-- One question for one AI agent's tool call, as a glass sheet: who asks, what it will do, why Helm asks, where, and
+         the exact details. Deny is the default (Enter, Escape and closing the window all deny); the Allow buttons wake up
+         a moment after it opens, so a key or click meant for another window never allows anything. The window around it
+         (McpConsentWindow on Windows) is on top of everything, even while Helm is hidden in the tray. -->
+    <UserControl.Styles>
+        <Style Selector="TextBlock.field">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,14,0,4" />
+        </Style>
+        <Style Selector="Border.details">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+        <Style Selector="Border.details.prominent">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmCaution}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+        </Style>
+        <Style Selector="Border.details.prominent TextBox">
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border x:Name="Card" Classes="sheet" CornerRadius="20" ClipToBounds="True">
+        <DockPanel>
+            <!-- Who asks, and the question -->
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="24,22,24,0">
+                <Border Width="40" Height="40" CornerRadius="12" Background="{DynamicResource HelmGlassHover}" BorderBrush="{DynamicResource HelmGlassStroke}"
+                        BorderThickness="1" VerticalAlignment="Top" Margin="0,2,14,0">
+                    <ic:SymbolIcon Symbol="Shield" FontSize="20" Foreground="{DynamicResource HelmEyebrow}" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock x:Name="CallerText" Classes="eyebrow" Text="{Binding Caller, Converter={x:Static m:McpConsentView.Upper}}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+
+            <!-- The answer: Deny is the default; Allow wakes up a moment after the window opens -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="24,8,24,22" Spacing="10">
+                <TextBlock Classes="muted" FontSize="12" Text="{Binding Timeout}" TextWrapping="Wrap" />
+                <Button x:Name="AllowSessionButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsEnabled="False"
+                        IsVisible="{Binding OfferSession}" Content="{Binding SessionText}"
+                        ToolTip.Tip="Until this connection ends or Helm restarts: the same tool on the same target runs without asking." />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Button x:Name="DenyButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Deny"
+                            ToolTip.Tip="Enter or Esc" />
+                    <Button x:Name="AllowOnceButton" Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            IsEnabled="False" Content="Allow once" />
+                </Grid>
+            </StackPanel>
+
+            <ScrollViewer x:Name="Scroller" Margin="0,6,0,0" Padding="24,0,24,8" HorizontalScrollBarVisibility="Disabled" core:ScrollFade.Enabled="True">
+                <StackPanel>
+                    <Border Classes="infobar warning" Margin="0,8,0,0" Padding="12,10" CornerRadius="10" IsVisible="{Binding HasWarning}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <ic:SymbolIcon Symbol="Warning" FontSize="18" Margin="0,1,10,0" VerticalAlignment="Top" Foreground="{DynamicResource HelmCaution}" />
+                            <TextBlock x:Name="WarningText" Grid.Column="1" Text="{Binding Warning}" TextWrapping="Wrap" />
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Classes="field" Text="What it will do" />
+                    <TextBlock Text="{Binding What}" TextWrapping="Wrap" />
+
+                    <TextBlock Classes="field" Text="Why Helm asks" />
+                    <TextBlock Classes="muted" FontSize="14" Text="{Binding Why}" TextWrapping="Wrap" />
+
+                    <StackPanel IsVisible="{Binding HasTarget}">
+                        <TextBlock Classes="field" Text="On" />
+                        <TextBlock Text="{Binding Target}" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel IsVisible="{Binding HasDetails}">
+                        <TextBlock Classes="field" Text="{Binding DetailsLabel}" />
+                        <!-- Read-only and selectable: shown exactly as it will run -->
+                        <Border Classes="details" Classes.prominent="{Binding DetailsProminent}">
+                            <TextBox x:Name="DetailsText" Classes="bare" IsReadOnly="True" Focusable="True" IsTabStop="False" Text="{Binding Details}"
+                                     FontFamily="Cascadia Mono, Consolas, Courier New, monospace" FontSize="12" TextWrapping="Wrap" MaxHeight="220"
+                                     Padding="0" MinHeight="0" AutomationProperties.Name="Details" />
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</UserControl>

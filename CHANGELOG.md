@@ -12,6 +12,9 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **MCP moved into General.** AI agents (Fairy, Claude Code, VS Code, Claude Desktop, any MCP client) and Helm's tools now
   live in **General › MCP** on the PC: the two switches, the tools they reach, how to connect each client, who is connected,
   and the permissions with the activity log. Nothing about the tools changed: same names, same rules, same questions first.
+- **An AI agent's question has the new look**: a glass card on top of everything, centred on the screen with your mouse,
+  even while Helm is hidden in the tray. It says who asks, what will happen, why Helm asks and exactly what will run;
+  Deny is still the default (Enter and Esc deny) and Allow wakes up a moment after it opens.
 - **Slack Bot is now Slack Report.** It reads your Slack, sorts it with Claude and keeps what needs you on screen, but it
   never answers by itself. Where you turn Write on, AI agents (Fairy) may post, behind the AI signature and asked first each
   time; the signature now says Fairy.
