@@ -2,6 +2,7 @@ using Avalonia.Media;
 using FluentIcons.Common;
 using Helm.Core.Modules;
 using Helm.Core.Platform;
+using Helm.Modules.Notes.Ui;
 
 namespace Helm.Modules.Notes;
 

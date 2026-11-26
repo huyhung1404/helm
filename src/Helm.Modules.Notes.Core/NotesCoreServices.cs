@@ -42,9 +42,13 @@ public static class NotesCoreServices
     /// Notes content page, which opens a linked note.
     /// </summary>
     public static IServiceCollection AddNoteLinks(this IServiceCollection services, Type contentPage) =>
+        services.AddNoteLinks(navigation => navigation.ShowPage(contentPage));
+
+    /// <summary>Notes as link targets; <paramref name="showPage"/> brings up the Notes page (Windows: by its tool id).</summary>
+    public static IServiceCollection AddNoteLinks(this IServiceCollection services, Action<IShellNavigation> showPage) =>
         services.AddHelmLinks().AddSingleton<ILinkProvider>(sp => new NoteLinkProvider(sp.GetRequiredService<NotesStore>(), id =>
         {
-            sp.GetRequiredService<IShellNavigation>().ShowPage(contentPage);
+            showPage(sp.GetRequiredService<IShellNavigation>());
             sp.GetRequiredService<NotesViewModel>().OpenNote(id);
         }));
 }
