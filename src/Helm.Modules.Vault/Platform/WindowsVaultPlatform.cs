@@ -1,21 +1,17 @@
 using System.Diagnostics;
 using System.IO;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Documents;
-using System.Windows.Media;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Helm.Core.Settings;
 using Helm.Modules.Vault.Session;
 using Helm.Modules.Vault.ViewModels;
+using Helm.Ui.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Win32;
-using WpfUiMessageBox = Wpf.Ui.Controls.MessageBox;
-using WpfUiMessageBoxResult = Wpf.Ui.Controls.MessageBoxResult;
 
 namespace Helm.Modules.Vault.Platform;
 
-/// <summary>The Windows side of the vault screens: dialogs, files, the protected clipboard, printing.</summary>
+/// <summary>The Windows side of the vault screens: dialogs, files, the protected clipboard, the Emergency Kit file.</summary>
 internal sealed class WindowsVaultPlatform : IVaultPlatform
 {
     private readonly IServiceProvider _services;
@@ -34,35 +30,33 @@ internal sealed class WindowsVaultPlatform : IVaultPlatform
         _openFolder = Path.Combine(settings.Paths.Root, "vault-open");
         // Decrypted copies opened in other apps never outlive the unlocked vault (nor a crash: wiped at start too).
         WipeOpenedFiles();
-        session.Locking += (_, _) => Application.Current?.Dispatcher.BeginInvoke(() =>
+        session.Locking += (_, _) => Dispatcher.UIThread.Post(() =>
         {
             _clipboard.ClearIfOurs();
             WipeOpenedFiles();
         });
     }
 
-    private static Window? Owner => Application.Current?.MainWindow;
+    /// <summary>The pickers open over the vault page's window when it is on screen, else over the window in front.</summary>
+    private static Avalonia.Visual? Anchor => Ui.VaultDialogs.Anchor;
 
-    public Task<VaultPickedFile?> PickFileAsync(CancellationToken ct)
+    public async Task<VaultPickedFile?> PickFileAsync(CancellationToken ct)
     {
-        var dialog = new OpenFileDialog { Title = "Attach a document", CheckFileExists = true };
-        if (dialog.ShowDialog(Owner) != true) return Task.FromResult<VaultPickedFile?>(null);
-        var name = Path.GetFileName(dialog.FileName);
-        return Task.FromResult<VaultPickedFile?>(new VaultPickedFile(name, Sizes.MediaTypeOf(name), File.OpenRead(dialog.FileName)));
+        var picked = await DesktopWindows.PickFilesAsync("Attach a document", anchor: Anchor).ConfigureAwait(true);
+        if (picked.Count == 0 || !File.Exists(picked[0])) return null;
+        var name = Path.GetFileName(picked[0]);
+        return new VaultPickedFile(name, Sizes.MediaTypeOf(name), File.OpenRead(picked[0]));
     }
 
-    public Task<Stream?> CreateFileAsync(string suggestedName, string mediaType, CancellationToken ct)
+    public async Task<Stream?> CreateFileAsync(string suggestedName, string mediaType, CancellationToken ct)
     {
         var extension = Path.GetExtension(suggestedName);
-        var dialog = new SaveFileDialog
-        {
-            Title = "Save",
-            FileName = suggestedName,
-            DefaultExt = extension,
-            Filter = extension.Length > 0 ? $"{extension.TrimStart('.').ToUpperInvariant()} file|*{extension}|All files|*.*" : "All files|*.*",
-        };
-        if (dialog.ShowDialog(Owner) != true) return Task.FromResult<Stream?>(null);
-        return Task.FromResult<Stream?>(File.Create(dialog.FileName));
+        var all = new FilePickerFileType("All files") { Patterns = ["*.*"] };
+        IReadOnlyList<FilePickerFileType> types = extension.Length > 0
+            ? [new FilePickerFileType($"{extension.TrimStart('.').ToUpperInvariant()} file") { Patterns = [$"*{extension}"] }, all]
+            : [all];
+        var path = await DesktopWindows.PickSaveAsync("Save", suggestedName, types, Anchor).ConfigureAwait(true);
+        return path is null ? null : File.Create(path);
     }
 
     public async Task OpenFileAsync(string name, string mediaType, byte[] content, CancellationToken ct)
@@ -102,44 +96,38 @@ internal sealed class WindowsVaultPlatform : IVaultPlatform
     /// <summary>Helm's own confirmation sheet, drawn by the vault page that is on screen.</summary>
     public Task<bool> ConfirmAsync(string title, string message, string confirmText) => Ui.VaultDialogs.ConfirmAsync(title, message, confirmText);
 
-    public Task<string?> PickBackupLocationAsync(CancellationToken ct)
+    public async Task<string?> PickBackupLocationAsync(CancellationToken ct)
     {
-        var dialog = new OpenFolderDialog
+        if (DesktopWindows.Storage(Anchor) is not { } storage) return null;
+        var start = _settings.Current.BackupLocation is { Length: > 0 } current && Directory.Exists(current)
+            ? current : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var folders = await storage.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = "Choose the backup folder (for example a Google Drive or OneDrive folder, or a USB stick)",
-            InitialDirectory = _settings.Current.BackupLocation ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        };
-        return Task.FromResult(dialog.ShowDialog(Owner) == true ? dialog.FolderName : null);
+            SuggestedStartLocation = await storage.TryGetFolderFromPathAsync(start).ConfigureAwait(true),
+        }).ConfigureAwait(true);
+        return folders.FirstOrDefault()?.TryGetLocalPath();
     }
 
-    /// <summary>Prints the kit (choose "Microsoft Print to PDF" to save it as a file instead).</summary>
-    public Task SaveEmergencyKitAsync(EmergencyKit kit, CancellationToken ct)
+    /// <summary>
+    /// Saves the kit as a text file where the user chooses, to print from there or keep offline (as on Android: the PC
+    /// app has no print dialog of its own since it is Avalonia).
+    /// </summary>
+    public async Task SaveEmergencyKitAsync(EmergencyKit kit, CancellationToken ct)
     {
-        var print = new PrintDialog();
-        if (print.ShowDialog() != true) return Task.CompletedTask;
-        var document = new FlowDocument
-        {
-            FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 13,
-            PagePadding = new Thickness(56),
-            ColumnWidth = double.PositiveInfinity,
-        };
-        foreach (var line in kit.Text.Split(Environment.NewLine))
-        {
-            var isKey = line.Trim() == kit.RecoveryKey;
-            document.Blocks.Add(new Paragraph(new Run(line))
-            {
-                Margin = new Thickness(0, 0, 0, 4),
-                FontFamily = isKey ? new FontFamily("Consolas") : document.FontFamily,
-                FontSize = isKey ? 15 : line.StartsWith("HELM VAULT", StringComparison.Ordinal) ? 20 : 13,
-                FontWeight = isKey || line.StartsWith("HELM VAULT", StringComparison.Ordinal) ? FontWeights.SemiBold : FontWeights.Normal,
-            });
-        }
-        print.PrintDocument(((IDocumentPaginatorSource)document).DocumentPaginator, "Helm Vault Emergency Kit");
-        return Task.CompletedTask;
+        // The recovery key opens the whole vault without the password: say so before it lands in a synced folder.
+        if (!await ConfirmAsync("Save the Emergency Kit",
+                "This file holds the recovery key, which opens your whole vault without the password. Save it where you can print it or move it to a USB stick, then delete the file. Do not keep it in OneDrive, Google Drive, email or chat.",
+                "Save").ConfigureAwait(true))
+            return;
+        var stream = await CreateFileAsync("Helm Vault Emergency Kit.txt", "text/plain", ct).ConfigureAwait(true);
+        if (stream is null) return;
+        await using (stream)
+        await using (var writer = new StreamWriter(stream))
+            await writer.WriteAsync(kit.Text).ConfigureAwait(true);
     }
 
-    public void ShowVault() => _services.GetRequiredService<Helm.Core.Services.IShellNavigation>().ShowPage(typeof(VaultContentPage));
+    public void ShowVault() => _services.GetRequiredService<Helm.Core.Services.IShellNavigation>().ShowTool(VaultModule.ModuleId);
 
     private void WipeOpenedFiles()
     {

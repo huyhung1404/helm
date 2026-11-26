@@ -3,14 +3,13 @@
   <!-- Vault on Windows: hosts the shared Vault page (Helm.Modules.Vault.UI) over Helm.Modules.Vault.Core, plus the Windows
        parts: Windows Hello, the protected clipboard, auto-type, locking with Windows. -->
   <PropertyGroup>
-    <UseWPF>true</UseWPF>
     <RootNamespace>Helm.Modules.Vault</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vault.Core\Helm.Modules.Vault.Core.csproj" />
-    <!-- The vault page itself is the shared Avalonia view, shown through Helm.Ui.Windows. -->
+    <!-- The vault page itself is the shared Avalonia view (the module's CreatePage). -->
     <ProjectReference Include="..\Helm.Modules.Vault.UI\Helm.Modules.Vault.UI.csproj" />
     <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>

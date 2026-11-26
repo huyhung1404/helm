@@ -164,7 +164,6 @@ internal sealed class AutoTypePicker
 
     public AutoTypePicker(IWindowService windows, IMonitorService monitors)
     {
-        HelmAvalonia.EnsureStarted();
         var view = new AutoTypePickerView(_viewModel);
         _panel = new AvaloniaFloatingPanel(windows, monitors, 460, "Auto-type") { Panel = view };
         _panel.Summoned += (_, _) => view.FocusSearch();

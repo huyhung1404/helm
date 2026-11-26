@@ -1,3 +1,6 @@
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
@@ -5,9 +8,9 @@ using Helm.Core.Settings;
 using Helm.Modules.Vault.Backup;
 using Helm.Modules.Vault.Items;
 using Helm.Modules.Vault.Session;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
-using Wpf.Ui.Controls;
 
 namespace Helm.Modules.Vault;
 
@@ -23,7 +26,8 @@ public sealed class VaultModule(
     IUiDispatcher ui,
     IHotkeyManager hotkeys,
     Platform.AutoTypeService autoType,
-    ILogger<VaultModule> logger) : HelmModuleBase, IModuleContent
+    IServiceProvider services,
+    ILogger<VaultModule> logger) : HelmModuleBase
 {
     public const string ModuleId = "vault";
     private const string AutoTypeHotkeyId = "auto-type";
@@ -36,11 +40,12 @@ public sealed class VaultModule(
     public override string DisplayName => "Vault";
     public override string Description => "Keeps passwords, secure notes, cards and documents encrypted, synced and backed up.";
     public override ModuleGroup Group => ModuleGroup.SecurityAndServers;
-    public override SymbolRegular Icon => SymbolRegular.ShieldKeyhole24;
-    public override System.Windows.Media.ImageSource IconImage => VaultIcon.Image;
-    // The settings are a sheet inside the vault page (the gear): one page.
-    public override Type SettingsPageType => typeof(VaultContentPage);
-    public Type ContentPageType => typeof(VaultContentPage);
+    public override Symbol Icon => Symbol.ShieldKeyhole;
+    public override IImage IconImage => Ui.VaultIcon.Image;
+
+    /// <summary>The shared vault page; its settings are a sheet inside it (the gear).</summary>
+    public override Control CreatePage() => ActivatorUtilities.CreateInstance<WindowsVaultPageHost>(services, this).View;
+
     public override IReadOnlyList<HotkeyDefinition> Hotkeys =>
         autoType.Settings.Current.AutoTypeHotkey.IsEmpty ? []
             : [new HotkeyDefinition(ModuleId, AutoTypeHotkeyId, "Auto-type a login into the window in front", autoType.Settings.Current.AutoTypeHotkey)];
