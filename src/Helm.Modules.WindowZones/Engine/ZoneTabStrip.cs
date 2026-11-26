@@ -1,20 +1,20 @@
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Documents;
-using System.Windows.Interop;
-using System.Windows.Media;
-using System.Windows.Media.Effects;
-using System.Windows.Threading;
+using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Threading;
 using Helm.Core.Desktop;
 using Helm.Core.Geometry;
 using Helm.Core.Services;
+using Helm.Modules.WindowZones.Ui;
+using Helm.Ui.Windows;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.WindowZones.Engine;
 
 /// <summary>
-/// The tab strip on the UI thread: shown at the top of the zone when you switch windows or open the zone, gone a
-/// moment after the last switch. It never takes the focus and clicks go through it.
+/// The tab strip: shown at the top of the zone when you switch windows or open the zone, gone a moment after the last
+/// switch (it stays while the pointer is on it). It never takes the focus; clicking a tab brings that window forward
+/// (<see cref="TabChosen"/>). The engine calls it from its own thread: everything is marshalled to the UI thread, which
+/// is also Avalonia's.
 /// </summary>
 public sealed class ZoneTabStrip(IUiDispatcher ui, IWindowService windows, ILogger<ZoneTabStrip> logger) : IZoneTabStrip
 {
@@ -23,13 +23,35 @@ public sealed class ZoneTabStrip(IUiDispatcher ui, IWindowService windows, ILogg
     private TabStripWindow? _window;
     private DispatcherTimer? _timer;
 
+    /// <summary>A tab was clicked (UI thread): the module brings that window forward in its zone.</summary>
+    public event EventHandler<nint>? TabChosen;
+
     public void Show(TabStripView view) => ui.Post(() =>
     {
         try
         {
-            _window ??= new TabStripWindow(windows);
+            HelmAvalonia.EnsureStarted();
+            if (_window is null)
+            {
+                _window = new TabStripWindow(windows);
+                _window.TabChosen += (_, handle) =>
+                {
+                    HideNow();
+                    TabChosen?.Invoke(this, handle);
+                };
+                // Reading the tabs or reaching for one: keep them until the pointer leaves.
+                _window.PointerInside += (_, inside) =>
+                {
+                    _timer?.Stop();
+                    if (!inside) _timer?.Start();
+                };
+            }
             _window.ShowStrip(view);
-            _timer ??= new DispatcherTimer(ShowFor, DispatcherPriority.Normal, (_, _) => HideNow(), Dispatcher.CurrentDispatcher);
+            if (_timer is null)
+            {
+                _timer = new DispatcherTimer { Interval = ShowFor };
+                _timer.Tick += (_, _) => HideNow();
+            }
             _timer.Stop();
             _timer.Start();
         }
@@ -48,128 +70,78 @@ public sealed class ZoneTabStrip(IUiDispatcher ui, IWindowService windows, ILogg
     }
 }
 
-/// <summary>A see-through strip of tabs, one per window of the zone: its program's icon and its title.</summary>
-internal sealed class TabStripWindow : Window
+/// <summary>
+/// The see-through Avalonia window around <see cref="ZoneTabStripView"/>: topmost, out of the taskbar and Alt+Tab, and
+/// never activated (WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW), so the window you work in keeps the keyboard even when a tab
+/// is clicked. Centred on the zone's top edge, just inside it (over the title bar of the window in front).
+/// </summary>
+internal sealed class TabStripWindow
 {
-    private const double TabWidth = 220, ShadowSpace = 12;
-
     private readonly IWindowService _windows;
-    private readonly Border _surface;
-    private TabStripView? _view;
+    private readonly Window _window;
+    private readonly ZoneTabStripView _view = new();
+    private TabStripView? _shown;
 
     public TabStripWindow(IWindowService windows)
     {
         _windows = windows;
-        Title = "Window Zones tabs";
-        WindowStyle = WindowStyle.None;
-        AllowsTransparency = true;
-        Background = Brushes.Transparent;
-        ResizeMode = ResizeMode.NoResize;
-        ShowInTaskbar = false;
-        ShowActivated = false;
-        Topmost = true;
-        Focusable = false;
-        IsHitTestVisible = false;
-        SizeToContent = SizeToContent.WidthAndHeight;
-        UseLayoutRounding = true;
-
-        _surface = new Border
+        _window = new Window
         {
-            Margin = new Thickness(ShadowSpace),
-            Padding = new Thickness(6),
-            CornerRadius = new CornerRadius(10),
-            BorderThickness = new Thickness(1),
-            Effect = new DropShadowEffect { BlurRadius = 16, ShadowDepth = 2, Opacity = 0.3, Direction = 270 },
+            Title = "Window Zones tabs",
+            SizeToContent = SizeToContent.WidthAndHeight,
+            CanResize = false,
+            ShowInTaskbar = false,
+            ShowActivated = false,
+            Topmost = true,
+            Focusable = false,
+            WindowDecorations = WindowDecorations.None,
+            TransparencyLevelHint = [WindowTransparencyLevel.Transparent],
+            Background = Brushes.Transparent,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Content = _view,
         };
-        _surface.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush");
-        _surface.SetResourceReference(TextElement.ForegroundProperty, "TextFillColorPrimaryBrush");
-        _surface.SetResourceReference(Border.BackgroundProperty, "ApplicationBackgroundBrush");
-        Content = _surface;
-
-        SourceInitialized += (_, _) => _windows.MakePassiveOverlay(new WindowInteropHelper(this).Handle);
+        _view.TabChosen += (_, handle) => TabChosen?.Invoke(this, handle);
+        _window.PointerEntered += (_, _) => PointerInside?.Invoke(this, true);
+        _window.PointerExited += (_, _) => PointerInside?.Invoke(this, false);
+        // Moved onto a monitor with another DPI: laid out again at its size, so centre it again.
+        _window.ScalingChanged += (_, _) => Dispatcher.UIThread.Post(Place, DispatcherPriority.Loaded);
     }
+
+    public event EventHandler<nint>? TabChosen;
+
+    public event EventHandler<bool>? PointerInside;
+
+    public bool IsVisible => _window.IsVisible;
 
     public void ShowStrip(TabStripView view)
     {
-        _view = view;
-        _surface.Child = Build(view);
-        if (!IsVisible)
+        _shown = view;
+        _view.Show(view, ProgramIcons.For);
+        if (!_window.IsVisible)
         {
             // Off-screen first, so it never flashes at the old spot before moving.
-            Left = -32000;
-            Top = -32000;
-            Show();
+            _window.Position = new Avalonia.PixelPoint(-32000, -32000);
+            _window.Show();
+            // After Show: Avalonia sets the window's extended styles as it shows it. Never activated, out of Alt+Tab.
+            if (Handle is { } hwnd) _windows.MakeNonActivating(hwnd);
         }
         Place();
         // The strip may have moved to a monitor with another DPI and changed size: place it again once laid out.
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, Place);
+        Dispatcher.UIThread.Post(Place, DispatcherPriority.Loaded);
     }
 
-    private static UIElement Build(TabStripView view)
-    {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        var label = new TextBlock
-        {
-            Text = view.Label,
-            FontSize = 12,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(8, 0, 10, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        label.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
-        row.Children.Add(label);
+    public void Hide() => _window.Hide();
 
-        // Never wider than the zone: the tabs share what is left, each at most TabWidth.
-        var room = view.Zone.Width / view.Monitor.Scale - 2 * ShadowSpace - 120;
-        var width = Math.Clamp(room / Math.Max(1, view.Windows.Count), 90, TabWidth);
-        foreach (var w in view.Windows) row.Children.Add(Tab(w, w.Handle == view.Current, width));
-        return row;
-    }
+    private nint? Handle => _window.TryGetPlatformHandle()?.Handle is { } h && h != 0 ? h : null;
 
-    private static FrameworkElement Tab(ZoneWindowSnapshot window, bool current, double width)
-    {
-        var content = new DockPanel { LastChildFill = true };
-        if (!string.IsNullOrEmpty(window.ProcessPath) && ShellIcons.ForFile(window.ProcessPath) is { } icon)
-        {
-            var image = new Image { Source = icon, Width = 16, Height = 16, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
-            DockPanel.SetDock(image, Dock.Left);
-            content.Children.Add(image);
-        }
-        var title = new TextBlock
-        {
-            Text = string.IsNullOrWhiteSpace(window.Title) ? window.ProcessName : window.Title,
-            FontSize = 13,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        if (current) title.SetResourceReference(TextBlock.ForegroundProperty, "TextOnAccentFillColorPrimaryBrush");
-        else if (window.IsMinimized) title.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorTertiaryBrush");
-        content.Children.Add(title);
-
-        var tab = new Border
-        {
-            Width = width,
-            Height = 34,
-            Margin = new Thickness(2, 0, 2, 0),
-            Padding = new Thickness(10, 0, 10, 0),
-            CornerRadius = new CornerRadius(6),
-            Child = content,
-        };
-        tab.SetResourceReference(Border.BackgroundProperty, current ? "AccentFillColorDefaultBrush" : "ControlFillColorDefaultBrush");
-        return tab;
-    }
-
-    /// <summary>Centred on the zone's top edge, just inside it (over the title bar of the window in front).</summary>
     private void Place()
     {
-        if (!IsVisible || _view is not { } view) return;
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == 0) return;
+        if (!_window.IsVisible || _shown is not { } view || Handle is not { } hwnd) return;
         var scale = view.Monitor.Scale;
-        var width = (int)Math.Round(ActualWidth * scale);
+        var width = (int)Math.Round(_window.Bounds.Width * scale);
         var zone = view.Zone;
         var x = zone.Left + Math.Max(0, (zone.Width - width) / 2);
+        // Inside the zone, so nothing sticks out onto a monitor above.
         var y = zone.Top + (int)Math.Round(4 * scale);
         _windows.SetWindowPosition(hwnd, new PixelPoint(x, y));
     }

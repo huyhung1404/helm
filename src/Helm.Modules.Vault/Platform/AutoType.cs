@@ -1,16 +1,13 @@
-using System.Windows;
-using System.Windows.Automation;
-using System.Windows.Controls;
-using System.Windows.Input;
 using Helm.Core.Desktop;
 using Helm.Core.Hooks;
 using Helm.Core.Hotkeys;
 using Helm.Core.Services;
 using Helm.Core.Settings;
-using Helm.Core.Ui;
 using Helm.Modules.Vault.Items;
 using Helm.Modules.Vault.Session;
+using Helm.Modules.Vault.Ui;
 using Helm.Modules.Vault.ViewModels;
+using Helm.Ui.Windows;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.Vault.Platform;
@@ -154,101 +151,38 @@ public sealed class AutoTypeService(
 
 }
 
-/// <summary>The auto-type picker: the likely logins first, a search over all of them, Enter or a click types.</summary>
-internal sealed class AutoTypePicker : FloatingPanelWindow
+/// <summary>
+/// The auto-type picker: the shared <see cref="AutoTypePickerView"/> in a floating Avalonia window over the app to type
+/// into (<see cref="AvaloniaFloatingPanel"/>, like Quick Capture's box). It takes the keyboard while it is open; choosing
+/// a login hides it first, so the sign-in window can get the focus back before anything is typed.
+/// </summary>
+internal sealed class AutoTypePicker
 {
-    private readonly TextBox _search = new() { Margin = new Thickness(0, 0, 0, 8) };
-    private readonly ListBox _list = new() { MaxHeight = 320, BorderThickness = new Thickness(0) };
-    private readonly CheckBox _remember = new() { Margin = new Thickness(0, 8, 0, 0) };
-    private readonly TextBlock _empty = new() { Margin = new Thickness(4, 4, 4, 8), Text = "No login matches.", Visibility = Visibility.Collapsed };
-    private IReadOnlyList<VaultEntry> _all = [];
-    private IReadOnlyList<VaultEntry> _likely = [];
+    private readonly AutoTypePickerViewModel _viewModel = new();
+    private readonly AvaloniaFloatingPanel _panel;
     private Action<VaultEntry, bool>? _chosen;
 
-    public AutoTypePicker(IWindowService windows, IMonitorService monitors) : base(windows, monitors, 460)
+    public AutoTypePicker(IWindowService windows, IMonitorService monitors)
     {
-        Title = "Auto-type";
-        System.Windows.Automation.AutomationProperties.SetName(_search, "Search the vault");
-        _empty.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
-        var header = new TextBlock { Text = "Type which login?", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
-        var panel = new StackPanel { Margin = new Thickness(12) };
-        panel.Children.Add(header);
-        panel.Children.Add(_search);
-        panel.Children.Add(_empty);
-        panel.Children.Add(_list);
-        panel.Children.Add(_remember);
-        Panel = panel;
-
-        _search.TextChanged += (_, _) => Filter();
-        _search.PreviewKeyDown += (_, e) =>
+        HelmAvalonia.EnsureStarted();
+        var view = new AutoTypePickerView(_viewModel);
+        _panel = new AvaloniaFloatingPanel(windows, monitors, 460, "Auto-type") { Panel = view };
+        _panel.Summoned += (_, _) => view.FocusSearch();
+        // Esc or a click elsewhere: nothing is typed.
+        _panel.Dismissed += (_, _) => _chosen = null;
+        _viewModel.Chosen += (_, choice) =>
         {
-            if (e.Key == Key.Down && _list.Items.Count > 0)
-            {
-                _list.SelectedIndex = Math.Min(_list.SelectedIndex + 1, _list.Items.Count - 1);
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Up && _list.Items.Count > 0)
-            {
-                _list.SelectedIndex = Math.Max(_list.SelectedIndex - 1, 0);
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Enter)
-            {
-                Choose();
-                e.Handled = true;
-            }
-        };
-        _list.MouseDoubleClick += (_, _) => Choose();
-        _list.PreviewMouseLeftButtonUp += (_, _) => Choose();
-        _list.KeyDown += (_, e) =>
-        {
-            if (e.Key != Key.Enter) return;
-            Choose();
-            e.Handled = true;
+            var chosen = _chosen;
+            _chosen = null;
+            _panel.Dismiss();
+            chosen?.Invoke(choice.Entry, choice.Remember);
         };
     }
 
     public void Show(IReadOnlyList<AutofillMatch> likely, IReadOnlyList<VaultEntry> all, string? rememberText, Action<VaultEntry, bool> chosen)
     {
-        _likely = likely.Select(m => m.Entry).ToList();
-        _all = all.OrderBy(e => e.Item.Title, StringComparer.CurrentCultureIgnoreCase).ToList();
+        _viewModel.Load(likely.Select(m => m.Entry).ToList(), all, rememberText);
         _chosen = chosen;
-        _remember.Content = rememberText;
-        _remember.IsChecked = rememberText is not null;
-        _remember.Visibility = rememberText is null ? Visibility.Collapsed : Visibility.Visible;
-        _search.Text = "";
-        Filter();
-        Summon();
-        _search.Focus();
-    }
-
-    private void Filter()
-    {
-        var terms = Helm.Core.Text.TextSearch.Terms(_search.Text);
-        var shown = terms.Count == 0
-            ? _likely.Concat(_all.Where(e => _likely.All(l => l.Uid != e.Uid))).Take(30)
-            : _all.Where(e => Helm.Core.Text.TextSearch.Score(terms, e.Item.Title, e.Item.Username) > 0).Take(30);
-        _list.Items.Clear();
-        foreach (var entry in shown)
-        {
-            var row = new StackPanel { Tag = entry, Margin = new Thickness(4, 2, 4, 2) };
-            row.Children.Add(new TextBlock { Text = entry.Item.Title, FontWeight = FontWeights.SemiBold });
-            var detail = new TextBlock { Text = entry.Item.Username ?? "", FontSize = 12 };
-            detail.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
-            row.Children.Add(detail);
-            _list.Items.Add(new ListBoxItem { Content = row, Tag = entry });
-        }
-        _list.SelectedIndex = _list.Items.Count > 0 ? 0 : -1;
-        _empty.Visibility = _list.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void Choose()
-    {
-        if (_list.SelectedItem is not ListBoxItem { Tag: VaultEntry entry }) return;
-        var remember = _remember.IsChecked == true;
-        var chosen = _chosen;
-        _chosen = null;
-        Dismiss();
-        chosen?.Invoke(entry, remember);
+        _panel.Summon();
     }
 }

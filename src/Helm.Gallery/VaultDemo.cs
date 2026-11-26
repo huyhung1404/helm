@@ -27,6 +27,17 @@ internal enum VaultStage
     Empty,
 }
 
+/// <summary>What auto-type's picker (Windows) shows in a Gallery entry.</summary>
+internal enum AutoTypeStage
+{
+    /// <summary>Two logins matched the app in front: they come first, with "offer it in … next time".</summary>
+    Likely,
+    /// <summary>Something typed into the search.</summary>
+    Search,
+    /// <summary>The search found nothing.</summary>
+    NoMatch,
+}
+
 /// <summary>
 /// The real Vault view over a real (in-memory-sized) vault in a scratch folder: real keys, session and store, a fake
 /// platform. Like tests/Helm.Tests/VaultViewsTests.cs, but with Argon2 settings as shipped.
@@ -133,6 +144,51 @@ internal static class VaultDemo
             Fields = [F("Username", "hungnh", VaultFieldKind.Username), F("Password", "forum-demo-pass-5", VaultFieldKind.Password)],
         });
         store.MoveToTrash(trashed);
+    }
+
+    /// <summary>Auto-type's picker over pretend logins, as it floats over the app to type into.</summary>
+    public static Control AutoType(AutoTypeStage stage) => new Panel
+    {
+        Children =
+        {
+            new Helm.Core.Ui.Backdrop(),
+            new AutoTypePickerView(AutoTypePicker(stage)) { MaxWidth = 460 + 32, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top, Margin = new Avalonia.Thickness(0, 24, 0, 0) },
+        },
+    };
+
+    /// <summary>The picker's view model as auto-type loads it: the likely logins, all of them, the "remember" line (the UI tests drive it).</summary>
+    public static AutoTypePickerViewModel AutoTypePicker(AutoTypeStage stage)
+    {
+        var logins = AutoTypeLogins();
+        var vm = new AutoTypePickerViewModel();
+        vm.Load([logins[1], logins[2]], logins, stage == AutoTypeStage.Likely ? "Offer it in Unity Hub next time" : null);
+        vm.Search = stage switch
+        {
+            AutoTypeStage.Search => "git",
+            AutoTypeStage.NoMatch => "bank of mars",
+            _ => "",
+        };
+        return vm;
+    }
+
+    /// <summary>Pretend logins (never stored: auto-type only reads them).</summary>
+    public static IReadOnlyList<VaultEntry> AutoTypeLogins()
+    {
+        (string Title, string User)[] logins =
+        [
+            ("Cloudflare", "admin@example.com"),
+            ("Unity ID", "hung.dev@example.com"),
+            ("Unity Hub (work)", "hung@studio.example"),
+            ("GitHub", "hung-dev"),
+            ("GitLab (studio)", "hung"),
+            ("Google", "hung.dev@example.com"),
+            ("Jira", "hung@studio.example"),
+            ("Zalo", "0901 234 567"),
+        ];
+        return logins.Select((l, i) => new VaultEntry($"demo-{i}", VaultItem.New(VaultItemKind.Login, l.Title) with
+        {
+            Fields = [new VaultField("Username", l.User, VaultFieldKind.Username), new VaultField("Password", "demo-pass", VaultFieldKind.Password)],
+        }, false, null, DateTimeOffset.UnixEpoch, [], $"record-{i}")).ToList();
     }
 
     private sealed class DemoHost : IVaultPageHost

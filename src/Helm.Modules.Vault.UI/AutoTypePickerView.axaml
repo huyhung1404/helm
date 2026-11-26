@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vault.ViewModels"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:local="using:Helm.Modules.Vault.Ui"
+             x:Class="Helm.Modules.Vault.Ui.AutoTypePickerView"
+             x:DataType="vm:AutoTypePickerViewModel">
+
+    <!-- Auto-type's picker, floating over the app to type into (Windows puts this card in a see-through window of its own,
+         like Quick Capture's box): the likely logins first, typing searches all of them, Up and Down choose, Enter or a click
+         types the login into the window that was in front, Esc closes. The margin leaves room for the card's shadow (the tight card shadow: the window would cut a bigger one). -->
+    <Border x:Name="Card" Classes="sheet" Margin="16" Padding="20,16,20,14" BoxShadow="{DynamicResource HelmGlassShadow}">
+        <StackPanel Spacing="12">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="eyebrow" Text="AUTO-TYPE" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Classes="muted" FontSize="12" Text="Esc to close" VerticalAlignment="Center" />
+            </Grid>
+            <TextBlock FontSize="18" FontWeight="SemiBold" Text="Type which login?" />
+
+            <TextBox x:Name="SearchBox" Classes="glass" Text="{Binding Search}" PlaceholderText="Search the vault — Enter types the chosen login"
+                     AutomationProperties.Name="Search the vault" />
+
+            <TextBlock Classes="muted" Text="No login matches. Try another word." IsVisible="{Binding IsEmpty}" Margin="2,0" />
+
+            <ScrollViewer x:Name="Scroller" MaxHeight="336" Padding="0,0,14,6" core:ScrollFade.Enabled="True" IsVisible="{Binding !IsEmpty}">
+                <ItemsControl x:Name="List" ItemsSource="{Binding Rows}" AutomationProperties.Name="Logins">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AutoTypeRow">
+                            <Button Classes="glass" Classes.selected="{Binding IsSelected}" Padding="10,8" Margin="0,0,0,6" Focusable="False"
+                                    Command="{Binding $parent[UserControl].((vm:AutoTypePickerViewModel)DataContext).ChooseCommand}" CommandParameter="{Binding}"
+                                    AutomationProperties.Name="{Binding Title}" ToolTip.Tip="Type this login">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                    <Border Width="34" Height="34" CornerRadius="9" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}">
+                                        <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="15" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                        <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Classes="muted" FontSize="12" Text="{Binding Username}" IsVisible="{Binding HasUsername}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <!-- It matched the window in front -->
+                                    <Border Grid.Column="2" Classes="tag" VerticalAlignment="Center" IsVisible="{Binding IsLikely}">
+                                        <TextBlock Text="Match" />
+                                    </Border>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- An app (not a site): offer this login there next time -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding HasRemember}">
+                <TextBlock Text="{Binding RememberText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <ToggleSwitch x:Name="RememberSwitch" Grid.Column="1" IsChecked="{Binding Remember}" OnContent="" OffContent=""
+                              AutomationProperties.Name="{Binding RememberText}" Focusable="False" />
+            </Grid>
+
+            <TextBlock Classes="muted" FontSize="12" Text="Up and Down choose · Enter types · Esc closes" />
+        </StackPanel>
+    </Border>
+</UserControl>

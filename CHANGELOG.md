@@ -52,7 +52,15 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **Window Zones has the new look on the PC**: your screens drawn to scale with their zones, a card per zone with its
   windows (show one, take it out), first-run steps while there are no zones, and the zone editor as a sheet over the page.
   The settings (drag key, shortcuts, the on/off switch) are a sheet behind the gear; Home → Utilities opens Window Zones
-  itself. Edit on the screens, the drag overlay and the tab strip are unchanged.
+  itself. The drag overlay is unchanged.
+- **Window Zones: Edit on the screens has the new look too.** Each monitor shows its zones at full size on the dark veil;
+  the monitor you opened it on has the toolbar card (split, delete, Cancel, Save), the others say where it is. Esc cancels,
+  Del deletes the chosen zone, Ctrl+Enter saves, as before.
+- **Window Zones: the tabs at the top of a zone have the new look, and a click on a tab brings that window forward.**
+  They still never take the keyboard from the window you work in, and stay while the pointer is on them.
+- **Vault: the auto-type picker has the new look.** The likely logins come first (marked Match), typing searches them
+  all, Up and Down choose, Enter or a click types into the window that was in front, Esc closes; "Offer it in … next time"
+  is a switch.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the

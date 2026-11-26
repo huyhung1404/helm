@@ -62,6 +62,8 @@ public sealed class WindowZonesModule : HelmModuleBase, IModuleContent, IWindowZ
         _ui = ui;
         _logger = logger;
         Settings.Changed += (_, _) => _ = ApplySettingsAsync();
+        // A tab clicked in the strip: that window comes forward in its zone.
+        tabStrip.TabChosen += (_, handle) => ShowWindow(handle);
         Data.Changed += (_, _) => _ = OnZonesEditedAsync();
         _zones = Offline();
     }

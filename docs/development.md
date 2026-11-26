@@ -75,7 +75,7 @@ src/
   Helm.Modules.Wallet/       Windows: the module, the WPF page that hosts the shared view (CSV save dialog)
   Helm.Modules.Wallet.Android/ Android: the module, the page that hosts the shared view, bank notification listener, "what was it?" notification, widgets (not in Helm.sln)
   Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
-  Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
+  Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard, auto-type (its picker is the shared AutoTypePickerView in an Avalonia window)
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
   Helm.Modules.Vocab.Core/   net8.0: words and their parts (on Helm Sync), the quiz, the card, MCP tools, shared view models
   Helm.Modules.Vocab.UI/     Avalonia: the Vocabulary page (Learn, Words, Roots), its sheets and settings (every platform)
@@ -93,8 +93,8 @@ src/
   Helm.Modules.SlackBot.UI/  Avalonia: the Slack Report page, its reply sheet and settings sheet
   Helm.Modules.SlackBot/     Windows only: the module, the always-on-top list window, the WPF page that hosts the shared view
   Helm.Modules.WindowZones.Core/ net8.0: zone layouts, rules, engine contracts, shared view model
-  Helm.Modules.WindowZones.UI/ Avalonia: the Window Zones page, its settings sheet and the zone layout view
-  Helm.Modules.WindowZones/  Windows only: the module, the snapping engine and drag overlay, the full-screen editor, the WPF page that hosts the shared view
+  Helm.Modules.WindowZones.UI/ Avalonia: the Window Zones page, its settings sheet, the zone layout view, the full-screen editor and the tab strip
+  Helm.Modules.WindowZones/  Windows only: the module, the snapping engine and drag overlay, the Avalonia windows of the full-screen editor and the tab strip, the WPF page that hosts the shared view
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
   Helm.Core.Linux/           net8.0, Linux for the connector: secrets under a host key (0600, optionally sealed by
                              systemd-creds), MCP on a Unix socket, plain child processes; namespaces stay Helm.Core.*

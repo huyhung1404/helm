@@ -30,6 +30,19 @@ internal enum WindowZonesStage
     SettingsEnd,
 }
 
+/// <summary>Which full-screen editor or tab strip a Gallery entry shows.</summary>
+internal enum ZoneScreenStage
+{
+    /// <summary>The full-screen editor on the monitor it was opened on: the toolbar, a zone chosen.</summary>
+    Toolbar,
+    /// <summary>The full-screen editor on the other monitor: where the toolbar is, a zone chosen.</summary>
+    OtherMonitor,
+    /// <summary>The tab strip of a zone with three windows, the second in front.</summary>
+    Tabs,
+    /// <summary>The tab strip of a narrow zone with many windows: the tabs share its width.</summary>
+    ManyTabs,
+}
+
 /// <summary>
 /// The real Window Zones view and view model over zones in a temporary folder and a pretend engine: two pretend monitors,
 /// pretend windows. Nothing touches a real window: opening, closing and taking out only change the pretend list.
@@ -37,6 +50,60 @@ internal enum WindowZonesStage
 internal static class WindowZonesDemo
 {
     public static Control Create(FakeModule module, WindowZonesStage stage) => Build(module, stage).View;
+
+    /// <summary>The full-screen editor (one monitor's window content) or the tab strip, over the same pretend zones.</summary>
+    public static Control Screen(FakeModule module, ZoneScreenStage stage) => stage switch
+    {
+        ZoneScreenStage.Tabs or ZoneScreenStage.ManyTabs => OnBackdrop(Tabs(stage)),
+        _ => ScreenEditor(module, stage),
+    };
+
+    /// <summary>The editor's view for one pretend monitor, its session shared as on the real screens.</summary>
+    public static ZoneScreenEditorView ScreenEditor(FakeModule module, ZoneScreenStage stage)
+    {
+        var (_, _, zones) = Build(module, WindowZonesStage.Zones);
+        var session = new Helm.Modules.WindowZones.Editor.EditorSession(zones.Data, Monitors, Monitors[0]);
+        // The big zone chosen on the first screen; the unnamed one on the second.
+        session.Edit.Select(stage == ZoneScreenStage.Toolbar ? 0 : 5);
+        return stage == ZoneScreenStage.Toolbar
+            ? new ZoneScreenEditorView(session, Monitors[0], isHome: true)
+            : new ZoneScreenEditorView(session, Monitors[1], isHome: false);
+    }
+
+    /// <summary>The tab strip as Windows shows it at the top of a zone .</summary>
+    public static ZoneTabStripView Tabs(ZoneScreenStage stage)
+    {
+        var view = new ZoneTabStripView { HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top, Margin = new Avalonia.Thickness(0, 24, 0, 0) };
+        view.Show(TabStrip(stage), _ => null);
+        return view;
+    }
+
+    /// <summary>The strip over Helm's background, as it floats over other apps.</summary>
+    private static Control OnBackdrop(Control strip) => new Panel { Children = { new Helm.Core.Ui.Backdrop(), strip } };
+
+    /// <summary>What the engine hands the strip: the zone, its monitor, its windows and the one in front.</summary>
+    public static TabStripView TabStrip(ZoneScreenStage stage)
+    {
+        if (stage == ZoneScreenStage.ManyTabs)
+        {
+            IReadOnlyList<ZoneWindowSnapshot> many =
+            [
+                new(0x2001, "Slack | #release-bubble-pop | Bubble Studio", "slack", "", false, true),
+                new(0x2002, "Zalo", "Zalo", "", false, false),
+                new(0x2003, "Messenger", "Messenger", "", true, false),
+                new(0x2004, "Discord | #general | Unity devs", "Discord", "", false, false),
+                new(0x2005, "Telegram", "Telegram", "", false, false),
+            ];
+            return new TabStripView("2 · Chat", new PixelRect(1485, 0, 2560, 696), Monitors[0], many, 0x2001);
+        }
+        IReadOnlyList<ZoneWindowSnapshot> windows =
+        [
+            new(0x1001, "WindowZonesView.axaml — Helm — Visual Studio Code", "Code", "", false, true),
+            new(0x1002, "BubblePop — Rider", "rider64", "", false, false),
+            new(0x1008, "Windows PowerShell", "powershell", "", true, false),
+        ];
+        return new TabStripView("1 · Code", new PixelRect(0, 0, 1485, 1392), Monitors[0], windows, 0x1002);
+    }
 
     /// <summary>The view with its view model and pretend engine (the UI tests drive them).</summary>
     public static (WindowZonesView View, WindowZonesViewModel ViewModel, PretendZones Zones) Build(FakeModule module, WindowZonesStage stage)
