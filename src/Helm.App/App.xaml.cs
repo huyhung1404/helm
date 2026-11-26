@@ -74,6 +74,9 @@ public partial class App : Application
             _logger.LogInformation("Helm {Version} starting (elevated: {Elevated})",
                 AppInfo.Version, Services.GetRequiredService<Core.Services.IProcessLauncher>().IsElevated);
 
+            // Workspace Controller is gone: its hooks in Claude Code's settings would call a Helm that no longer answers.
+            Core.Services.LegacyClaudeHooks.RemoveInBackground(_logger!);
+
             var shell = Services.GetRequiredService<ShellController>();
             // "--page X" (dev/testing) always shows the window on that page.
             var startHidden = !_args.Contains("--page", StringComparer.OrdinalIgnoreCase) && (_args.Contains("--startup", StringComparer.OrdinalIgnoreCase)

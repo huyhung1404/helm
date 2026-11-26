@@ -27,7 +27,6 @@ public static class BugReportsServices
             sp.GetRequiredService<ISyncedCollection<BugReport>>(), sp.GetRequiredService<ISyncedCollection<BugEntry>>(),
             sp.GetRequiredService<IBugFiles>(), () => sp.GetRequiredService<IDeviceInfo>().DeviceName, deviceKind, AppInfo.Version));
         services.AddSingleton<IMcpToolProvider, BugMcpTools>(sp => new BugMcpTools(sp.GetRequiredService<BugStore>()));
-        services.AddSingleton<BugHandOff>();
         services.AddSingleton<BugReportsViewModel>();
         return services;
     }

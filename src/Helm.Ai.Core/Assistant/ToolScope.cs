@@ -28,7 +28,6 @@ public static partial class ToolScope
         ("phone", ["bao thuc", "danh thuc", "goi dau", "goi day", " day", "hen gio", "timer", "lich", "calendar", "su kien", "hop ",
             "copy", "clipboard", "dan ", "sao chep", "duong toi", "duong den", "duong di", "chi duong", "dan duong", "ban do", "map",
             "mo ", "open", "grab", "youtube", "zalo", "chia se", "share", "nhan tin", "tin nhan", "soan tin"]),
-        ("workspace", ["claude", "workspace", "phien", "session"]),
     ];
 
     /// <summary>The group of a tool: its name's first word, singular ("habits_list" and "habit_check" are "habit").</summary>

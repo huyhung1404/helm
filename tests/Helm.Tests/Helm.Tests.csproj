@@ -43,8 +43,6 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Scratch\Helm.Modules.Scratch.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.NovelReader\Helm.Modules.NovelReader.csproj" />
     <ProjectReference Include="..\..\src\Helm.Speech.Vietnamese\Helm.Speech.Vietnamese.csproj" />
-    <ProjectReference Include="..\..\src\Helm.Modules.Workspace\Helm.Modules.Workspace.csproj" />
-    <ProjectReference Include="..\..\src\Helm.Modules.Workspace.Core\Helm.Modules.Workspace.Core.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.WindowZones\Helm.Modules.WindowZones.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Vocab\Helm.Modules.Vocab.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Habits\Helm.Modules.Habits.csproj" />

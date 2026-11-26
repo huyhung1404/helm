@@ -21,7 +21,6 @@ public class NavGroupTests
         ["vault"] = ModuleGroup.SecurityAndServers,
         ["ssh"] = ModuleGroup.SecurityAndServers,
         ["always-on-top"] = ModuleGroup.WindowsAndDesktop,
-        ["workspace-controller"] = ModuleGroup.WindowsAndDesktop,
         ["window-zones"] = ModuleGroup.WindowsAndDesktop,
         ["keyboard"] = ModuleGroup.WindowsAndDesktop,
         ["vocab"] = ModuleGroup.Learning,

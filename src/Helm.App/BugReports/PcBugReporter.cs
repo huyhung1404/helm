@@ -20,7 +20,6 @@ internal sealed class PcBugReporter(
     IServiceProvider services,
     BugStore store,
     BlackBox box,
-    BugHandOff handOff,
     IHotkeyManager hotkeys,
     IModuleHost modules,
     TabManager tabs,
@@ -76,9 +75,8 @@ internal sealed class PcBugReporter(
         var page = tabs.ActivePageTitle;
         var tool = fromCrash ? null : tools.FirstOrDefault(t => page is not null && page.StartsWith(t, StringComparison.OrdinalIgnoreCase));
         var form = new BugReportFormViewModel(store, box, snapshot, tool, tools, fromCrash);
-        _window = new BugReportWindow(form, windows, monitors, handOff.IsAvailable);
+        _window = new BugReportWindow(form, windows, monitors);
         _window.OpenRequested += (_, id) => ShowPage(id);
-        _window.HandOffRequested += async (_, id) => await ShowPage(id).HandOffAsync(id).ConfigureAwait(true);
         _window.Closed += (_, _) => _window = null;
         _window.Show();
     }

@@ -388,17 +388,15 @@ public sealed partial class BugDetailViewModel : ObservableObject
 {
     private readonly BugStore _store;
     private readonly BlackBox _box;
-    private readonly BugHandOff _handOff;
     private readonly IClipboardService? _clipboard;
     private readonly TimeProvider _time;
     private BlackBoxSnapshot? _snapshot;
 
-    public BugDetailViewModel(string id, BugStore store, BlackBox box, BugHandOff handOff, IClipboardService? clipboard, TimeProvider time)
+    public BugDetailViewModel(string id, BugStore store, BlackBox box, IClipboardService? clipboard, TimeProvider time)
     {
         Id = id;
         _store = store;
         _box = box;
-        _handOff = handOff;
         _clipboard = clipboard;
         _time = time;
         _bug = store.Get(id) ?? new BugReport();
@@ -589,20 +587,6 @@ public sealed partial class BugDetailViewModel : ObservableObject
 
     // ---- Claude Code ----
 
-    public bool CanHandOff => _handOff.IsAvailable;
-
-    public string HandOffPrompt => BugHandOff.Prompt(Bug);
-
-    public Task<IReadOnlyList<HandOffTarget>> HandOffTargetsAsync() => _handOff.TargetsAsync();
-
-    /// <summary>After the platform's "Hand to Claude Code" dialog.</summary>
-    public Task HandOffAsync(HandOffTarget target) => RunAsync(async () =>
-    {
-        var sentTo = await _handOff.SendAsync(target, HandOffPrompt);
-        _store.HandOver(Id, target.NewSession ? $"Claude Code · {target.Project}" : $"Claude Code · {target.Label}");
-        return $"Sent {Code} to {sentTo}";
-    });
-
     /// <summary>The bug and its black box as Markdown, for pasting into any AI chat.</summary>
     [RelayCommand]
     private void CopyForClaude()
@@ -694,17 +678,15 @@ public sealed partial class BugReportsViewModel : ObservableObject
 {
     private readonly BugStore _store;
     private readonly BlackBox _box;
-    private readonly BugHandOff _handOff;
     private readonly IClipboardService? _clipboard;
     private readonly IUiDispatcher? _ui;
     private readonly TimeProvider _time;
     private int _refreshQueued;
 
-    public BugReportsViewModel(BugStore store, BlackBox box, BugHandOff handOff, IClipboardService? clipboard = null, IUiDispatcher? ui = null, TimeProvider? time = null)
+    public BugReportsViewModel(BugStore store, BlackBox box, IClipboardService? clipboard = null, IUiDispatcher? ui = null, TimeProvider? time = null)
     {
         _store = store;
         _box = box;
-        _handOff = handOff;
         _clipboard = clipboard;
         _ui = ui;
         _time = time ?? TimeProvider.System;
@@ -748,7 +730,7 @@ public sealed partial class BugReportsViewModel : ObservableObject
     {
         if (value is null) return;
         if (Selected?.Id == value.Id) return;
-        Selected = new BugDetailViewModel(value.Id, _store, _box, _handOff, _clipboard, _time);
+        Selected = new BugDetailViewModel(value.Id, _store, _box, _clipboard, _time);
     }
 
     [RelayCommand]
@@ -764,7 +746,7 @@ public sealed partial class BugReportsViewModel : ObservableObject
         if (_store.Get(id) is null) return;
         if (Bugs.FirstOrDefault(b => b.Id == id) is null) { Filter = BugFilter.All; Query = ""; }
         SelectedRow = Bugs.FirstOrDefault(b => b.Id == id);
-        if (SelectedRow is null) Selected = new BugDetailViewModel(id, _store, _box, _handOff, _clipboard, _time);
+        if (SelectedRow is null) Selected = new BugDetailViewModel(id, _store, _box, _clipboard, _time);
     }
 
     /// <summary>Back to the list (the phone shows one at a time).</summary>

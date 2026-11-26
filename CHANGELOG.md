@@ -32,6 +32,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **Lumi** in Slack (answers when called, per-conversation models and project folders), Slack's automatic replies and its
   Telegram phone alerts.
 - **Weekly Report.**
+- **Workspace Controller** (Claude Code sessions in VS Code, steered from the phone) and with it Bug reports' "Hand to
+  Claude Code" (Copy for Claude Code stays; AI agents still take bugs with the bug_ tools). On its first start Helm takes
+  Workspace's hooks out of Claude Code's settings (`~/.claude/settings.json`); nothing else in that file changes. The
+  Helm Bridge extension stays in VS Code until you uninstall it.
 
 ## [0.92.1] - 2026-11-26
 

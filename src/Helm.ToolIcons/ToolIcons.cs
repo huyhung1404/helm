@@ -24,7 +24,6 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         "tracker" => Helm.Modules.Tracker.TrackerIcon.Image,
         "vocab" => Helm.Modules.Vocab.VocabIcon.Image,
         "wallet" => Helm.Modules.Wallet.WalletIcon.Image,
-        "workspace" => Helm.Modules.Workspace.WorkspaceIcon.Image,
         "vault" => Helm.Modules.Vault.Ui.VaultIcon.Image,
         "keyboard" => Keyboard.Value,
         "window-zones" => WindowZones.Value,

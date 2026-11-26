@@ -236,9 +236,6 @@
                     </Border>
 
                     <WrapPanel Margin="0,4,0,4">
-                        <ui:Button Appearance="Primary" Content="Hand to Claude Code" Icon="{ui:SymbolIcon Bot24}" Margin="0,0,8,8" Click="HandOff_Click"
-                                   ToolTip="Type a fix request into a Claude Code session on your PC (Workspace)"
-                                   Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}" />
                         <ui:Button Content="Close" Icon="{ui:SymbolIcon Checkmark24}" Margin="0,0,8,8" Click="Close_Click"
                                    Visibility="{Binding IsClosed, Converter={StaticResource InverseBoolToVisibility}}" />
                         <ui:Button Appearance="Transparent" Content="Copy for Claude Code" Icon="{ui:SymbolIcon Copy24}" Margin="0,0,8,8" Command="{Binding CopyForClaudeCommand}"

@@ -6,14 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Helm.App.Android.BugReports;
 
 /// <summary>
-/// The phone's Bug reports page. Closing, reopening and handing a bug to Claude Code ask their question in a card that
+/// The phone's Bug reports page. Closing and reopening a bug ask their question in a card that
 /// opens in place (no dialog over the page).
 /// </summary>
 public partial class BugReportsView : UserControl
 {
-    private IReadOnlyList<HandOffTarget> _targets = [];
-    private readonly List<RadioButton> _targetButtons = [];
-
     public BugReportsView()
     {
         InitializeComponent();
@@ -37,7 +34,6 @@ public partial class BugReportsView : UserControl
     {
         ClosePanel.IsVisible = false;
         ReopenPanel.IsVisible = false;
-        HandOffPanel.IsVisible = false;
     }
 
     private void HidePanels_Click(object? sender, RoutedEventArgs e) => HidePanels();
@@ -81,55 +77,6 @@ public partial class BugReportsView : UserControl
         }
         HidePanels();
         await detail.ReopenAsync(why, ReopenWithBox.IsChecked == true);
-    }
-
-    private async void ShowHandOff_Click(object? sender, RoutedEventArgs e)
-    {
-        if (Detail is not { } detail) return;
-        HidePanels();
-        HandOffTargets.Children.Clear();
-        _targetButtons.Clear();
-        HandOffNote.Text = "Looking for your PCs…";
-        HandOffSend.IsEnabled = false;
-        HandOffPanel.IsVisible = true;
-        HandOffPanel.BringIntoView();
-        try
-        {
-            _targets = detail.CanHandOff ? await detail.HandOffTargetsAsync() : [];
-        }
-        catch (Exception ex) when (ex is Helm.Core.Mcp.McpToolException or InvalidOperationException)
-        {
-            _targets = [];
-            HandOffNote.Text = ex.Message;
-            return;
-        }
-        if (_targets.Count == 0)
-        {
-            HandOffNote.Text = "No Claude Code session to hand it to: turn on Workspace Controller on a PC with VS Code open (Helm running). Or use Copy for Claude Code.";
-            return;
-        }
-        for (var i = 0; i < _targets.Count; i++)
-        {
-            var t = _targets[i];
-            var text = new StackPanel();
-            text.Children.Add(new TextBlock { Text = t.Label, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
-            var sub = new TextBlock { Text = t.Busy ? $"{t.Detail} · busy with another task" : t.Detail, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
-            sub.Classes.Add("secondary");
-            text.Children.Add(sub);
-            var radio = new RadioButton { Content = text, GroupName = "handoff", IsChecked = i == 0 };
-            _targetButtons.Add(radio);
-            HandOffTargets.Children.Add(radio);
-        }
-        HandOffNote.Text = detail.HandOffPrompt;
-        HandOffSend.IsEnabled = true;
-    }
-
-    private async void HandOff_Click(object? sender, RoutedEventArgs e)
-    {
-        if (Detail is not { } detail || _targets.Count == 0) return;
-        var index = Math.Max(0, _targetButtons.FindIndex(r => r.IsChecked == true));
-        HidePanels();
-        await detail.HandOffAsync(_targets[index]);
     }
 
     private async void AnswerImage_Click(object? sender, RoutedEventArgs e)

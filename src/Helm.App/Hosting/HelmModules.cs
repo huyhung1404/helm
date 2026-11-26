@@ -12,7 +12,6 @@ using Helm.Modules.Vocab;
 using Helm.Modules.WindowZones;
 using Helm.Modules.Tracker;
 using Helm.Modules.Wallet;
-using Helm.Modules.Workspace;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Hosting;
@@ -37,7 +36,6 @@ internal static class HelmModules
         services.AddQuickCaptureModule();
         services.AddWindowZonesModule();
         services.AddKeyboardModule();
-        services.AddWorkspaceModule();
         services.AddVocabModule();
         services.AddSlackBotModule();
 

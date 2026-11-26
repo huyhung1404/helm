@@ -75,8 +75,6 @@ public sealed class HelmAssistant(
         "mission_skip_step",
         "mission_check_item",
         "vocab_add_words", "vocab_words",
-        "workspace_sessions",
-        "workspace_send",
         "ai_briefs", "ai_brief_undo", "ai_auto_jobs", "ai_auto_job_set",
     };
 

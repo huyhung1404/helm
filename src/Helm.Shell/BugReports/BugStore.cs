@@ -223,7 +223,7 @@ public sealed class BugStore
         SetStatus(bugId, You, false, _deviceName(), BugStatus.Open, "Taken back from " + (Get(bugId)?.FixingBy ?? "the agent"),
             r => r with { FixingBy = null, PendingQuestion = null });
 
-    /// <summary>Marks the bug handed to an agent (the Workspace hand-off) until the agent claims it itself.</summary>
+    /// <summary>Marks the bug handed to an agent (the old Workspace hand-off; kept for bugs handed over before it was removed) until the agent claims it itself.</summary>
     public BugChange HandOver(string bugId, string to) =>
         SetStatus(bugId, You, false, _deviceName(), BugStatus.Fixing, $"Handed to {to}", r => r with { FixingBy = to });
 

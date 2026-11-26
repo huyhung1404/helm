@@ -33,7 +33,6 @@ internal static class HomeDemo
         Tool("vault", "Vault", "Security & Servers"),
         Tool("keyboard", "Helm Keyboard", "Windows & Desktop", on: false),
         Tool("window-zones", "Window Zones", "Windows & Desktop"),
-        Tool("workspace", "Workspace Controller", "Windows & Desktop"),
     ];
 
     private static HomeTool Tool(string id, string name, string group, bool on = true) =>
@@ -76,10 +75,6 @@ internal static class HomeDemo
                 new TodayItem("Write 150 words about your hometown", "Next step"),
             ], "Continue", Done, urgency: 40),
             new TodayCard(tools["vocab"], "18 words to review", [], "Review", Done, urgency: 30),
-            new TodayCard(tools["workspace"], "Claude is waiting for you",
-            [
-                new TodayItem("helm · feat/home-ui", "Asked a question 4 minutes ago"),
-            ], "Answer", Done, urgency: 80),
         ]);
         return new HomeView(vm);
     }
@@ -107,7 +102,6 @@ internal static class HomeDemo
         vm.Devices.Add(new SyncDevice("Home PC", "Seen 3 days ago · Windows 11", isThis: false, NoOp));
         vm.Devices.Add(new SyncDevice("Pixel 8", "Seen 20 minutes ago · Android 15", isThis: !desktop, NoOp));
         vm.Jobs.Add(new BackgroundJob("Tracker", "Due-date reminders, every 10 minutes", "Since 08:12", NoOp));
-        vm.Jobs.Add(new BackgroundJob("Workspace Controller", "Relays your VS Code sessions to the phone", "Since 08:12", NoOp));
         if (desktop) vm.Jobs.Add(new BackgroundJob("Window Zones", "Listens for Ctrl+Alt+N", "Since 08:12", NoOp));
         vm.Section("updates").NeedsAttention = true;
         return new GeneralView(vm);

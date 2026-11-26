@@ -37,7 +37,6 @@ body:
         - SSH
         - Slack Bot
         - Window Zones
-        - Workspace Controller
         - Tracker
         - Vault
         - Wallet

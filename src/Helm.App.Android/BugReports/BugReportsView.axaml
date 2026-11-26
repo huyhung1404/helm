@@ -196,20 +196,12 @@
             </Border>
 
             <!-- What can be done -->
-            <Grid ColumnDefinitions="*,8,*" Margin="0,4,0,8">
-                <Button Classes="wide accent" Click="ShowHandOff_Click" IsVisible="{Binding IsOpen}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ic:SymbolIcon Symbol="Bot" FontSize="18" />
-                        <TextBlock Text="To Claude Code" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-                <Button Grid.Column="2" Classes="wide" Click="ShowClose_Click" IsVisible="{Binding !IsClosed}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ic:SymbolIcon Symbol="Checkmark" FontSize="18" />
-                        <TextBlock Text="Close" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-            </Grid>
+            <Button Classes="wide" Click="ShowClose_Click" IsVisible="{Binding !IsClosed}" Margin="0,4,0,8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ic:SymbolIcon Symbol="Checkmark" FontSize="18" />
+                    <TextBlock Text="Close" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
             <Button Classes="wide" Command="{Binding CopyForClaudeCommand}" Margin="0,0,0,8">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <ic:SymbolIcon Symbol="Copy" FontSize="18" />
@@ -241,19 +233,6 @@
                     <Grid ColumnDefinitions="*,8,*">
                         <Button Classes="wide" Content="Cancel" Click="HidePanels_Click" />
                         <Button Grid.Column="2" Classes="wide accent" Content="Reopen" Click="Reopen_Click" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-            <!-- Hand to Claude Code: which session -->
-            <Border x:Name="HandOffPanel" Classes="card" IsVisible="False" Margin="0,0,0,8">
-                <StackPanel Spacing="6">
-                    <TextBlock Text="Hand to Claude Code" Classes="title" />
-                    <TextBlock Text="Helm types the request into a Claude Code session on your PC. Follow it in Workspace." Classes="secondary" />
-                    <StackPanel x:Name="HandOffTargets" />
-                    <TextBlock x:Name="HandOffNote" Classes="secondary" TextWrapping="Wrap" />
-                    <Grid ColumnDefinitions="*,8,*" Margin="0,6,0,0">
-                        <Button Classes="wide" Content="Cancel" Click="HidePanels_Click" />
-                        <Button x:Name="HandOffSend" Grid.Column="2" Classes="wide accent" Content="Send" Click="HandOff_Click" />
                     </Grid>
                 </StackPanel>
             </Border>

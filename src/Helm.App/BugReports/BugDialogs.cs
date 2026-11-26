@@ -44,54 +44,6 @@ internal static class BugDialogs
         }
     }
 
-    /// <summary>Picks a Claude Code session (a new one in the helm project first) and sends the fix request there.</summary>
-    public static async Task HandOffAsync(BugDetailViewModel detail)
-    {
-        IReadOnlyList<HandOffTarget> targets;
-        try
-        {
-            targets = await detail.HandOffTargetsAsync().ConfigureAwait(true);
-        }
-        catch (Exception ex) when (ex is Helm.Core.Mcp.McpToolException or InvalidOperationException)
-        {
-            detail.Status = ex.Message;
-            return;
-        }
-        if (targets.Count == 0)
-        {
-            await new WpfUiMessageBox
-            {
-                Title = "No Claude Code session to hand it to",
-                Content = "Turn on Workspace Controller on a PC with VS Code open (Helm running), then try again. Or use Copy for Claude Code.",
-                CloseButtonText = "OK",
-                MinWidth = 420,
-            }.ShowDialogAsync().ConfigureAwait(true);
-            return;
-        }
-        var radios = targets.Select((t, i) => Radio(t.Label, t.Busy ? $"{t.Detail} · busy with another task" : t.Detail, i == 0)).ToList();
-        var prompt = new TextBlock
-        {
-            Text = detail.HandOffPrompt,
-            TextWrapping = TextWrapping.Wrap,
-            FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas"),
-            FontSize = 12,
-            Margin = new Thickness(0, 10, 0, 0),
-        };
-        prompt.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
-        var intro = new TextBlock
-        {
-            Text = "Helm types the request into a Claude Code session on your PC. Follow it from your phone as usual.",
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 8),
-        };
-        var list = new StackPanel();
-        foreach (var r in radios) list.Children.Add(r);
-        var scroller = new ScrollViewer { Content = list, MaxHeight = 260, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        if (!await AskAsync("Hand to Claude Code", Stack(intro, scroller, prompt), "Send").ConfigureAwait(true)) return;
-        var chosen = targets[Math.Max(0, radios.FindIndex(r => r.IsChecked == true))];
-        await detail.HandOffAsync(chosen).ConfigureAwait(true);
-    }
-
     private static async Task<bool> AskAsync(string title, UIElement content, string confirm) =>
         await new WpfUiMessageBox
         {

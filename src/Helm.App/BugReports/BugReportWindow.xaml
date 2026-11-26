@@ -156,8 +156,7 @@
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <ui:Button Content="Close" Margin="0,0,8,0" Click="Close_Click" />
-                        <ui:Button Content="Open" Margin="0,0,8,0" Click="Open_Click" />
-                        <ui:Button x:Name="HandOffButton" Appearance="Primary" Content="Hand to Claude Code" Icon="{ui:SymbolIcon Bot24}" Click="HandOff_Click" />
+                        <ui:Button Appearance="Primary" Content="Open" Click="Open_Click" />
                     </StackPanel>
                     <TextBlock FontSize="12" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                Text="{Binding SentCode, StringFormat='Claude Code reads it with bug_get {0}'}" />

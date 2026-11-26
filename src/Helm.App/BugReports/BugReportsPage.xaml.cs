@@ -35,18 +35,6 @@ internal partial class BugReportsPage : Page
             await detail.ReopenAsync(answer.Why, answer.WithBlackBox).ConfigureAwait(true);
     }
 
-    private async void HandOff_Click(object sender, RoutedEventArgs e)
-    {
-        if (Detail is { } detail) await BugDialogs.HandOffAsync(detail).ConfigureAwait(true);
-    }
-
-    /// <summary>Opens the bug and asks where to hand it (the report window's "Hand to Claude Code").</summary>
-    public async Task HandOffAsync(string id)
-    {
-        _viewModel.Open(id);
-        if (Detail is { } detail && detail.Id == id) await BugDialogs.HandOffAsync(detail).ConfigureAwait(true);
-    }
-
     private void ShowBlackBox_Click(object sender, RoutedEventArgs e)
     {
         BlackBoxExpander.IsExpanded = true;

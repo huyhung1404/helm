@@ -22,7 +22,7 @@ public sealed class BackgroundActivity : IDisposable
 
     public string ModuleId { get; }
 
-    /// <summary>What runs, short: "Workspace Controller".</summary>
+    /// <summary>What runs, short: "Window Zones".</summary>
     public string Title { get; }
 
     /// <summary>What it is doing now: "Listening to Claude · 3 VS Code windows".</summary>

@@ -12,7 +12,6 @@ using Helm.Modules.Notes;
 using Helm.Modules.Tracker;
 using Helm.Modules.Vocab;
 using Helm.Modules.Wallet;
-using Helm.Modules.Workspace;
 
 namespace Helm.Tests;
 
@@ -288,8 +287,6 @@ public sealed class AskHelmTokensTests
             new HabitsMcpTools(new HabitsStore(new MemorySynced<Habit>(), new MemorySynced<HabitCheck>(), new MemorySynced<HabitLapse>(), _time, TimeZoneInfo.Utc)),
             new MissionsMcpTools(new MissionsStore(new MemorySynced<Mission>(), new MemorySynced<MissionStep>(), new MemorySyncedLog<MissionEvent>(), _time)),
             new VocabMcpTools(vocab, new VocabQuiz(vocab, new Random(1))),
-            new WorkspaceAskTools(new MemorySynced<WorkspaceHostRecord>(), new MemorySynced<WorkspaceSessionRecord>(), new MemorySynced<WorkspaceCommand>(),
-                new MemorySynced<WorkspaceResultRecord>(), time: _time),
             new AiBriefTools(new AiBriefBook(new MemorySynced<AiBrief>(), _time), new MemorySettings<AiFeatureSettings>(), () => []),
         ];
         return new HelmAssistant(new AiKeyStore(new MemorySynced<AiKey>()), new MemorySettings<AiFeatureSettings>(), new AiUsageBook(new MemorySyncedLog<AiUsageEntry>()),

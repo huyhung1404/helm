@@ -19,14 +19,13 @@ internal partial class BugReportWindow : Window
     private readonly IMonitorService _monitors;
     private bool _escapeOnce;
 
-    public BugReportWindow(BugReportFormViewModel form, IWindowService windows, IMonitorService monitors, bool canHandOff)
+    public BugReportWindow(BugReportFormViewModel form, IWindowService windows, IMonitorService monitors)
     {
         _form = form;
         _windows = windows;
         _monitors = monitors;
         DataContext = form;
         InitializeComponent();
-        HandOffButton.Visibility = canHandOff ? Visibility.Visible : Visibility.Collapsed;
         Closed += (_, _) => _form.Close();
         Loaded += (_, _) =>
         {
@@ -49,9 +48,6 @@ internal partial class BugReportWindow : Window
 
     /// <summary>Open the bug on the Bug reports page (the id).</summary>
     public event EventHandler<string>? OpenRequested;
-
-    /// <summary>Hand the bug to Claude Code from the page (the id).</summary>
-    public event EventHandler<string>? HandOffRequested;
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -97,12 +93,6 @@ internal partial class BugReportWindow : Window
     private void Open_Click(object sender, RoutedEventArgs e)
     {
         if (_form.SentId is { } id) OpenRequested?.Invoke(this, id);
-        Close();
-    }
-
-    private void HandOff_Click(object sender, RoutedEventArgs e)
-    {
-        if (_form.SentId is { } id) HandOffRequested?.Invoke(this, id);
         Close();
     }
 

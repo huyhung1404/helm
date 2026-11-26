@@ -6,14 +6,13 @@ using Helm.Core.Mcp;
 using Helm.Modules.Missions;
 using Helm.Modules.Notes;
 using Helm.Modules.Wallet;
-using Helm.Modules.Workspace;
 using static Helm.Tests.AskHelmScript;
 
 namespace Helm.Tests;
 
 /// <summary>
 /// Ask Helm's other tools: directions and apps on the phone, a mission made from one sentence, quick ideas, notes found
-/// by meaning, and a request typed into Claude Code on the PC.
+/// by meaning.
 /// </summary>
 public sealed class AskHelmToolsTests
 {
@@ -183,90 +182,7 @@ public sealed class AskHelmToolsTests
         Assert.Equal([fresh, old], NoteRecall.Rank(notes.Notes(), ["sap", "server"], _time.Now).Select(n => n.Id));
     }
 
-    // ---- K1: a request typed into Claude Code ---------------------------------------------------------------------
-
-    private readonly MemorySynced<WorkspaceHostRecord> _hosts = new();
-    private readonly MemorySynced<WorkspaceSessionRecord> _sessions = new();
-    private readonly MemorySynced<WorkspaceCommand> _commands = new();
-    private readonly MemorySynced<WorkspaceResultRecord> _results = new();
-
-    private WorkspaceAskTools Workspace()
-    {
-        _hosts.Upsert("pc1", new WorkspaceHostRecord
-        {
-            MachineId = "pc1", MachineName = "PC-HUNG", Running = true, LastSeen = _time.Now,
-            Windows =
-            [
-                new HostWindowInfo { Folder = @"C:\Project\Helm", Name = "Helm" },
-                new HostWindowInfo { Folder = @"C:\Project\WebAdmin", Name = "WebAdmin" },
-                new HostWindowInfo { Folder = @"C:\tmp\hw-ask", Name = "hw-ask" },
-            ],
-        });
-        _hosts.Upsert("pc2", new WorkspaceHostRecord { MachineId = "pc2", MachineName = "OLD-PC", Running = true, LastSeen = _time.Now - TimeSpan.FromHours(1) });
-        _sessions.Upsert("s1", new WorkspaceSessionRecord { MachineId = "pc1", SessionId = "s1", WindowFolder = @"C:\Project\Helm", Folder = @"C:\Project\Helm", Title = "Fix the sync", State = SessionState.Done });
-        _sessions.Upsert("s2", new WorkspaceSessionRecord { MachineId = "pc1", SessionId = "s2", WindowFolder = @"C:\Project\WebAdmin", Folder = @"C:\Project\WebAdmin", Title = "Deploy", State = SessionState.Working });
-        _sessions.Upsert("s3", new WorkspaceSessionRecord { MachineId = "pc1", SessionId = "s3", WindowFolder = @"C:\Project\WebAdmin", Folder = @"C:\Project\WebAdmin", Title = "Backups", State = SessionState.Idle });
-        _sessions.Upsert("s4", new WorkspaceSessionRecord { MachineId = "pc2", SessionId = "s4", WindowFolder = @"D:\Helm", Folder = @"D:\Helm", Title = "Old", State = SessionState.Idle });
-        return new WorkspaceAskTools(_hosts, _sessions, _commands, _results, time: _time);
-    }
-
-    [Fact]
-    public async Task A_spoken_request_goes_to_the_session_of_the_project_named_and_Undo_withdraws_it_until_the_PC_takes_it()
-    {
-        var script = new AskHelmScript(Step(Call("workspace_send", """{"to":"Helm","text":"thêm test cho Ask Helm","summary":"Gửi Claude Code (Helm): thêm test cho Ask Helm"}""")));
-
-        var reply = await script.Say("gửi cho Claude Code ở Helm: thêm test cho Ask Helm", [Workspace()]);
-
-        Assert.All(script.Offered[0], t => Assert.Equal("workspace", ToolScope.GroupOf(t.Name)));
-        var command = Assert.Single(_commands.All()).Value;
-        Assert.Equal(WorkspaceCommandKind.Prompt, command.Kind);
-        Assert.Equal(("pc1", "s1", "thêm test cho Ask Helm"), (command.MachineId, command.SessionId, command.Text));
-
-        await Assert.Single(reply.Done).UndoAsync(CancellationToken.None);
-        Assert.Empty(_commands.All());
-    }
-
-    [Fact]
-    public async Task A_request_the_PC_already_took_is_not_taken_back()
-    {
-        var send = Workspace().Tools.Single(t => t.Name == "workspace_send");
-        var sent = JsonSerializer.SerializeToElement(await send.Run(JsonDocument.Parse("""{"to":"helm","text":"go"}""").RootElement, default));
-        var id = sent.GetProperty("id").GetString()!;
-        _results.Upsert(id, new WorkspaceResultRecord { CommandId = id, MachineId = "pc1", Status = WorkspaceCommandStatus.Received });
-
-        await Assert.ThrowsAsync<McpToolException>(() => send.Undo!(sent, default));
-        Assert.Single(_commands.All());
-    }
-
-    [Fact]
-    public async Task Several_sessions_that_fit_are_listed_for_the_user_to_choose_and_nothing_is_sent()
-    {
-        var send = Workspace().Tools.Single(t => t.Name == "workspace_send");
-
-        var ex = await Assert.ThrowsAsync<McpToolException>(() => send.Run(JsonDocument.Parse("""{"to":"WebAdmin","text":"status?"}""").RootElement, default));
-
-        Assert.Contains("Deploy (working)", ex.Message);
-        Assert.Contains("Backups (idle)", ex.Message);
-        Assert.Empty(_commands.All());
-    }
-
-    [Fact]
-    public async Task A_window_without_a_session_opens_a_new_one_and_an_offline_PC_is_left_out()
-    {
-        var tools = Workspace().Tools.ToDictionary(t => t.Name);
-
-        await tools["workspace_send"].Run(JsonDocument.Parse("""{"to":"hw-ask","text":"chạy test"}""").RootElement, default);
-        var list = JsonSerializer.Serialize(await tools["workspace_sessions"].Run(JsonDocument.Parse("{}").RootElement, default));
-
-        var command = Assert.Single(_commands.All()).Value;
-        Assert.Equal(WorkspaceCommandKind.NewSession, command.Kind);
-        Assert.Equal(@"C:\tmp\hw-ask", command.Folder);
-        Assert.DoesNotContain("OLD-PC", list);
-        Assert.Contains("Fix the sync", list);
-    }
-
     [Theory]
-    [InlineData("gửi cho Claude Code ở Helm: thêm test", "workspace")]
     [InlineData("Đường tới 36 Hoàng Cầu", "phone")]
     [InlineData("mở Grab", "phone")]
     [InlineData("Đỗ Aptis B1 ngày 15/11", "mission")]
@@ -284,13 +200,13 @@ public sealed class AskHelmToolsTests
         [
             new WalletShareTools(debts, wallet), new BillMcpTools(new BillBook(new MemorySynced<WalletBill>(), wallet, _time), wallet),
             new MissionsMcpTools(new MissionsStore(new MemorySynced<Mission>(), new MemorySynced<MissionStep>(), new MemorySyncedLog<MissionEvent>(), _time)),
-            new NotesMcpTools(new NotesStore(new MemorySynced<NoteItem>(), _time), links), Workspace(),
+            new NotesMcpTools(new NotesStore(new MemorySynced<NoteItem>(), _time), links),
         ];
         var offered = new AskHelmScript().Assistant(providers).OfferedTools([new FakePhone()]).ToDictionary(t => t.Name);
 
-        foreach (var name in new[] { "wallet_split_bill", "bill_add", "bill_pay", "mission_create", "mission_complete_step", "mission_skip_step", "mission_check_item", "notes_create", "workspace_send" })
+        foreach (var name in new[] { "wallet_split_bill", "bill_add", "bill_pay", "mission_create", "mission_complete_step", "mission_skip_step", "mission_check_item", "notes_create" })
             Assert.Equal(AssistantToolMode.Auto, offered[name].Mode);
-        foreach (var name in new[] { "wallet_debt_reminder", "bills_list", "workspace_sessions", "notes_search" })
+        foreach (var name in new[] { "wallet_debt_reminder", "bills_list", "notes_search" })
             Assert.Equal(AssistantToolMode.Read, offered[name].Mode);
         Assert.Contains("phone_navigate", offered.Keys);
         Assert.DoesNotContain("mission_replan", offered.Keys);

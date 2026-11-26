@@ -319,13 +319,12 @@ More of Ask Helm's tools, each reached by saying it (no new screens). Changes ru
 | "Đỗ Aptis B1 ngày 15/11" | `mission_create` | One mission with ordered steps, the exam its last step, the date its deadline; `mission_complete_step`, `mission_skip_step` and `mission_check_item` are Ask Helm's too, each with Undo |
 | "Ý tưởng game: …" | `notes_create` `tags` | A note ending in `#idea #game`; the tool's description lists the hashtags in use (`NoteTags`), so the project tag is the user's own |
 | "Ghi chú về lỗi server hôm trước" | `notes_search` `any` | Several alternative words the model expands (synonyms, Vietnamese and English); notes with more of them first, then by how well and how recently (`NoteRecall`, half-life 14 days). No embeddings service |
-| "Gửi cho Claude Code ở Helm: …" | `workspace_sessions`, `workspace_send` | A `WorkspaceCommand` to the session (or a new one in the window) named by project, folder or title, on a PC online; several fit: nothing is sent, the card asks which. Free: Claude Code works on the user's plan. Undo withdraws it until the PC takes it |
 
 **One call, several records.** A tool result with a `records` list (`McpTool.RecordsProperty`), each item with its own
 `summary`, is listed as one row per item; Undo (here or on the PC that made it) gets that item alone.
 
 The phone tools are in `PhoneToolSpecs` (one place for both the phone's `PhoneTools` and the PC, which hands their
-calls back to the phone). `workspace_send` is also offered to other MCP clients on the PC, behind the usual consent.
+calls back to the phone).
 
 ## Ask Helm's card: photo to data, the brief chip
 
