@@ -1,14 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <UseWPF>true</UseWPF>
     <RootNamespace>Helm.Modules.NovelReader</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Modules.NovelReader.Core\Helm.Modules.NovelReader.Core.csproj" />
-    <!-- The page is the shared Avalonia view, shown through Helm.Ui.Windows. -->
+    <!-- The page is the shared Avalonia view. -->
     <ProjectReference Include="..\Helm.Modules.NovelReader.UI\Helm.Modules.NovelReader.UI.csproj" />
     <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>
@@ -20,6 +19,8 @@
   <ItemGroup>
     <!-- ONNX Runtime's native library for the VieNeu voice (the managed API comes with Helm.Modules.NovelReader.Core). -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
+    <!-- Makes covers small (Avalonia ships it; same version as Avalonia.Skia's). -->
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
   </ItemGroup>
 
   <ItemGroup>

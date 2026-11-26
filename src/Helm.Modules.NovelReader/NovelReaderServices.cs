@@ -26,8 +26,7 @@ public static class NovelReaderServices
             .AddSingleton<NovelScraperViewModel>()
             .AddSingleton<NovelSourceWatcher>()
             .AddNovelReaderCore()
-            .AddHelmModule<NovelReaderModule, NovelReaderContentPage, NovelReaderViewModel>()
-            .AddSingleton<NovelReaderContentPage>();
+            .AddHelmModule<NovelReaderModule, NovelReaderViewModel>();
 
     internal static Stream OpenWordClasses() =>
         new System.IO.Compression.GZipStream(

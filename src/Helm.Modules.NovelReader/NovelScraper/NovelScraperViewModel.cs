@@ -319,7 +319,7 @@ public sealed partial class NovelScraperViewModel : ObservableObject, INovelWebS
         }
     }
 
-    /// <summary>The site's cover made small like a picked one (on the UI thread: it draws with WPF), or null.</summary>
+    /// <summary>The site's cover made small like a picked one, or null.</summary>
     private byte[]? SmallCover(byte[]? picture)
     {
         if (picture is null) return null;
@@ -327,8 +327,7 @@ public sealed partial class NovelScraperViewModel : ObservableObject, INovelWebS
         {
             return CoverPicture.Shrink(picture);
         }
-        catch (Exception ex) when (ex is NotSupportedException or ArgumentException or InvalidOperationException or System.IO.IOException
-            or System.Runtime.InteropServices.COMException or FileFormatException)
+        catch (Exception ex) when (ex is NotSupportedException or ArgumentException or InvalidOperationException or System.IO.IOException)
         {
             _logger.LogInformation(ex, "The site's cover is not a picture Windows can read");
             return null;
