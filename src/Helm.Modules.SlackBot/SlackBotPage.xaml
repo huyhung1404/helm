@@ -5,6 +5,7 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
     xmlns:local="clr-namespace:Helm.Modules.SlackBot"
+    xmlns:sb="clr-namespace:Helm.Modules.SlackBot;assembly=Helm.Modules.SlackBot.Core"
     Module="{Binding Module}">
 
     <StackPanel>
@@ -82,7 +83,7 @@
                 <ScrollViewer MaxHeight="380" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding Channels}" VirtualizingPanel.IsVirtualizing="True">
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type local:SlackChannelRow}">
+                            <DataTemplate DataType="{x:Type sb:SlackChannelRow}">
                                 <Border Style="{DynamicResource HelmExpanderRow}" Padding="0,6">
                                     <core:RowLayout>
                                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />

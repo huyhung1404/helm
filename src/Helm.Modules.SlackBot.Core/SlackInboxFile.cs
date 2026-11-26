@@ -27,7 +27,7 @@ public sealed class SlackInboxFile : IDisposable
 
     public SlackInboxFile(HelmPaths paths, ISecretProtector protector, ILogger<SlackInboxFile> logger)
     {
-        _path = Path.Combine(paths.ModuleDataDirectory(SlackBotModule.ModuleId), "inbox.bin");
+        _path = Path.Combine(paths.ModuleDataDirectory(SlackBotIds.ModuleId), "inbox.bin");
         _protector = protector;
         _logger = logger;
         _timer = new Timer(_ => Flush(), null, Timeout.Infinite, Timeout.Infinite);

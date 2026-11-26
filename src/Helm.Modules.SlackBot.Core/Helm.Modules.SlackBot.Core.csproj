@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Slack Report's logic, with no WPF, Avalonia or Win32: reading Slack as the user (Web API + Socket Mode), the inbox
+       kept on this device (encrypted through ISecretProtector), Claude's sorting (through ISlackAgent), the settings and
+       the view models of the page and its settings. The Windows app adds the list on screen (the overlay), Claude Code
+       and the MCP tools; the shared page is Helm.Modules.SlackBot.UI. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.SlackBot</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+    <!-- The Gallery's demo (also compiled into the UI tests) shows the pages as if connected, with no Slack behind them. -->
+    <InternalsVisibleTo Include="Helm.Gallery" />
+    <InternalsVisibleTo Include="Helm.Ui.Tests" />
+  </ItemGroup>
+
+</Project>

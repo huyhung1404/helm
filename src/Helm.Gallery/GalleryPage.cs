@@ -43,6 +43,16 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Habits", "Reason for skipped days", "Habits", m => HabitsDemo.Create(m, HabitsStage.Reason), Framed: false),
         new("Habits", "First run", "Habits", m => HabitsDemo.Create(m, HabitsStage.FirstRun), Framed: false),
         new("Habits", "Settings", "Habits", m => HabitsDemo.Create(m, HabitsStage.Settings), Framed: false),
+        new("Slack Report", "To do", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.ToDo), Framed: false),
+        new("Slack Report", "Worth knowing", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.Knowing), Framed: false),
+        new("Slack Report", "Handled today", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.Handled), Framed: false),
+        new("Slack Report", "Reply", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.Reply), Framed: false),
+        new("Slack Report", "Claude Code missing", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.SortProblem), Framed: false),
+        new("Slack Report", "All clear", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.AllClear), Framed: false),
+        new("Slack Report", "First run (not signed in)", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.FirstRun), Framed: false),
+        new("Slack Report", "Settings", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.Settings), Framed: false),
+        new("Slack Report", "Settings (lower part)", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.SettingsEnd), Framed: false),
+        new("Slack Report", "Settings (connect)", "Slack Report", m => SlackBotDemo.Create(m, SlackBotStage.SettingsConnect), Framed: false),
         new("Base", "Controls", "Controls", _ => new ControlsPage()),
     ];
 

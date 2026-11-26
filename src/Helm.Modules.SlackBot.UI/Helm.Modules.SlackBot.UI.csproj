@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Slack Report page, ONE Avalonia view (Windows through Helm.Ui.Windows today; the tool is Windows-only for now):
+       what needs the user, the worth-knowing report, what was handled, the reply sheet and the settings sheet. What only
+       the app can do (copying the manifest, the list on screen) comes through ISlackBotPageHost / ISlackBotShell. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.SlackBot.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.SlackBot.Core\Helm.Modules.SlackBot.Core.csproj" />
+  </ItemGroup>
+
+</Project>

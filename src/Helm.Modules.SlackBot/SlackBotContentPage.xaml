@@ -5,6 +5,7 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
     xmlns:local="clr-namespace:Helm.Modules.SlackBot"
+    xmlns:sb="clr-namespace:Helm.Modules.SlackBot;assembly=Helm.Modules.SlackBot.Core"
     Title="Slack Report">
 
     <!-- SlackBot itself (menu and Quick access): the to-do list, the report, what was handled. Its options live on
@@ -16,7 +17,7 @@
         </Style>
 
         <!-- Who, where, when, Claude's line and the message -->
-        <DataTemplate x:Key="MessageBody" DataType="{x:Type local:InboxItemViewModel}">
+        <DataTemplate x:Key="MessageBody" DataType="{x:Type sb:InboxItemViewModel}">
             <StackPanel>
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Right" Text="{Binding When}" Style="{DynamicResource HelmSecondaryText}" />
@@ -74,7 +75,7 @@
                        Visibility="{Binding HasToDo, Converter={StaticResource InverseBoolToVisibility}}" />
             <ItemsControl ItemsSource="{Binding ToDo}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type local:InboxItemViewModel}">
+                    <DataTemplate DataType="{x:Type sb:InboxItemViewModel}">
                         <Border Margin="0,0,0,4" Style="{DynamicResource HelmSurface}">
                             <StackPanel>
                                 <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MessageBody}" />
@@ -127,7 +128,7 @@
                        Visibility="{Binding HasKnowing, Converter={StaticResource InverseBoolToVisibility}}" />
             <ItemsControl ItemsSource="{Binding Knowing}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type local:InboxGroupViewModel}">
+                    <DataTemplate DataType="{x:Type sb:InboxGroupViewModel}">
                         <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Channel24}">
                             <ui:CardExpander.Header>
                                 <core:RowLayout>
@@ -138,7 +139,7 @@
                             </ui:CardExpander.Header>
                             <ItemsControl ItemsSource="{Binding Items}">
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type local:InboxItemViewModel}">
+                                    <DataTemplate DataType="{x:Type sb:InboxItemViewModel}">
                                         <Border Style="{DynamicResource HelmExpanderRow}" Padding="0,8">
                                             <StackPanel>
                                                 <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MessageBody}" />
@@ -163,7 +164,7 @@
             <TextBlock Text="Handled today" Style="{DynamicResource HelmSectionHeader}" />
             <ItemsControl ItemsSource="{Binding Handled}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type local:InboxItemViewModel}">
+                    <DataTemplate DataType="{x:Type sb:InboxItemViewModel}">
                         <Border Margin="0,0,0,4" Style="{DynamicResource HelmSurface}" Opacity="0.85">
                             <DockPanel>
                                 <ui:Button DockPanel.Dock="Right" VerticalAlignment="Top" Margin="8,0,0,0" Appearance="Transparent" Content="Back to the list"
