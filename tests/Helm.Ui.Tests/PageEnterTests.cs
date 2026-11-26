@@ -26,11 +26,17 @@ public sealed class PageEnterTests
         Assert.True(page.RenderTransform is null || page.RenderTransform.Value.IsIdentity);
         Assert.Equal(1, backdrop.Opacity);
         Assert.Null(backdrop.Effect);
-        Assert.True(content.Opacity < 0.5);
+        // Still coming in: the headless clock follows real time, so the first tick can be ~100 ms in (opacity ~0.65).
+        Assert.True(content.Opacity < 1);
         Assert.IsAssignableFrom<IBlurEffect>(content.Effect);
 
-        // The headless clock moves a little per tick: run it until the animation is over.
-        for (var i = 0; i < 20000 && content.Opacity < 1; i++) Tick(1);
+        // The headless clock follows real time: tick until the animation is over (it takes 260 ms), at most 3 s.
+        var until = DateTime.UtcNow.AddSeconds(3);
+        while (content.Opacity < 1 && DateTime.UtcNow < until)
+        {
+            Tick(1);
+            Thread.Sleep(5);
+        }
         Tick(5);
 
         Assert.Equal(1, content.Opacity);
