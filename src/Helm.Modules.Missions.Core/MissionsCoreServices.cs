@@ -53,10 +53,14 @@ public static class MissionsCoreServices
     /// linked mission.
     /// </summary>
     public static IServiceCollection AddMissionLinks(this IServiceCollection services, Type contentPage) =>
+        services.AddMissionLinks(navigation => navigation.ShowPage(contentPage));
+
+    /// <summary>Missions as link targets; <paramref name="showPage"/> brings up the Missions page (Windows: by its tool id).</summary>
+    public static IServiceCollection AddMissionLinks(this IServiceCollection services, Action<IShellNavigation> showPage) =>
         services.AddHelmLinks()
             .AddSingleton<ILinkProvider>(sp => new MissionLinkProvider(sp.GetRequiredService<MissionsStore>(), id =>
             {
-                sp.GetRequiredService<IShellNavigation>().ShowPage(contentPage);
+                showPage(sp.GetRequiredService<IShellNavigation>());
                 sp.GetRequiredService<MissionsViewModel>().Select(id);
             }));
 }

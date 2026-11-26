@@ -1,19 +1,21 @@
-using System.Windows.Media;
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Helm.Modules.Missions.Ui;
 using Microsoft.Extensions.Logging;
-using Wpf.Ui.Controls;
 
 namespace Helm.Modules.Missions;
 
 /// <summary>
 /// Missions on Windows. The data lives in Helm Sync and the pages work on <see cref="MissionsStore"/>; the only
 /// background work is the daily step reminder (a tray notification) while the tool is on. The menu and Quick access
-/// and Home → Utilities open <see cref="MissionsContentPage"/>; its settings are a sheet inside it.
+/// and Home → Utilities open its page, the shared <see cref="MissionsView"/>; its settings are a sheet inside it.
 /// </summary>
-public sealed class MissionsModule : HelmModuleBase, IModuleContent, IDisposable
+public sealed class MissionsModule : HelmModuleBase, IDisposable
 {
     private static readonly TimeSpan CheckEvery = TimeSpan.FromMinutes(10);
 
@@ -42,11 +44,17 @@ public sealed class MissionsModule : HelmModuleBase, IModuleContent, IDisposable
     public override string DisplayName => MissionsIds.DisplayName;
     public override string Description => MissionsIds.Description;
     public override ModuleGroup Group => ModuleGroup.Planning;
-    public override SymbolRegular Icon => SymbolRegular.Flag24;
-    public override ImageSource IconImage => MissionsLogo.Image;
-    public override Type SettingsPageType => typeof(MissionsContentPage);
-    public Type ContentPageType => typeof(MissionsContentPage);
+    public override Symbol Icon => Symbol.Flag;
+    public override IImage IconImage => MissionsIcon.Image;
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
+
+    /// <summary>The view model is resolved here, the first time the tab opens, not with the module.</summary>
+    public override Control CreatePage()
+    {
+        var viewModel = _services.GetRequiredService<MissionsViewModel>();
+        var host = new WindowsMissionsPageHost(viewModel);
+        return host.Attach(new MissionsView(this, viewModel, host));
+    }
 
     public override Task EnableAsync(CancellationToken ct)
     {
@@ -83,7 +91,7 @@ public sealed class MissionsModule : HelmModuleBase, IModuleContent, IDisposable
         try
         {
             _services.GetRequiredService<IUserNotifications>().Show(reminder.Title, reminder.Message,
-                () => _services.GetRequiredService<IShellNavigation>().ShowPage(typeof(MissionsContentPage)));
+                () => _services.GetRequiredService<IShellNavigation>().ShowTool(MissionsIds.ModuleId));
             _logger.LogInformation("Missions reminder shown: {Title}", reminder.Title);
         }
         catch (Exception ex)

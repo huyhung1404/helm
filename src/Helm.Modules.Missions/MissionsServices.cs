@@ -8,7 +8,6 @@ public static class MissionsServices
     public static IServiceCollection AddMissionsModule(this IServiceCollection services) =>
         services
             .AddMissionsCore()
-            .AddMissionLinks(typeof(MissionsContentPage))
-            .AddHelmModule<MissionsModule, MissionsContentPage, MissionsViewModel>()
-            .AddSingleton<MissionsContentPage>();
+            .AddMissionLinks(navigation => navigation.ShowTool(MissionsIds.ModuleId))
+            .AddHelmModule<MissionsModule, MissionsViewModel>();
 }
