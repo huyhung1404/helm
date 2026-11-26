@@ -13,6 +13,7 @@ public static class KeyboardServices
         services.AddSyncGroup("keyboard.", "Helm Keyboard");
         services.AddSingleton<KeyboardApps>();
         services.AddSingleton<KeyboardInstaller>();
+        services.AddSingleton<IKeyboard>(sp => sp.GetRequiredService<KeyboardModule>());
         return services.AddHelmModule<KeyboardModule, KeyboardPage, KeyboardViewModel>();
     }
 }

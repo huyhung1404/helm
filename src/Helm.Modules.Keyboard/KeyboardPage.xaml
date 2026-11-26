@@ -5,6 +5,6 @@
       ScrollViewer.CanContentScroll="False"
       Title="Helm Keyboard">
 
-    <!-- Helm Keyboard's settings are an Avalonia page (KeyboardView), the same look as the other tools; this WPF page only hosts it. -->
+    <!-- Helm Keyboard is the shared Avalonia page, Helm.Modules.Keyboard.UI/KeyboardView. This WPF page only hosts it. -->
     <uiw:AvaloniaHost x:Name="Host" />
 </Page>

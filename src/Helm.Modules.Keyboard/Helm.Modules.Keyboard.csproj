@@ -3,14 +3,14 @@
   <PropertyGroup>
     <UseWPF>true</UseWPF>
     <RootNamespace>Helm.Modules.Keyboard</RootNamespace>
-    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Keyboard.Engine\Helm.Keyboard.Engine.csproj" />
-    <!-- The settings page is an Avalonia view (like the shared pages of the other tools), shown through Helm.Ui.Windows. -->
-    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Keyboard.Core\Helm.Modules.Keyboard.Core.csproj" />
+    <!-- The page is the shared Avalonia view, shown through Helm.Ui.Windows. -->
+    <ProjectReference Include="..\Helm.Modules.Keyboard.UI\Helm.Modules.Keyboard.UI.csproj" />
     <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>
 

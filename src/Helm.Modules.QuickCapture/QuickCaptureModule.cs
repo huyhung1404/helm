@@ -5,6 +5,7 @@ using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Ui;
+using Helm.Modules.QuickCapture.Ui;
 using Helm.Ui.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -17,7 +18,7 @@ namespace Helm.Modules.QuickCapture;
 /// into Notes or Tracker through their <see cref="ICaptureTarget"/>s and the box closes. Only the tools that are on
 /// are offered. No settings page content beyond the shortcut and the default target.
 /// </summary>
-public sealed class QuickCaptureModule : HelmModuleBase, IDisposable
+public sealed class QuickCaptureModule : HelmModuleBase, IQuickCapture, IDisposable
 {
     public const string ModuleId = "quick-capture";
     private const string HotkeyId = "open";

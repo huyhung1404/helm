@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Helm Keyboard's logic with no WPF, Avalonia or Win32: the settings, the modes, the keyboard each app keeps (on Helm
+       Sync), the tool as the page sees it (IKeyboard) and the page's view model. The Windows app adds the input method
+       installer, the engine (hooks, IME, the on-screen sign); the shared page is Helm.Modules.Keyboard.UI. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.Keyboard</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Modules.Keyboard" />
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

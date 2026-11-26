@@ -42,6 +42,8 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Ssh.UI\Helm.Modules.Ssh.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Vocab.UI\Helm.Modules.Vocab.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Wallet.UI\Helm.Modules.Wallet.UI.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Keyboard.UI\Helm.Modules.Keyboard.UI.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.QuickCapture.UI\Helm.Modules.QuickCapture.UI.csproj" />
   </ItemGroup>
 
   <!-- The Gallery's in-memory stand-ins, so a page runs with its real view model here too. -->
@@ -61,6 +63,9 @@
     <Compile Include="..\..\src\Helm.Gallery\VocabDemo.cs" Link="VocabDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\WalletDemo.cs" Link="WalletDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\McpConsentDemo.cs" Link="McpConsentDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\ShellPagesDemo.cs" Link="ShellPagesDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\KeyboardDemo.cs" Link="KeyboardDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\QuickCaptureDemo.cs" Link="QuickCaptureDemo.cs" />
   </ItemGroup>
 
 </Project>

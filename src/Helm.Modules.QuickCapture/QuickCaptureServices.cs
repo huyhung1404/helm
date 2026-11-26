@@ -7,5 +7,6 @@ public static class QuickCaptureServices
 {
     public static IServiceCollection AddQuickCaptureModule(this IServiceCollection services) =>
         services
+            .AddSingleton<IQuickCapture>(sp => sp.GetRequiredService<QuickCaptureModule>())
             .AddHelmModule<QuickCaptureModule, QuickCapturePage, QuickCaptureViewModel>();
 }

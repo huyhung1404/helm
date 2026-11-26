@@ -16,7 +16,7 @@ public sealed partial class QuickCaptureViewModel : ObservableObject
     [ObservableProperty] private HotkeyGesture _hotkey;
     [ObservableProperty] private int _defaultTargetIndex;
 
-    public QuickCaptureViewModel(QuickCaptureModule module)
+    public QuickCaptureViewModel(IQuickCapture module)
     {
         Module = module;
         _store = module.Settings;
@@ -33,7 +33,7 @@ public sealed partial class QuickCaptureViewModel : ObservableObject
 
     private readonly List<string> _targetIds;
 
-    public QuickCaptureModule Module { get; }
+    public IQuickCapture Module { get; }
 
     public HotkeyGesture DefaultHotkey => QuickCaptureSettings.DefaultHotkey;
 

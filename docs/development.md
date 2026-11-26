@@ -33,7 +33,7 @@ A few command-line flags are handy while developing:
 | Path | Content |
 |---|---|
 | `%LOCALAPPDATA%\Helm\settings\general.json` | Theme, window placement, enabled modules, last update check |
-| `%LOCALAPPDATA%\Helm\settings\<moduleId>.json` | One file per module (`zones.json`, `always-on-top.json`, `tracker.json`) |
+| `%LOCALAPPDATA%\Helm\settings\<moduleId>.json` | One file per module (`window-zones.json`, `keyboard.json`, `tracker.json`) |
 | `%LOCALAPPDATA%\Helm\sync\helm-sync.db` | Synced data (encrypted local replica), e.g. Tracker workspaces, items and history |
 | `%LOCALAPPDATA%\Helm\settings\zones\` | `layouts.json`, `applied.json` (monitor id → layout), `app-zone-history.json` |
 | `%LOCALAPPDATA%\Helm\logs\helm-YYYYMMDD.log` | Serilog rolling log, 14 days (`velopack-hooks.log` for install/update/uninstall hooks) |
@@ -47,18 +47,22 @@ A few command-line flags are handy while developing:
 src/
   Helm.Core/                 net8.0, no UI: module contract (IModule, ModuleRegistry<T>), settings, sync, update rules
   Helm.Shell/                net8.0: view models shared by both apps' Home and General (Updates, Sync), Bug reports (store, black box, view models)
-  Helm.Shell.UI/             Avalonia: Home, General and Bug reports (the page and the report form), the MCP consent question, every platform
+  Helm.Shell.UI/             Avalonia: Home, General, Bug reports (the page and the report form), Welcome, the MCP consent question, every platform
   Helm.Shell.Windows/        Windows: the WPF pages that host Home, General and Bug reports, the report window, the MCP consent window, this PC's pictures and MCP part
   Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
-                             GDI overlay window, DPAPI, shared WPF controls (Ui/, also the confetti); namespaces stay Helm.Core.*
-  Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, Home/General/Diagnostics pages
+                             GDI overlay window, DPAPI, the few WPF controls the shell still uses (Ui/); namespaces stay Helm.Core.*
+  Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, the WPF pages that host Welcome and Diagnostics
   Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
-  Helm.Modules.AlwaysOnTop/  Windows only: engine, settings page
   Helm.Keyboard.Engine/      net8.0: Telex (namespace Helm.Typing), the ids Helm and the input method share
   Helm.Keyboard.Tip/         HelmKeyboard.dll: the Vietnamese input method (TSF, NativeAOT, 64- and 32-bit);
                              built by scripts/build-keyboard.ps1, needs the C++ build tools
-  Helm.Modules.Keyboard/     Windows only: installs the input method, EN / VI / 中 shortcut, keyboard per app (on Helm Sync)
+  Helm.Modules.QuickCapture.Core/ net8.0: settings, IQuickCapture, the view models of the page and the capture box
+  Helm.Modules.QuickCapture.UI/ Avalonia: the Quick Capture page and the capture box
+  Helm.Modules.QuickCapture/ Windows only: the shortcut, the floating window around the box, the WPF page that hosts the shared view
+  Helm.Modules.Keyboard.Core/ net8.0: settings, modes, the keyboard per app (on Helm Sync), IKeyboard, shared view model
+  Helm.Modules.Keyboard.UI/  Avalonia: the Helm Keyboard page
+  Helm.Modules.Keyboard/     Windows only: installs the input method, EN / VI / 中 shortcut, the WPF page that hosts the shared view
   Helm.Modules.Tracker.Core/ net8.0: Tracker data (on Helm Sync), reports, CSV, shared view model
   Helm.Modules.Tracker/      Windows: Tracker page
   Helm.Modules.Tracker.Android/ Android: Tracker page and home-screen widget (not in Helm.sln)
