@@ -1,6 +1,7 @@
 using Avalonia.Media;
 using FluentIcons.Common;
 using Helm.Core.Modules;
+using Helm.Modules.Tracker.Ui;
 using Microsoft.Extensions.Logging;
 using AndroidApp = Android.App.Application;
 

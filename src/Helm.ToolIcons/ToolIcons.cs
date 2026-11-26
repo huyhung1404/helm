@@ -21,7 +21,7 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         "quick-capture" => Helm.Modules.QuickCapture.QuickCaptureIcon.Image,
         "scratch" => Helm.Modules.Scratch.ScratchIcon.Image,
         "ssh" => Helm.Modules.Ssh.Ui.SshIcon.Image,
-        "tracker" => Helm.Modules.Tracker.TrackerIcon.Image,
+        "tracker" => Helm.Modules.Tracker.Ui.TrackerIcon.Image,
         "vocab" => Helm.Modules.Vocab.Ui.VocabIcon.Image,
         "wallet" => Helm.Modules.Wallet.Ui.WalletIcon.Image,
         "vault" => Helm.Modules.Vault.Ui.VaultIcon.Image,
