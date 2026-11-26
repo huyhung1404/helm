@@ -21,7 +21,7 @@ public sealed partial class HabitsViewModel : ObservableObject
     private readonly HabitsStore _store;
     private readonly ISettingsStore<HabitsSettings> _settings;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
     private readonly HabitReminderService _reminders;
     private readonly ILogger<HabitsViewModel> _logger;
     private readonly Dictionary<string, HabitCard> _cards = new(StringComparer.Ordinal);
@@ -92,6 +92,9 @@ public sealed partial class HabitsViewModel : ObservableObject
         Refresh();
     }
 
+    /// <summary>Confirmations (deleting a habit) from the page that shows them (the shared view's glass sheet).</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
+
     /// <summary>Raised when a habit is done here for today (true for a big one: a milestone or the last habit of the day).</summary>
     public event EventHandler<bool>? Celebrated;
 
@@ -132,6 +135,17 @@ public sealed partial class HabitsViewModel : ObservableObject
 
     /// <summary>"2 of 5 habits done today".</summary>
     public string TodayText => $"{DoneToday.Count} of {Plural(DoneToday.Count + ToDo.Count, "habit")} done today";
+
+    /// <summary>The line at the top of the page: "Thursday 26 November · 2 of 5 done".</summary>
+    public string TodayLine
+    {
+        get
+        {
+            var date = _store.Today.ToString("dddd d MMMM", CultureInfo.CurrentCulture);
+            var total = DoneToday.Count + ToDo.Count;
+            return total == 0 ? date : $"{date} · {DoneToday.Count} of {total} done";
+        }
+    }
 
     /// <summary>One line of encouragement under the progress bar.</summary>
     public string TodayHint => ToDo.Count == 0 ? "Everything is done for today. See you tomorrow!"
@@ -747,6 +761,7 @@ public sealed partial class HabitsViewModel : ObservableObject
             OnPropertyChanged(nameof(TodayProgress));
             OnPropertyChanged(nameof(TodayText));
             OnPropertyChanged(nameof(TodayHint));
+            OnPropertyChanged(nameof(TodayLine));
             // A reason written on another device, or the days ticked after all: the question may be answered already.
             if (PendingLapse is not null) CheckLapses();
         }

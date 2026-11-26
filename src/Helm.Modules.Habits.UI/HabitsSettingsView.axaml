@@ -1,0 +1,153 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Habits"
+             x:Class="Helm.Modules.Habits.Ui.HabitsSettingsView"
+             x:DataType="vm:HabitsViewModel">
+
+    <!-- Habits' settings as a sheet over the page (the gear): on/off, the habits (add, rename, order, delete),
+         celebrations, reminders. One card per subject, a switch or a field on the right. -->
+    <UserControl.Styles>
+        <Style Selector="Border.tile">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="HABITS" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- On or off: off keeps the habits (read only) and stops the reminders -->
+        <Border Classes="glass">
+            <DockPanel>
+                <ToggleSwitch x:Name="EnableSwitch" DockPanel.Dock="Right" OnContent="" OffContent="" AutomationProperties.Name="Habits on or off" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Habits is on" Classes="head" />
+                    <TextBlock Text="Off keeps your habits but makes them read only, and stops the reminders." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- The habits: each on its own row (rename in place, move, delete), then add one -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Habits" Classes="head" />
+                    <TextBlock Text="Rename a habit in place, change the order of the cards, or delete one with its history." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding ManageHabits}" IsVisible="{Binding HasHabits}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:HabitRow">
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6" Margin="0,0,0,10">
+                                <StackPanel Spacing="4">
+                                    <TextBox Classes="glass" MaxLength="120" Text="{Binding Title, UpdateSourceTrigger=LostFocus}" KeyDown="Rename_KeyDown"
+                                             AutomationProperties.Name="Habit name" />
+                                    <TextBlock Text="{Binding Detail}" Classes="secondary" Margin="2,0,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" IsEnabled="{Binding CanMoveUp}" ToolTip.Tip="Move up"
+                                        Command="{Binding $parent[UserControl].((vm:HabitsViewModel)DataContext).MoveHabitUpCommand}" CommandParameter="{Binding}"
+                                        AutomationProperties.Name="Move up">
+                                    <ic:SymbolIcon Symbol="ArrowUp" FontSize="14" />
+                                </Button>
+                                <Button Grid.Column="2" Classes="chip" VerticalAlignment="Top" IsEnabled="{Binding CanMoveDown}" ToolTip.Tip="Move down"
+                                        Command="{Binding $parent[UserControl].((vm:HabitsViewModel)DataContext).MoveHabitDownCommand}" CommandParameter="{Binding}"
+                                        AutomationProperties.Name="Move down">
+                                    <ic:SymbolIcon Symbol="ArrowDown" FontSize="14" />
+                                </Button>
+                                <Button Grid.Column="3" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Delete this habit"
+                                        Command="{Binding $parent[UserControl].((vm:HabitsViewModel)DataContext).DeleteHabitCommand}" CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{Binding Title, StringFormat='Delete {0}'}">
+                                    <ic:SymbolIcon Symbol="Delete" FontSize="16" Foreground="{DynamicResource HelmDanger}" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBox x:Name="NewHabitBox" Classes="glass" MaxLength="120" PlaceholderText="A new habit — press Enter" Text="{Binding NewHabitTitle}"
+                             AutomationProperties.Name="New habit">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding AddHabitCommand}" />
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <Button Grid.Column="1" Classes="pill" Content="Add habit" Command="{Binding AddHabitCommand}" IsEnabled="{Binding CanAddHabit}" />
+                </Grid>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding NewHabitIsQuit}" OnContent="" OffContent="" AutomationProperties.Name="A habit to quit" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="A habit to quit" />
+                        <TextBlock Text="Like smoking: each day you keep clear of it is marked clean the day after." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <TextBlock Text="A new habit starts today; the days before it do not count." Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Display" Classes="head" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding PlayCelebrations}" OnContent="" OffContent="" AutomationProperties.Name="Play celebrations" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Play celebrations" />
+                        <TextBlock Text="Confetti when a habit is done for the day. The congratulations show either way." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Reminders" Classes="head" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RemindersEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Skipped habit reminder" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Skipped habit reminder" />
+                        <TextBlock Text="Once a day, about the habits skipped two days or more in a row." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Spacing="6" IsEnabled="{Binding RemindersEnabled}">
+                    <TextBlock Text="Reminder time" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}"
+                              AutomationProperties.Name="Reminder time" />
+                </StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding StreakRemindersEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Streak reminder" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Streak reminder" />
+                        <TextBlock Text="Once an evening, about a streak of two days or more still waiting for today." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Spacing="6" IsEnabled="{Binding StreakRemindersEnabled}">
+                    <TextBlock Text="Streak reminder time" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding StreakReminderHourIndex}"
+                              AutomationProperties.Name="Streak reminder time" />
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Remind me now" Command="{Binding RemindNowCommand}" />
+                <TextBlock Text="After two or more days in a row without a habit, Habits asks why before you go on. The reasons are in the report."
+                           Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- What only this platform has -->
+        <ContentControl x:Name="PlatformCards" />
+
+        <Border Classes="glass" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" />
+    </StackPanel>
+</UserControl>

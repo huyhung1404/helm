@@ -14,7 +14,16 @@ public sealed class SheetHandle
 {
     internal Control? Overlay;
 
+    /// <summary>Asked before a tap outside, Escape or Back closes it; false keeps it open. Null: always closes.</summary>
+    internal Func<bool>? CanClose;
+
     public event Action? Closed;
+
+    /// <summary>A tap outside, Escape or Back: closes it unless <see cref="CanClose"/> says no.</summary>
+    internal void Dismiss()
+    {
+        if (CanClose?.Invoke() != false) Close();
+    }
 
     public bool IsOpen => Overlay is not null;
 
@@ -63,7 +72,8 @@ public static class Sheet
                 Opened.RemoveAt(i);
                 continue;
             }
-            handle.Close();
+            // A sheet that must be answered first stays, and Back stays on it.
+            handle.Dismiss();
             return true;
         }
         return false;
@@ -86,15 +96,18 @@ public static class Sheet
         return scroller;
     }
 
-    /// <summary>Opens <paramref name="body"/> in a sheet; null when there is no screen to open over.</summary>
-    public static SheetHandle? Show(Control anchor, Control body, double width = 400)
+    /// <summary>
+    /// Opens <paramref name="body"/> in a sheet; null when there is no screen to open over. <paramref name="canClose"/>
+    /// is asked before a tap outside, Escape or Back closes it (false: it stays, for a question that must be answered).
+    /// </summary>
+    public static SheetHandle? Show(Control anchor, Control body, double width = 400, Func<bool>? canClose = null)
     {
         if (Find(anchor) is not { } found || OverlayLayer.GetOverlayLayer(anchor) is not { } layer) return null;
         var (screen, top) = found;
         var at = screen.TranslatePoint(default, top) ?? default;
         var size = screen.Bounds.Size;
         var phone = size.Width < PhoneBelow;
-        var handle = new SheetHandle();
+        var handle = new SheetHandle { CanClose = canClose };
 
         var card = new Border
         {
@@ -118,10 +131,10 @@ public static class Sheet
         card.PointerPressed += (_, e) => e.Handled = true;
         var scrim = new Grid { Width = size.Width, Height = size.Height, Children = { card }, Focusable = true };
         scrim.Bind(Panel.BackgroundProperty, anchor.GetResourceObservable("HelmScrim"));
-        scrim.PointerPressed += (_, _) => handle.Close();
+        scrim.PointerPressed += (_, _) => handle.Dismiss();
         scrim.KeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape) handle.Close();
+            if (e.Key == Key.Escape) handle.Dismiss();
         };
 
         // The overlay layer is outside the page: keep the page's light/dark (it may differ from the window's, in the Gallery).

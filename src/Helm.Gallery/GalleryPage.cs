@@ -36,6 +36,13 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Scratch", "Wall", "Scratch", m => ScratchDemo.Create(m, ScratchStage.Wall), Framed: false),
         new("Scratch", "Details (phone)", "Scratch", m => ScratchDemo.Create(m, ScratchStage.Wall, detail: true), Framed: false),
         new("Scratch", "Empty", "Scratch", m => ScratchDemo.Create(m, ScratchStage.Empty), Framed: false),
+        new("Habits", "Today", "Habits", m => HabitsDemo.Create(m, HabitsStage.Today), Framed: false),
+        new("Habits", "Report", "Habits", m => HabitsDemo.Create(m, HabitsStage.Report), Framed: false),
+        new("Habits", "Mark a day", "Habits", m => HabitsDemo.Create(m, HabitsStage.MarkDay), Framed: false),
+        new("Habits", "Celebration", "Habits", m => HabitsDemo.Create(m, HabitsStage.Celebration), Framed: false),
+        new("Habits", "Reason for skipped days", "Habits", m => HabitsDemo.Create(m, HabitsStage.Reason), Framed: false),
+        new("Habits", "First run", "Habits", m => HabitsDemo.Create(m, HabitsStage.FirstRun), Framed: false),
+        new("Habits", "Settings", "Habits", m => HabitsDemo.Create(m, HabitsStage.Settings), Framed: false),
         new("Base", "Controls", "Controls", _ => new ControlsPage()),
     ];
 

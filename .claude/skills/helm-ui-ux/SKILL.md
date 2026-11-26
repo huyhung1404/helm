@@ -92,7 +92,12 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   unlimited width, so a long sentence is cut at the card's edge). Check every message and warning at Phone 390.
 - Every floating card (date picker, settings, confirmation) is `Sheet.Show(anchor, body)`: a card in the middle on PC, a
   sheet from the bottom on a phone. It opens over the nearest ancestor with class `screen` (the Gallery's phone frame)
-  or the window, keeps the page's light/dark, and grows into place.
+  or the window, keeps the page's light/dark, and grows into place. A pop-up that a view model drives (Habits: marking a
+  day → celebration → reason for skipped days) is ONE sheet whose content follows the view model, and a question that
+  must be answered passes `canClose` (a tap outside, Escape and Back then leave it open). Old WPF scrim + card pop-ups
+  (an adorner over the page) are not kept: move them to a sheet.
+- Gallery `--shot <folder> [--only <text>]` saves every page at phone and PC size, dark and light, sheets included: check
+  a page from the PNGs without opening a window on the desktop.
 
 ## 6. Motion: never static, never in the way
 - Things grow into place (popup scale ~0.94 → 1 with opacity, 260 ms, cubic ease-out), not a plain fade:

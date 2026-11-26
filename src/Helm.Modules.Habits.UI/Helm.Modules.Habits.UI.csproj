@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Habits page, ONE view for every platform (Windows through Helm.Ui.Windows, Android, later macOS/iOS): the cards
+       with their year grids, the report, the pop-ups (marking a day, the celebration, the reason for skipped days) and
+       the settings sheet. What differs per platform (notification permission, the phone's menu) comes through
+       IHabitsPageHost. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.Habits.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Habits.Core\Helm.Modules.Habits.Core.csproj" />
+  </ItemGroup>
+
+</Project>
