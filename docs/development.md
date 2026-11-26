@@ -75,7 +75,7 @@ src/
   Helm.Modules.Wallet/       Windows: the module, the WPF page that hosts the shared view (CSV save dialog)
   Helm.Modules.Wallet.Android/ Android: the module, the page that hosts the shared view, bank notification listener, "what was it?" notification, widgets (not in Helm.sln)
   Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
-  Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
+  Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard, auto-type (its picker is the shared AutoTypePickerView in an Avalonia window)
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
   Helm.Modules.Vocab.Core/   net8.0: words and their parts (on Helm Sync), the quiz, the card, MCP tools, shared view models
   Helm.Modules.Vocab.UI/     Avalonia: the Vocabulary page (Learn, Words, Roots), its sheets and settings (every platform)

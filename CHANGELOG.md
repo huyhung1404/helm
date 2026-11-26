@@ -58,6 +58,9 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
   Del deletes the chosen zone, Ctrl+Enter saves, as before.
 - **Window Zones: the tabs at the top of a zone have the new look, and a click on a tab brings that window forward.**
   They still never take the keyboard from the window you work in, and stay while the pointer is on them.
+- **Vault: the auto-type picker has the new look.** The likely logins come first (marked Match), typing searches them
+  all, Up and Down choose, Enter or a click types into the window that was in front, Esc closes; "Offer it in … next time"
+  is a switch.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the
