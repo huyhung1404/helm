@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Helm.Tests;
 
 /// <summary>
-/// The SlackBot overlay and pages load with messages, built off-screen: no window is shown (the overlay is topmost).
+/// The SlackBot overlay loads with messages (the page itself is the shared Avalonia view, tested in Helm.Ui.Tests), built off-screen: no window is shown (the overlay is topmost).
 /// With HELM_SLACKBOT_SNAPSHOTS set to a folder each one is rendered to a PNG there, for checking the layout by eye.
 /// </summary>
 public sealed class SlackBotViewsTests : IDisposable
@@ -63,7 +63,7 @@ public sealed class SlackBotViewsTests : IDisposable
     }
 
     [Fact]
-    public void The_overlay_and_pages_load_with_messages() => WpfHost.Run(() =>
+    public void The_overlay_loads_with_messages() => WpfHost.Run(() =>
     {
         SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
         var paths = new HelmPaths(_dir.Path);
@@ -105,9 +105,6 @@ public sealed class SlackBotViewsTests : IDisposable
         // Open goes to the newest message of the card.
         Assert.Equal("https://team.slack.com/archives/D1/p1700000150000100", Assert.Single(launcher.Opened));
 
-        var content = new SlackBotContentPage(module, inbox);
-        Layout(content, new Size(1000, 1300), "3-content");
-
         engine.ConnectedForTests(new NoSlack(), new SlackIdentity("ME", "hung", "T1", "https://team.slack.com/"), "Hưng",
         [
             new SlackConversation("C1", "release", SlackConversationKind.Channel),
@@ -122,11 +119,6 @@ public sealed class SlackBotViewsTests : IDisposable
         Assert.False(viewModel.HasTokens);
         Assert.Equal([true, false, true], viewModel.Channels.Select(c => c.CanRead));
         Assert.Equal([true, false, false], viewModel.Channels.Select(c => c.CanWrite));
-        var page = new SlackBotPage(viewModel);
-        Layout(page, new Size(1000, 1500), "4-settings");
-        // Opened: each conversation with its Read and Write switches.
-        foreach (var expander in Descendants<Wpf.Ui.Controls.CardExpander>(page)) expander.IsExpanded = true;
-        Layout(page, new Size(1000, 2600), "4b-settings-open");
 
         // Done takes the card off the list (both of the DM's messages); replying in the thread takes the mention off too.
         inbox.DoneCommand.Execute(inbox.ToDo[0]);
@@ -176,16 +168,6 @@ public sealed class SlackBotViewsTests : IDisposable
         inbox.Reacted("D2", "1700000050.000100");
         inbox.BotReplied("D1:1700000000.000100", "D1", "1700000001.000100", "Dạ em đã nhận được và báo anh ấy rồi ạ, anh ấy sẽ xem trước 15:00.");
         inbox.Digest(DateTimeOffset.FromUnixTimeSeconds(1_650_000_000));
-    }
-
-    /// <summary>Lets the view model's short refresh delay run.</summary>
-    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
-    {
-        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
-        {
-            if (child is T found) yield return found;
-            foreach (var deeper in Descendants<T>(child)) yield return deeper;
-        }
     }
 
     /// <summary>Runs the dispatcher until <paramref name="done"/> holds (the lists refresh 300 ms after a change; a slow

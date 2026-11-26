@@ -1,54 +1,35 @@
-using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using Helm.Core.Modules;
+using Helm.Modules.SlackBot.Ui;
 
 namespace Helm.Modules.SlackBot;
 
 /// <summary>
-/// SlackBot itself, opened from the menu, the Quick access tile and the overlay (see <see cref="IModuleContent"/>).
-/// While the tool is off, what it kept stays visible but read-only, with a note pointing to the settings.
+/// Slack Report itself, opened from the menu, the Quick access tile, Home → Utilities and the list on screen (see
+/// <see cref="IModuleContent"/>): the shared Avalonia <see cref="SlackBotView"/> inside this WPF page. Its settings are a
+/// sheet behind the gear. The Windows-only part is the clipboard (the Slack app's manifest).
 /// </summary>
-public partial class SlackBotContentPage : Page
+public partial class SlackBotContentPage : Page, ISlackBotPageHost
 {
-    private readonly SlackBotModule _module;
-    private readonly SlackBotInboxViewModel _viewModel;
-
-    public SlackBotContentPage(SlackBotModule module, SlackBotInboxViewModel viewModel)
+    public SlackBotContentPage(SlackBotModule module, SlackBotInboxViewModel inbox, SlackBotViewModel settings)
     {
-        _module = module;
-        _viewModel = viewModel;
-        DataContext = viewModel;
         InitializeComponent();
-        // Module and page are both singletons, so the subscription lives as long as the page.
-        module.PropertyChanged += OnModuleChanged;
-        ApplyEnabled();
-        // Reply on a message: the box takes the keyboard.
-        viewModel.PropertyChanged += (_, e) =>
+        Host.Show(() => new SlackBotView(module, inbox, settings, this));
+    }
+
+    public void Opened()
+    {
+    }
+
+    public void CopyText(string text)
+    {
+        try
         {
-            if (e.PropertyName == nameof(SlackBotInboxViewModel.ReplyTo) && viewModel.ReplyTo is not null && IsVisible)
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, () => Keyboard.Focus(ReplyBox));
-        };
-    }
-
-    private void ReplyBox_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter || (Keyboard.Modifiers & ModifierKeys.Shift) != 0) return;
-        e.Handled = true;
-        _viewModel.SendReplyCommand.Execute(null);
-    }
-
-    private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(IModule.IsEnabled)) Dispatcher.BeginInvoke(ApplyEnabled);
-    }
-
-    private void ApplyEnabled()
-    {
-        var on = _module.IsEnabled;
-        Body.IsEnabled = on;
-        OffBar.IsOpen = !on;
-        OffBar.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+            Clipboard.SetText(text);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            // The clipboard is busy; the button can be pressed again.
+        }
     }
 }

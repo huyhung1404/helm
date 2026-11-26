@@ -79,7 +79,7 @@ internal static class SlackBotDemo
         }
         else
         {
-            engine.ShowStateForPreview(SlackBotState.NoTokens, "Connect your Slack app on the settings page.");
+            engine.ShowStateForPreview(SlackBotState.NoTokens, "Connect your Slack app in the settings (the gear).");
         }
 
         var ui = new AvaloniaUi();

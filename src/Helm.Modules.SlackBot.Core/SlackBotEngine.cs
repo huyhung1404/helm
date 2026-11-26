@@ -11,7 +11,7 @@ namespace Helm.Modules.SlackBot;
 public enum SlackBotState
 {
     Off,
-    /// <summary>No tokens yet (settings page → Connect).</summary>
+    /// <summary>No tokens yet (the gear → Connect).</summary>
     NoTokens,
     Connecting,
     /// <summary>Reading what came while Helm was not connected.</summary>
@@ -217,7 +217,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
         {
             Set(SlackBotState.NoTokens, _tokens.Exist
                 ? "The saved tokens cannot be read on this PC; connect again."
-                : "Connect your Slack app on the settings page.");
+                : "Connect your Slack app in the settings (the gear).");
             return;
         }
         using var api = new SlackApi(tokens.User, tokens.App);
@@ -267,7 +267,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
             {
                 _logger.LogWarning(ex, "Slack refused SlackBot's tokens");
                 Set(SlackBotState.Failed, ex.Error == "missing_scope"
-                    ? "The Slack app lacks a permission; update it from the manifest on the settings page and reinstall it."
+                    ? "The Slack app lacks a permission; update it from the manifest in the settings (the gear) and reinstall it."
                     : $"Slack refused the tokens ({ex.Error}); connect again with new ones.");
                 return;
             }

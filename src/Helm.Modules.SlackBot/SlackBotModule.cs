@@ -9,7 +9,7 @@ namespace Helm.Modules.SlackBot;
 /// Slack Report on Windows: reads the user's Slack with their own account (<see cref="SlackBotEngine"/>), sorts it with
 /// Claude Code, and keeps what needs them on screen until they answer (<see cref="SlackBotOverlay"/>). It only shows:
 /// it never answers by itself (Fairy posts through the MCP tools, where the user allowed writing). The menu and Quick
-/// access open <see cref="SlackBotContentPage"/>; Home → Utilities opens the settings (<see cref="SlackBotPage"/>).
+/// access and Home → Utilities open <see cref="SlackBotContentPage"/>; its settings are a sheet inside it.
 /// Everything stays on this PC. The id stays "slackbot" so settings and the MCP tools carry over.
 /// </summary>
 public sealed class SlackBotModule(SlackBotEngine engine, SlackBotOverlay overlay) : HelmModuleBase, IModuleContent
@@ -22,7 +22,7 @@ public sealed class SlackBotModule(SlackBotEngine engine, SlackBotOverlay overla
     public override ModuleGroup Group => ModuleGroup.Messages;
     public override SymbolRegular Icon => SymbolRegular.Bot24;
     public override ImageSource IconImage => SlackBotLogo.Image;
-    public override Type SettingsPageType => typeof(SlackBotPage);
+    public override Type SettingsPageType => typeof(SlackBotContentPage);
     public Type ContentPageType => typeof(SlackBotContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 

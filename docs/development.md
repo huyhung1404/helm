@@ -73,6 +73,9 @@ src/
   Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
+  Helm.Modules.SlackBot.Core/ net8.0: Slack Report engine (reads Slack, sorts it with Claude), inbox, MCP tools, shared view models
+  Helm.Modules.SlackBot.UI/  Avalonia: the Slack Report page, its reply sheet and settings sheet
+  Helm.Modules.SlackBot/     Windows only: the module, the always-on-top list window, the WPF page that hosts the shared view
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
   Helm.Core.Linux/           net8.0, Linux for the connector: secrets under a host key (0600, optionally sealed by
                              systemd-creds), MCP on a Unix socket, plain child processes; namespaces stay Helm.Core.*

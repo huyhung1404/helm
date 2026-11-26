@@ -8,6 +8,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Modules.SlackBot.Core\Helm.Modules.SlackBot.Core.csproj" />
+    <!-- The page is the shared Avalonia view, shown through Helm.Ui.Windows. -->
+    <ProjectReference Include="..\Helm.Modules.SlackBot.UI\Helm.Modules.SlackBot.UI.csproj" />
+    <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>

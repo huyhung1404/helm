@@ -22,6 +22,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
   the ring to mark today, the ones done today folded under them, and the Report tab. Marking a day, the celebration and
   the reason for skipped days open as one sheet (the reason still cannot be skipped). The settings are a sheet behind
   the gear; Home → Utilities opens Habits itself.
+- **Slack Report has the new look on the PC**: the to-do list as glass cards, what you handled today folded under it, the
+  Worth knowing tab, the reply as a sheet and, until Slack is connected, a first-run card with the steps. The settings
+  (connection, channels, how it sorts, when it reports, the on/off switch) are a sheet behind the gear; Home → Utilities opens
+  Slack Report itself. The list that stays on screen is unchanged.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the
