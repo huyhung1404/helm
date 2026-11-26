@@ -1,0 +1,143 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             xmlns:ui="using:Helm.Modules.Vocab.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Vocab.Ui.VocabView"
+             x:DataType="vm:VocabViewModel">
+
+    <!-- Vocabulary itself, the same view on every platform: the top bar (today, what waits for the AI agent, the tabs,
+         the gear), then the tab: Learn (the card; its answer bar at the foot of the page), Words (add, what waits, the
+         list, a word's page) or Roots (families, root practice, a family's page). Analysis, Add text, editing a word,
+         a new analysis, the card's menu and the settings are sheets over the page. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Vocab.UI/VocabStyles.axaml" />
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="Page" Margin="40,28,40,40">
+
+                <!-- A phone's page has no app bar: the menu button opens the drawer -->
+                <StackPanel x:Name="MenuRow" IsVisible="False" Margin="0,0,0,12">
+                    <Button Classes="chip" HorizontalAlignment="Left" Click="Menu_Click" ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                        <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                    </Button>
+                </StackPanel>
+
+                <!-- Today, what waits for the agent, which tab, the gear -->
+                <Grid x:Name="TopBar" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                    <TextBlock x:Name="TodayLine" Classes="eyebrow" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                    <StackPanel x:Name="Tabs" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="AgentChip" Classes="chip" Command="{Binding OpenAgentCommand}" ToolTip.Tip="{Binding AgentChipToolTip}"
+                                AutomationProperties.Name="{Binding AgentChipText, StringFormat='Analysis: {0}'}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Panel>
+                                    <ic:SymbolIcon Symbol="ArrowSync" Classes="spin" FontSize="16" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding IsAgentBusy}" />
+                                    <ic:SymbolIcon Symbol="HourglassHalf" FontSize="16" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding !IsAgentBusy}" />
+                                </Panel>
+                                <TextBlock Classes="label" Text="{Binding AgentChipText}" FontSize="13" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Border x:Name="TabGroup" Classes="glass" Padding="3" CornerRadius="10" BoxShadow="">
+                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                <RadioButton x:Name="LearnTab" Classes="seg" GroupName="VocabTab" IsChecked="True" IsCheckedChanged="Tab_Changed" AutomationProperties.Name="Learn">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="Learn" />
+                                        <TextBlock Text="{Binding LearnCount}" Foreground="{DynamicResource HelmEyebrow}" FontWeight="SemiBold"
+                                                   IsVisible="{Binding LearnCount, Converter={x:Static ui:VocabConverters.Any}}" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton x:Name="WordsTab" Classes="seg" GroupName="VocabTab" IsCheckedChanged="Tab_Changed" AutomationProperties.Name="Words">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="Words" />
+                                        <TextBlock Text="{Binding List.Count}" Classes="muted" FontSize="13" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton x:Name="RootsTab" Classes="seg" GroupName="VocabTab" IsCheckedChanged="Tab_Changed" AutomationProperties.Name="Roots">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="Roots" />
+                                        <TextBlock Text="{Binding Roots.TotalCount}" Classes="muted" FontSize="13" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </StackPanel>
+                        </Border>
+                        <Button Classes="chip" Click="Settings_Click" ToolTip.Tip="Vocabulary settings" AutomationProperties.Name="Vocabulary settings">
+                            <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Border x:Name="OffBar" Classes="glass" Margin="0,16,0,0" IsVisible="False">
+                    <StackPanel>
+                        <TextBlock Text="Vocabulary is turned off" Classes="head" />
+                        <TextBlock Text="Your words are kept. Turn Vocabulary on in its settings (the gear) to learn and add them." Classes="muted" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel x:Name="Body">
+                    <!-- A notice from the last action (a word already there, hidden, copied, a problem) -->
+                    <Border Classes="glass" core:Motion.EnterOnShow="True" Margin="0,16,0,0" IsVisible="{Binding HasMessage}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="flat" Width="36" Height="36" Padding="0" Command="{Binding DismissMessageCommand}"
+                                    ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- First run: the way in, step by step (1 is the only thing to do now) -->
+                    <Border x:Name="FirstRun" Classes="glass hero enter" Margin="0,32,0,0" Padding="28,26" IsVisible="False">
+                        <StackPanel Spacing="18">
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="eyebrow" Text="START HERE" />
+                                <TextBlock Text="Learn words by the pieces they are made of" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <UniformGrid x:Name="FirstRunSteps" Columns="3">
+                                <Border Classes="glass" Margin="0,0,10,10" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="eyebrow" Text="1" />
+                                        <TextBlock Text="Add a word you met" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="Type it, or paste a whole text: song lyrics, an article, a chapter." />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="eyebrow" Text="2" />
+                                        <TextBlock Text="An AI agent breaks it down" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="Into its roots or characters, with examples and a way to remember it." />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="eyebrow" Text="3" />
+                                        <TextBlock Text="Learn it card by card" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Classes="muted" TextWrapping="Wrap" Text="Words you forget come back sooner; the ones you know, later." />
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
+                            <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AddFirst_Click" AutomationProperties.Name="Add my first word">
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                    <TextBlock Text="Add my first word" Foreground="{DynamicResource HelmPillForeground}" />
+                                    <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- The tabs: each replaces the whole page under the top bar -->
+                    <ui:VocabLearnPanel x:Name="LearnPanel" Classes="enter" />
+                    <ui:VocabWordsPanel x:Name="WordsPanel" IsVisible="False" />
+                    <ui:VocabWordPage x:Name="WordPage" IsVisible="False" />
+                    <ui:VocabRootsPanel x:Name="RootsPanel" DataContext="{Binding Roots}" IsVisible="False" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- In reach whatever scrolls: the answer buttons (Learn) and root practice's -->
+        <ui:VocabAnswerBar x:Name="AnswerBar" VerticalAlignment="Bottom" MaxWidth="720" Margin="40,0,40,18" />
+    </Panel>
+</UserControl>

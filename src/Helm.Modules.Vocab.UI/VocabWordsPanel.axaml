@@ -1,0 +1,241 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="using:System"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             xmlns:ui="using:Helm.Modules.Vocab.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Vocab.Ui.VocabWordsPanel"
+             x:DataType="vm:VocabViewModel">
+
+    <!-- The Words tab, top to bottom as the user works: add a word (or paste a text) → what waits for the AI agent →
+         find a word (language, search, order, filters) → the list, a page at a time. A tap opens the word's own page
+         (VocabWordPage), which takes the whole tab. -->
+    <StackPanel>
+        <StackPanel Margin="0,22,0,16">
+            <TextBlock Classes="display" Text="Words" />
+            <TextBlock x:Name="Summary" Classes="muted" FontSize="14" Margin="0,4,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- 1. Add: a word or a phrase, Enter; where you met it is optional; a whole text goes to Add text -->
+        <Border Classes="glass" Padding="16,8,8,8">
+            <StackPanel>
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                    <TextBox x:Name="NewWordBox" Classes="bare" FontSize="15" PlaceholderText="Add a word — press Enter" Text="{Binding NewWord}"
+                             VerticalAlignment="Center" AutomationProperties.Name="New word">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <ToggleButton x:Name="NoteToggle" Grid.Column="1" Classes="chip" Margin="8,0,0,0" VerticalAlignment="Center"
+                                  ToolTip.Tip="Where you met it" AutomationProperties.Name="Where you met it">
+                        <ic:SymbolIcon Symbol="Options" FontSize="16" />
+                    </ToggleButton>
+                    <Button Grid.Column="2" Classes="chip" Margin="8,0" VerticalAlignment="Center" Command="{Binding Texts.OpenCommand}"
+                            ToolTip.Tip="Paste a text (song lyrics, an article): an AI agent picks the words worth learning (Ctrl+Shift+N)"
+                            AutomationProperties.Name="Add text">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="DocumentText" FontSize="16" />
+                            <TextBlock Classes="label" Text="Paste a text" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="3" Classes="pill" Width="40" Height="40" MinHeight="40" Padding="0" VerticalAlignment="Center"
+                            Command="{Binding AddCommand}" ToolTip.Tip="Add (Enter)" AutomationProperties.Name="Add">
+                        <ic:SymbolIcon Symbol="Add" FontSize="18" Foreground="{DynamicResource HelmPillForeground}" />
+                    </Button>
+                </Grid>
+                <TextBox Classes="glass" Margin="0,8,8,0" PlaceholderText="Where you met it (optional): Aptis reading, a song, a chapter…" Text="{Binding NewNote}"
+                         IsVisible="{Binding #NoteToggle.IsChecked}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True" AutomationProperties.Name="Where you met it">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <TextBlock x:Name="AddHint" Classes="muted" Margin="0,6,8,4" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- 2. What waits for the AI agent: the new words (✕ removes a typo), and where the agent is -->
+        <Border x:Name="WaitingCard" Classes="glass" Margin="0,12,0,0" core:Motion.EnterOnShow="True">
+            <Border.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="HasAgentWork" />
+                    <Binding Path="IsAgentBusy" />
+                </MultiBinding>
+            </Border.IsVisible>
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="Auto,*">
+                    <Panel Width="22" Margin="0,1,10,0" VerticalAlignment="Top">
+                        <ic:SymbolIcon Symbol="ArrowSync" Classes="spin" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding IsAgentBusy}" />
+                        <ic:SymbolIcon Symbol="HourglassHalf" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding !IsAgentBusy}" />
+                    </Panel>
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Classes="head" Text="{Binding AgentChipText}" TextWrapping="Wrap" IsVisible="{Binding IsAgentBusy}" />
+                        <TextBlock Classes="head" Text="Waiting for the AI agent" TextWrapping="Wrap" IsVisible="{Binding !IsAgentBusy}" />
+                        <TextBlock Classes="muted" FontSize="13" Text="{Binding Agent.Status}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis">
+                            <TextBlock.IsVisible>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="Agent.IsBusy" />
+                                    <Binding Path="Agent.HasStatus" />
+                                </MultiBinding>
+                            </TextBlock.IsVisible>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+                <ItemsControl ItemsSource="{Binding PendingWords}" IsVisible="{Binding HasPending}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VocabWordRow">
+                            <Border Classes="inset" Padding="10,0,2,0" CornerRadius="10" ToolTip.Tip="{Binding Note}">
+                                <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <TextBlock Text="{Binding Text}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Button Classes="flat" Width="30" Height="30" Padding="0" Command="{Binding Remove}" IsVisible="{Binding CanRemove}"
+                                            ToolTip.Tip="Remove (a typo, or not worth learning)" AutomationProperties.Name="{Binding Text, StringFormat='Remove {0}'}">
+                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="OtherWork" Classes="muted" FontSize="13" TextWrapping="Wrap" />
+                <Grid x:Name="WaitingActions" ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button x:Name="AnalyzeButton" Classes="pill" HorizontalAlignment="Stretch" Command="{Binding Agent.AnalyzeCommand}"
+                            ToolTip.Tip="Claude Code breaks new words down, writes new ways to remember the words you keep forgetting, and fills in missing details"
+                            AutomationProperties.Name="Analyze now">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                            <TextBlock Text="Analyze now" Foreground="{DynamicResource HelmPillForeground}" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="StopButton" Classes="ghost" HorizontalAlignment="Stretch" Content="Stop" Command="{Binding Agent.StopCommand}" />
+                    <Button x:Name="DetailsButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding OpenAgentCommand}"
+                            ToolTip.Tip="Every step of the agent, what else waits, the request for Claude Code" AutomationProperties.Name="Analysis details">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:SymbolIcon Symbol="TextBulletList" FontSize="16" />
+                            <TextBlock Text="Details" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- 3. Find: the language (when there are Chinese words), the search, the order -->
+        <Grid x:Name="FindRow" ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8" Margin="0,22,0,0"
+              IsVisible="{Binding HasWords}" DataContext="{Binding List}" x:DataType="vm:VocabWordListViewModel">
+            <Border x:Name="LanguageSeg" Classes="glass" Padding="3" CornerRadius="10" BoxShadow="" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <RadioButton Classes="seg" GroupName="WordsLanguage" IsChecked="{Binding IsEnglish, Mode=OneWay}" Command="{Binding ShowEnglishCommand}"
+                                 Content="{Binding EnglishTabText}" AutomationProperties.Name="English words" />
+                    <RadioButton Classes="seg" GroupName="WordsLanguage" IsChecked="{Binding IsChinese, Mode=OneWay}" Command="{Binding ShowChineseCommand}"
+                                 Content="{Binding ChineseTabText}" AutomationProperties.Name="Chinese words" />
+                </StackPanel>
+            </Border>
+            <TextBox x:Name="SearchBox" Grid.Column="1" Classes="glass" PlaceholderText="Search words and meanings" Text="{Binding SearchText}"
+                     AutomationProperties.Name="Search words and meanings">
+                <TextBox.InnerLeftContent>
+                    <ic:SymbolIcon Symbol="Search" FontSize="16" Margin="12,0,0,0" Foreground="{DynamicResource HelmSecondaryText}" />
+                </TextBox.InnerLeftContent>
+            </TextBox>
+            <ComboBox x:Name="OrderBox" Grid.Column="2" Classes="glass" MinWidth="160" ItemsSource="{Binding Sorts}" SelectedIndex="{Binding SortIndex}"
+                      ToolTip.Tip="Order" AutomationProperties.Name="Order" />
+        </Grid>
+
+        <!-- Show only: every filter as a chip with how many words it keeps -->
+        <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Margin="0,10,0,0" IsVisible="{Binding List.HasWords}">
+            <ItemsControl ItemsSource="{Binding List.Chips}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VocabFilterChip">
+                        <Button Classes="chip" Classes.selected="{Binding IsOn}" MinHeight="34" Command="{Binding Pick}" AutomationProperties.Name="{Binding Name}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{Binding Name, Converter={x:Static ui:VocabConverters.ChipName}}" FontSize="13" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Count}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- 4. The words -->
+        <Border Classes="glass" Margin="0,14,0,0" Padding="28,24" IsVisible="{Binding List.HasNoWords}">
+            <StackPanel Spacing="6" HorizontalAlignment="Center">
+                <ic:SymbolIcon Symbol="ArrowUp" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" HorizontalAlignment="Center" />
+                <TextBlock Classes="muted" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480"
+                           Text="Add the first word above. Once an AI agent has broken it into its parts it shows up here, and on the Learn tab." />
+            </StackPanel>
+        </Border>
+        <Border Classes="glass" Margin="0,14,0,0" IsVisible="{Binding List.HasNoMatches}">
+            <TextBlock Classes="muted" FontSize="14" TextWrapping="Wrap" Text="No word matches. Try another word, or show all." />
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding List.Words}" Margin="0,14,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:VocabWordRow">
+                    <StackPanel>
+                        <TextBlock Classes="eyebrow" Text="{Binding Header, Converter={x:Static core:UpperCase.Instance}}" Margin="2,10,0,8" IsVisible="{Binding HasHeader}" />
+                        <Border Classes="glass lift fade" Padding="14,10" Margin="0,0,0,8">
+                            <Button Classes="rowhit" Padding="0" Margin="0,-2" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <TextBlock Text="{Binding Text}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Bottom" />
+                                            <TextBlock Grid.Column="1" ui:ToneText.Text="{Binding Phonetic}" FontSize="13" TextTrimming="CharacterEllipsis" Margin="10,0,0,1"
+                                                       VerticalAlignment="Bottom" IsVisible="{Binding HasPhonetic}" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding Meaning}" Classes="muted" FontSize="13.5" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Border Classes="tag" Classes.acc="{Binding IsNew}" Classes.py="{Binding IsSlipping}" Classes.warn="{Binding IsHard}"
+                                                    Classes.mute="{Binding IsHidden}" IsVisible="{Binding HasFlag}">
+                                                <TextBlock Text="{Binding Flag}" />
+                                            </Border>
+                                            <Border Classes="tag" Margin="0" IsVisible="{Binding HasLevel}">
+                                                <TextBlock Text="{Binding Level}" />
+                                            </Border>
+                                        </StackPanel>
+                                        <ItemsControl ItemsSource="{Binding Dots}" HorizontalAlignment="Right" ToolTip.Tip="{Binding LevelText}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" Spacing="3" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="sys:Boolean">
+                                                    <Ellipse Classes="dot" Classes.on="{Binding}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </Border>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- A page at a time -->
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,0" IsVisible="{Binding List.Pages.HasPages}">
+            <Button Classes="ghost" Command="{Binding List.Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page">
+                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="ChevronLeft" FontSize="14" /><TextBlock Classes="label" Text="Previous" /></StackPanel>
+            </Button>
+            <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="{Binding List.Pages.PageText}" FontSize="13" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding List.Pages.RangeText}" Classes="muted" FontSize="12" HorizontalAlignment="Center" />
+            </StackPanel>
+            <Button Grid.Column="2" Classes="ghost" Command="{Binding List.Pages.NextPageCommand}" AutomationProperties.Name="Next page">
+                <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Classes="label" Text="Next" /><ic:SymbolIcon Symbol="ChevronRight" FontSize="14" /></StackPanel>
+            </Button>
+        </Grid>
+    </StackPanel>
+</UserControl>

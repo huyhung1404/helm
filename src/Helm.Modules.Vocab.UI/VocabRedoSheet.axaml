@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             x:Class="Helm.Modules.Vocab.Ui.VocabRedoSheet"
+             x:DataType="vm:VocabWordDetailViewModel">
+
+    <!-- Ask for a new analysis: what should change, sent back to the AI agent; the word keeps its parts until then. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="NEW ANALYSIS" />
+                <TextBlock FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Word.Text, StringFormat='Break “{0}” down again?'}" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding BeginRedoCommand}" ToolTip.Tip="Cancel" AutomationProperties.Name="Cancel">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+        <TextBlock Classes="secondary" FontSize="14" TextWrapping="Wrap"
+                   Text="It goes back to the AI agent with your note. Until a new analysis arrives it keeps its current parts." />
+        <TextBox x:Name="NoteBox" Classes="glass" PlaceholderText="What should change? e.g. tách lat thành ferre" Text="{Binding RedoNote}" AcceptsReturn="True"
+                 TextWrapping="Wrap" MinHeight="88" VerticalContentAlignment="Top" Padding="12,10" AutomationProperties.Name="What should change" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel" Command="{Binding BeginRedoCommand}" />
+            <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Send back" Command="{Binding SendRedoCommand}" />
+        </Grid>
+    </StackPanel>
+</UserControl>

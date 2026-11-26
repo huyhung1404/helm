@@ -1,0 +1,160 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="using:System"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             xmlns:ui="using:Helm.Modules.Vocab.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Vocab.Ui.VocabWordPage"
+             x:DataType="vm:VocabViewModel">
+
+    <!-- One word, taking the whole Words tab: back to the list and the words before and after it; the word with its
+         reading, meaning, labels and how well it is known, and what can be done with it; then how it is built and what helps
+         to remember and use it. -->
+    <StackPanel Margin="0,22,0,0">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+            <Button Classes="ghost" Command="{Binding CloseDetailCommand}" ToolTip.Tip="Back to the list (Esc)" AutomationProperties.Name="All words">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="ArrowLeft" FontSize="14" />
+                    <TextBlock Text="All words" />
+                </StackPanel>
+            </Button>
+            <TextBlock Grid.Column="1" Classes="muted" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center"
+                       Text="{Binding WordPosition, Converter={x:Static ui:VocabConverters.Position}}" />
+            <Button Grid.Column="2" Classes="chip" Command="{Binding PreviousWordCommand}" IsEnabled="{Binding HasPreviousWord}" ToolTip.Tip="The word before (←)"
+                    AutomationProperties.Name="Previous word">
+                <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+            </Button>
+            <Button Grid.Column="3" Classes="chip" Command="{Binding NextWordCommand}" IsEnabled="{Binding HasNextWord}" ToolTip.Tip="The word after (→)"
+                    AutomationProperties.Name="Next word">
+                <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+            </Button>
+        </Grid>
+
+        <StackPanel x:Name="WordBody" Margin="0,16,0,0" Spacing="12" DataContext="{Binding Detail}" x:DataType="vm:VocabWordDetailViewModel">
+            <!-- The word -->
+            <Border Classes="glass" Padding="22,20">
+                <StackPanel Spacing="6">
+                    <WrapPanel>
+                        <TextBlock Text="{Binding Word.Text}" FontSize="36" FontWeight="SemiBold" VerticalAlignment="Bottom" TextWrapping="Wrap" Margin="0,0,12,0" />
+                        <TextBlock Text="{Binding ShownTraditional}" FontSize="22" Classes="muted" VerticalAlignment="Bottom" Margin="0,0,0,4" IsVisible="{Binding ShowTraditional}" />
+                    </WrapPanel>
+                    <WrapPanel>
+                        <TextBlock ui:ToneText.Text="{Binding Word.Phonetic}" FontSize="17" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBlock Text="{Binding Word.HanViet}" Classes="muted" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" IsVisible="{Binding HasHanViet}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding Word.Meaning}" FontSize="19" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    <TextBlock Text="{Binding Word.Explanation}" Classes="muted" FontSize="14" IsVisible="{Binding HasExplanation}" />
+                    <TextBlock Classes="muted" FontSize="13" FontStyle="Italic" IsVisible="{Binding HasNote}">
+                        <Run Text="Where you met it: " /><Run Text="{Binding Word.Note}" />
+                    </TextBlock>
+                    <TextBlock Classes="muted" FontSize="13" FontStyle="Italic" IsVisible="{Binding HasSourceSentence}">
+                        <Run Text="From the text: " /><Run Text="{Binding Word.SourceSentence}" />
+                    </TextBlock>
+
+                    <!-- How well it is known, its labels, the user's tags and what Helm noticed -->
+                    <WrapPanel Margin="0,6,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,12,6" VerticalAlignment="Center" IsVisible="{Binding !IsPending}">
+                            <ItemsControl ItemsSource="{Binding Dots}" VerticalAlignment="Center">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="3" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="sys:Boolean">
+                                        <Ellipse Classes="dot" Classes.on="{Binding}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{Binding LevelText}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Border Classes="tag" Margin="0,0,6,6" IsVisible="{Binding Word.Level, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"><TextBlock Text="{Binding Word.Level}" /></Border>
+                        <Border Classes="tag" Margin="0,0,6,6" IsVisible="{Binding Word.PartOfSpeech, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"><TextBlock Text="{Binding Word.PartOfSpeech}" /></Border>
+                        <Border Classes="tag" Margin="0,0,6,6" IsVisible="{Binding Word.Topic, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"><TextBlock Text="{Binding Word.Topic}" /></Border>
+                        <ItemsControl ItemsSource="{Binding Word.Tags}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Border Classes="tag acc" Margin="0,0,6,6"><TextBlock Text="{Binding Converter={x:Static ui:VocabConverters.Hashtag}}" /></Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Classes="tag warn" Margin="0,0,6,6" IsVisible="{Binding IsHard}"><TextBlock Text="Often forgotten" /></Border>
+                        <Border Classes="tag py" Margin="0,0,6,6" IsVisible="{Binding IsSlipping}"><TextBlock Text="Pinyin slips" /></Border>
+                        <Border Classes="tag mute" Margin="0,0,6,6" IsVisible="{Binding IsHidden}"><TextBlock Text="Hidden from the cards" /></Border>
+                        <Border Classes="tag acc" Margin="0,0,6,6" IsVisible="{Binding IsPending}"><TextBlock Text="Waiting for analysis" /></Border>
+                    </WrapPanel>
+                    <TextBlock Classes="muted" FontSize="12.5" IsVisible="{Binding IsHard}"
+                               Text="You keep forgetting it: an AI agent writes a new way to remember it." />
+                    <Border Classes="inset" IsVisible="{Binding IsPending}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <ic:SymbolIcon Symbol="HourglassHalf" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="{DynamicResource HelmEyebrow}" />
+                            <TextBlock Grid.Column="1" Text="{Binding PendingText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- What can be done with it (icons only on a phone) -->
+                    <WrapPanel Margin="0,8,0,0">
+                        <Button Classes="act" Command="{Binding SayWordCommand}" IsVisible="{Binding CanSay}" ToolTip.Tip="Say the word" AutomationProperties.Name="Listen">
+                            <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Speaker2" FontSize="14" /><TextBlock Classes="label" Text="Listen" /></StackPanel>
+                        </Button>
+                        <Button Classes="act" Command="{Binding YouGlishCommand}" IsVisible="{Binding ShowYouGlish}"
+                                ToolTip.Tip="Hear real people say it in YouTube videos (opens your browser)" AutomationProperties.Name="YouGlish">
+                            <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Video" FontSize="14" /><TextBlock Classes="label" Text="YouGlish" /></StackPanel>
+                        </Button>
+                        <Button Classes="act" Command="{Binding Editor.BeginCommand}" ToolTip.Tip="Edit the meaning, examples, labels…" AutomationProperties.Name="Edit">
+                            <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Edit" FontSize="14" /><TextBlock Classes="label" Text="Edit" /></StackPanel>
+                        </Button>
+                        <Button Classes="act" Command="{Binding KnowCommand}" IsVisible="{Binding !IsPending}" ToolTip.Tip="Known already: it comes back in a month"
+                                AutomationProperties.Name="I know it">
+                            <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Star" FontSize="14" /><TextBlock Classes="label" Text="I know it" /></StackPanel>
+                        </Button>
+                        <Button Classes="act" Command="{Binding ToggleHiddenCommand}" IsVisible="{Binding !IsHidden}"
+                                ToolTip.Tip="Leave it out of the cards and the pop-up (Words → Hidden shows it again)" AutomationProperties.Name="Hide from the cards">
+                            <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="EyeOff" FontSize="14" /><TextBlock Classes="label" Text="Hide" /></StackPanel>
+                        </Button>
+                        <Button Classes="act" Command="{Binding ToggleHiddenCommand}" IsVisible="{Binding IsHidden}" ToolTip.Tip="Back on the cards and the pop-up"
+                                AutomationProperties.Name="Show in the cards again">
+                            <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Eye" FontSize="14" /><TextBlock Classes="label" Text="Show in cards" /></StackPanel>
+                        </Button>
+                        <Button Classes="act" Command="{Binding BeginRedoCommand}" ToolTip.Tip="Send it back to the AI agent with what should change"
+                                AutomationProperties.Name="Ask for a new analysis">
+                            <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="ArrowClockwise" FontSize="14" /><TextBlock Classes="label" Text="New analysis" /></StackPanel>
+                        </Button>
+                        <Button Classes="act" Command="{Binding $parent[UserControl].((vm:VocabViewModel)DataContext).DeleteWordCommand}" ToolTip.Tip="Delete this word"
+                                AutomationProperties.Name="Delete">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                                <TextBlock Classes="label" Text="Delete" Foreground="{DynamicResource HelmDanger}" />
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- How it is built (across the page: a tree is wide), then what helps -->
+                <Border Classes="glass" Padding="20,16" IsVisible="{Binding HasTree}">
+                    <ui:FoldSection Title="How it’s built" Key="word.tree">
+                        <ui:VocabPartsView />
+                    </ui:FoldSection>
+                </Border>
+                <Border Classes="glass" Padding="20,16">
+                    <Panel>
+                        <Panel IsVisible="{Binding Info.HasAny}">
+                            <ui:VocabInfoView DataContext="{Binding Info}" />
+                        </Panel>
+                        <StackPanel Spacing="4" IsVisible="{Binding !Info.HasAny}">
+                            <TextBlock Classes="head" Text="Nothing more about it yet" />
+                            <TextBlock Classes="muted" FontSize="13" TextWrapping="Wrap"
+                                       Text="No examples or ways to remember it yet. Add them with Edit, or ask for a new analysis." />
+                        </StackPanel>
+                    </Panel>
+                </Border>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

@@ -1,0 +1,142 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             x:Class="Helm.Modules.Vocab.Ui.VocabEditSheet"
+             x:DataType="vm:VocabWordDetailViewModel">
+
+    <!-- Editing a word by hand: its own fields (the tree stays the AI agent's), grouped as the page shows them: the
+         meaning and the reading, what helps to remember and use it, its labels. Cancel or Save closes it; a tap outside
+         closes it only while nothing was changed. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Vocab.UI/VocabStyles.axaml" />
+        <Style Selector="TextBox.glass.area">
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="MinHeight" Value="64" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+            <Setter Property="Padding" Value="12,10" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="EDIT" />
+                <TextBlock Text="{Binding Word.Text}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding Editor.CancelCommand}" ToolTip.Tip="Cancel" AutomationProperties.Name="Cancel">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <StackPanel Spacing="14" DataContext="{Binding Editor}" x:DataType="vm:VocabWordEditor">
+            <Border Classes="glass" IsVisible="{Binding HasError}" BorderBrush="{DynamicResource HelmDanger}">
+                <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource HelmDanger}" />
+            </Border>
+
+            <Border Classes="glass">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="head" Text="Meaning and reading" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Meaning" Classes="secondary" />
+                        <TextBox x:Name="MeaningBox" Classes="glass area" Text="{Binding Meaning}" AutomationProperties.Name="Meaning" />
+                    </StackPanel>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Phonetic" Classes="secondary" />
+                            <TextBox Classes="glass" Text="{Binding Phonetic}" AutomationProperties.Name="Phonetic" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Part of speech" Classes="secondary" />
+                            <TextBox Classes="glass" Text="{Binding PartOfSpeech}" AutomationProperties.Name="Part of speech" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding IsChinese}">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Hán Việt" Classes="secondary" />
+                            <TextBox Classes="glass" Text="{Binding HanViet}" AutomationProperties.Name="Hán Việt" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Traditional" Classes="secondary" />
+                            <TextBox Classes="glass" Text="{Binding Traditional}" AutomationProperties.Name="Traditional" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="How the parts make the meaning" Classes="secondary" />
+                        <TextBox Classes="glass area" Text="{Binding Explanation}" AutomationProperties.Name="Explanation" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="glass">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="head" Text="To remember and use it" />
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="To remember it" Classes="secondary" />
+                        <TextBox Classes="glass area" Text="{Binding Mnemonic}" AutomationProperties.Name="To remember it" />
+                    </StackPanel>
+                    <StackPanel Spacing="4" IsVisible="{Binding IsChinese}">
+                        <TextBlock Text="To remember the pinyin" Classes="secondary" />
+                        <TextBox Classes="glass area" Text="{Binding PinyinMnemonic}" AutomationProperties.Name="To remember the pinyin" />
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Examples · sentence | translation, one per line" Classes="secondary" />
+                        <TextBox Classes="glass area" MinHeight="84" Text="{Binding Examples}" AutomationProperties.Name="Examples" />
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Goes with · separated by commas" Classes="secondary" />
+                        <TextBox Classes="glass" Text="{Binding Collocations}" AutomationProperties.Name="Goes with" />
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Word family · word | part of speech | meaning, one per line" Classes="secondary" />
+                        <TextBox Classes="glass area" Text="{Binding Forms}" AutomationProperties.Name="Word family" />
+                    </StackPanel>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Similar · commas" Classes="secondary" />
+                            <TextBox Classes="glass" Text="{Binding Synonyms}" AutomationProperties.Name="Similar" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Opposite · commas" Classes="secondary" />
+                            <TextBox Classes="glass" Text="{Binding Antonyms}" AutomationProperties.Name="Opposite" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Easy to mix up with · word | what tells them apart, one per line" Classes="secondary" />
+                        <TextBox Classes="glass area" Text="{Binding Confusables}" AutomationProperties.Name="Easy to mix up with" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="glass">
+                <StackPanel Spacing="10">
+                    <TextBlock Classes="head" Text="Labels" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Level" Classes="secondary" />
+                            <TextBox Classes="glass" Text="{Binding Level}" PlaceholderText="B1, HSK3" AutomationProperties.Name="Level" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Topic" Classes="secondary" />
+                            <TextBox Classes="glass" Text="{Binding Topic}" AutomationProperties.Name="Topic" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Your tags · commas" Classes="secondary" />
+                        <TextBox Classes="glass" Text="{Binding Tags}" PlaceholderText="Aptis, Truyện…" AutomationProperties.Name="Your tags" />
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Where you met it" Classes="secondary" />
+                        <TextBox Classes="glass" Text="{Binding Note}" AutomationProperties.Name="Where you met it" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel" Command="{Binding CancelCommand}" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Save" Command="{Binding SaveCommand}" />
+            </Grid>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

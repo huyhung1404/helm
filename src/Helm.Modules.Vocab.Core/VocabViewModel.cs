@@ -34,7 +34,7 @@ public sealed partial class VocabViewModel : ObservableObject
     private readonly VocabStore _store;
     private readonly VocabQuiz _quiz;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly VocabVoice? _voice;
     private readonly VocabQuickAnalyzer? _quick;
@@ -95,6 +95,9 @@ public sealed partial class VocabViewModel : ObservableObject
         Refresh();
         Card.ShowNext();
     }
+
+    /// <summary>Asks its questions (Delete this word?) through these from now on: the shared page's own glass sheet.</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
 
     public VocabSettingsViewModel Settings { get; }
 

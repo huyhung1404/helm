@@ -1,0 +1,185 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             x:Class="Helm.Modules.Vocab.Ui.VocabSettingsView"
+             x:DataType="vm:VocabViewModel">
+
+    <!-- Vocabulary's settings as a sheet over the page (the gear): on/off, the cards, the pop-up card (and what only this
+         platform has: the phone's bubble and blocked apps), display, the AI agent. One card per subject. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Vocab.UI/VocabStyles.axaml" />
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="VOCABULARY" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- On or off: off keeps the words (read only) and stops the pop-up and the agent -->
+        <Border Classes="glass">
+            <DockPanel>
+                <ToggleSwitch x:Name="EnableSwitch" DockPanel.Dock="Right" OnContent="" OffContent="" AutomationProperties.Name="Vocabulary on or off" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Vocabulary is on" Classes="head" />
+                    <TextBlock Text="Off keeps your words but makes them read only, and stops the pop-up card and the AI agent." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- The Learn tab's cards -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Cards" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Kind of card" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}"
+                              AutomationProperties.Name="Kind of card" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="What the card asks: the meaning, the word, its sound, a gap to fill, the word typed, or a mix." />
+                </StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.TypePinyin}" OnContent="" OffContent="" AutomationProperties.Name="Chinese: type the pinyin" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Chinese: type the pinyin" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                   Text="Every card of a Chinese word asks for its pinyin first; no tones is fine (bujiu), or marks or numbers (bǔjiù, bu3jiu4)." />
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.AutoSay}" OnContent="" OffContent="" AutomationProperties.Name="Say the word when its meaning shows" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Say the word when its meaning shows" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="On the Learn tab, the word is read aloud as you check it." />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- The pop-up card over other apps -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Pop-up card" Classes="head" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.PopupEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Show a word now and then" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Show a word now and then" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                   Text="A card with one of your words appears over what you are doing, without taking the focus. Tap it to see the meaning; unanswered, it goes away by itself." />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Spacing="12" IsEnabled="{Binding Settings.PopupEnabled}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="How often" />
+                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.PopupFrequencyNames}" SelectedIndex="{Binding Settings.PopupFrequencyIndex}"
+                                  AutomationProperties.Name="How often" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="A random time in this range, so it never comes on the clock." />
+                    </StackPanel>
+                    <StackPanel Spacing="6" IsVisible="{Binding Settings.IsCustomFrequency}">
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Shortest gap (seconds)" Classes="secondary" />
+                                <TextBox Classes="glass" Text="{Binding Settings.CustomFromText}" AutomationProperties.Name="Shortest gap in seconds" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="Longest gap (seconds)" Classes="secondary" />
+                                <TextBox Classes="glass" Text="{Binding Settings.CustomToText}" AutomationProperties.Name="Longest gap in seconds" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{Binding Settings.CustomError}" Classes="secondary" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding Settings.HasCustomError}" />
+                    </StackPanel>
+                    <StackPanel Spacing="4">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Card opacity" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Settings.CardOpacityText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </Grid>
+                        <Slider x:Name="OpacitySlider" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding Settings.CardOpacity}"
+                                AutomationProperties.Name="Card opacity" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                   Text="How solid the card is while you are not using it, so what is under it stays readable. It turns solid while you use it." />
+                    </StackPanel>
+                    <Button x:Name="ShowNowButton" Classes="ghost" HorizontalAlignment="Stretch" AutomationProperties.Name="Show a word now">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:SymbolIcon Symbol="Play" FontSize="14" />
+                            <TextBlock Text="Show a word now" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- What only this platform has (the phone's bubble, the apps the pop-up stays out of) -->
+        <ContentControl x:Name="PlatformCards" />
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Display" Classes="head" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.ShowTraditional}" OnContent="" OffContent="" AutomationProperties.Name="Show traditional characters" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Show traditional characters" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Next to a Chinese word or part when its traditional form differs: 补救 (補救)." />
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.ShowYouGlish}" OnContent="" OffContent="" AutomationProperties.Name="YouGlish button" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="YouGlish button" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Next to the word: hear real people say it in YouTube videos (opens youglish.com)." />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Words per page" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.ItemsShownNames}" SelectedIndex="{Binding Settings.ItemsShownIndex}"
+                              AutomationProperties.Name="Words per page" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="The Words and Roots lists show one page at a time, so they stay quick however many words you have." />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- The AI agent that breaks words down -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="AI agent" Classes="head" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !Agent.CanRun}"
+                           Text="Words you add wait until Claude Code on your PC breaks them down (Helm's tools must be allowed there). The analysis comes back here through sync." />
+                <StackPanel Spacing="12" IsVisible="{Binding Agent.CanRun}">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.AutoAnalyze}" OnContent="" OffContent="" AutomationProperties.Name="Break new words down by itself" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Break new words down by itself" />
+                            <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                       Text="A moment after words arrive (typed here, from Quick Capture or from the phone), Claude Code breaks them down without a window." />
+                        </StackPanel>
+                    </DockPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Claude model" />
+                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.AnalysisModelNames}" SelectedIndex="{Binding Settings.AnalysisModelIndex}"
+                                  AutomationProperties.Name="Claude model" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                   Text="For Analyze now, by itself and Suggest words. Sonnet is enough for roots and components; Opus costs more of your plan for little gain." />
+                    </StackPanel>
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding CopyPromptCommand}" AutomationProperties.Name="Copy the request for Claude Code">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="Copy" FontSize="14" />
+                        <TextBlock Text="Copy the request for Claude Code" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="To run it yourself: let AI agents use Helm's tools (General › MCP), then paste the request into Claude Code." />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" />
+    </StackPanel>
+</UserControl>

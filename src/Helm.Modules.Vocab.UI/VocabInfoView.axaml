@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             xmlns:ui="using:Helm.Modules.Vocab.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Vocab.Ui.VocabInfoView"
+             x:DataType="vm:VocabWordInfo">
+
+    <!-- What helps to remember and use a word, one foldable section each, in as many columns as fit: how to remember the pinyin, the mnemonic,
+         examples, what it goes with, its family, similar and opposite words, words easy to mix it up with. Sections
+         without content are left out. -->
+    <core:MasonryPanel MinColumnWidth="280" Spacing="18">
+        <ui:FoldSection Classes="py" Title="Remembering the pinyin" Key="info.pinyin" IsVisible="{Binding HasPinyinMnemonic}">
+            <TextBlock Text="{Binding PinyinMnemonic}" TextWrapping="Wrap" />
+        </ui:FoldSection>
+
+        <ui:FoldSection Classes="memo" Title="To remember it" Key="info.mnemonic" IsVisible="{Binding HasMnemonic}">
+            <TextBlock Text="{Binding Mnemonic}" TextWrapping="Wrap" FontStyle="Italic" />
+        </ui:FoldSection>
+
+        <ui:FoldSection Title="Examples" Key="info.examples" IsVisible="{Binding HasExamples}">
+            <ItemsControl ItemsSource="{Binding Examples}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="10" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VocabExample">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="{Binding Sentence}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Translation}" Classes="muted" FontSize="13" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ui:FoldSection>
+
+        <ui:FoldSection Title="Goes with" Key="info.collocations" IsVisible="{Binding HasCollocations}">
+            <TextBlock Text="{Binding Collocations}" TextWrapping="Wrap" />
+        </ui:FoldSection>
+
+        <ui:FoldSection Title="Word family" Key="info.forms" IsVisible="{Binding HasForms}">
+            <ItemsControl ItemsSource="{Binding Forms}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="6" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VocabForm">
+                        <TextBlock TextWrapping="Wrap"><Run Text="{Binding Word}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding PartOfSpeech}" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" /><Run Text="  " /><Run Text="{Binding Meaning}" /></TextBlock>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ui:FoldSection>
+
+        <ui:FoldSection Title="Similar · opposite" Key="info.similar">
+            <ui:FoldSection.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="HasSynonyms" />
+                    <Binding Path="HasAntonyms" />
+                </MultiBinding>
+            </ui:FoldSection.IsVisible>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Classes="eyebrow" Text="SIMILAR" />
+                    <TextBlock Text="{Binding Synonyms}" TextWrapping="Wrap" IsVisible="{Binding HasSynonyms}" />
+                    <TextBlock Text="–" Classes="muted" IsVisible="{Binding !HasSynonyms}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Classes="eyebrow" Text="OPPOSITE" />
+                    <TextBlock Text="{Binding Antonyms}" TextWrapping="Wrap" IsVisible="{Binding HasAntonyms}" />
+                    <TextBlock Text="–" Classes="muted" IsVisible="{Binding !HasAntonyms}" />
+                </StackPanel>
+            </Grid>
+        </ui:FoldSection>
+
+        <ui:FoldSection Classes="warn" Title="Easy to mix up with" Key="info.confusables" IsVisible="{Binding HasConfusables}">
+            <ItemsControl ItemsSource="{Binding ConfusableItems}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="6" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VocabConfusable">
+                        <TextBlock TextWrapping="Wrap"><Run Text="{Binding Word}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding Note}" /></TextBlock>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ui:FoldSection>
+    </core:MasonryPanel>
+</UserControl>
