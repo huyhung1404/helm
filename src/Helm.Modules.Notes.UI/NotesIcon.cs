@@ -1,9 +1,9 @@
 using Avalonia;
 using Avalonia.Media;
 
-namespace Helm.Modules.Notes;
+namespace Helm.Modules.Notes.Ui;
 
-/// <summary>The Notes icon as an Avalonia vector image, drawn from the same shapes as on Windows.</summary>
+/// <summary>The Notes icon as an Avalonia vector image, drawn from NotesIconShape (the same picture on every platform).</summary>
 public static class NotesIcon
 {
     public static IImage Image { get; } = Create();

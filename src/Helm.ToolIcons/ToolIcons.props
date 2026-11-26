@@ -3,13 +3,8 @@
   <!-- The tools whose Avalonia icon is not in a .UI project yet: the phone app's builders and their shapes, so pages
        that list tools look as they do in Helm. The others come from their .UI projects (Helm.ToolIcons.csproj). -->
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Notes.Core\NotesIconShape.cs" Link="ToolIcons\NotesIconShape.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Scratch.Core\ScratchIconShape.cs" Link="ToolIcons\ScratchIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.QuickCapture\QuickCaptureIconShape.cs" Link="ToolIcons\QuickCaptureIconShape.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Notes.Android\NotesIcon.cs" Link="ToolIcons\NotesIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.QuickCapture.Android\QuickCaptureIcon.cs" Link="ToolIcons\QuickCaptureIcon.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Scratch.Android\ScratchIcon.cs" Link="ToolIcons\ScratchIcon.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Tracker.Android\TrackerIcon.cs" Link="ToolIcons\TrackerIcon.cs" />
   </ItemGroup>
 
 </Project>

@@ -58,11 +58,15 @@ public static class TrackerCoreServices
     /// Tasks as link targets (notes link to them). The platform passes its Tracker content page, which opens a linked
     /// task.
     /// </summary>
-    public static IServiceCollection AddTrackerLinks(this IServiceCollection services, Type contentPage)
+    public static IServiceCollection AddTrackerLinks(this IServiceCollection services, Type contentPage) =>
+        services.AddTrackerLinks(navigation => navigation.ShowPage(contentPage));
+
+    /// <summary>Tasks as link targets; <paramref name="showPage"/> brings up the Tracker page (Windows: by its tool id).</summary>
+    public static IServiceCollection AddTrackerLinks(this IServiceCollection services, Action<IShellNavigation> showPage)
     {
         void Show(IServiceProvider sp, Action<TrackerViewModel> show)
         {
-            sp.GetRequiredService<IShellNavigation>().ShowPage(contentPage);
+            showPage(sp.GetRequiredService<IShellNavigation>());
             show(sp.GetRequiredService<TrackerViewModel>());
         }
         return services.AddHelmLinks()

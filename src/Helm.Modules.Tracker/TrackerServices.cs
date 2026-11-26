@@ -8,6 +8,6 @@ public static class TrackerServices
     public static IServiceCollection AddTrackerModule(this IServiceCollection services) =>
         services
             .AddTrackerCore()
-            .AddTrackerLinks(typeof(TrackerContentPage))
-            .AddHelmModule<TrackerModule, TrackerContentPage, TrackerViewModel>();
+            .AddTrackerLinks(navigation => navigation.ShowTool(TrackerIds.ModuleId))
+            .AddHelmModule<TrackerModule, TrackerViewModel>();
 }

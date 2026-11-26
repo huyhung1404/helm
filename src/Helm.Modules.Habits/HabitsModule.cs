@@ -1,19 +1,21 @@
-using System.Windows.Media;
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Helm.Modules.Habits.Ui;
 using Microsoft.Extensions.Logging;
-using Wpf.Ui.Controls;
 
 namespace Helm.Modules.Habits;
 
 /// <summary>
 /// Habits on Windows. The data lives in Helm Sync and the pages work on <see cref="HabitsStore"/>; the only background
 /// work is the daily reminders (skipped habits, streaks at risk in the evening) as tray notifications while the tool is on. The menu and Quick
-/// access and Home → Utilities open <see cref="HabitsContentPage"/>; its settings are a sheet inside it.
+/// access and Home → Utilities open its page, the shared <see cref="HabitsView"/>; its settings are a sheet inside it.
 /// </summary>
-public sealed class HabitsModule : HelmModuleBase, IModuleContent, IDisposable
+public sealed class HabitsModule : HelmModuleBase, IDisposable
 {
     private static readonly TimeSpan CheckEvery = TimeSpan.FromMinutes(10);
 
@@ -39,11 +41,16 @@ public sealed class HabitsModule : HelmModuleBase, IModuleContent, IDisposable
     public override string DisplayName => HabitsIds.DisplayName;
     public override string Description => HabitsIds.Description;
     public override ModuleGroup Group => ModuleGroup.Planning;
-    public override SymbolRegular Icon => SymbolRegular.CalendarCheckmark24;
-    public override ImageSource IconImage => HabitsLogo.Image;
-    public override Type SettingsPageType => typeof(HabitsContentPage);
-    public Type ContentPageType => typeof(HabitsContentPage);
+    public override Symbol Icon => Symbol.CalendarCheckmark;
+    public override IImage IconImage => HabitsIcon.Image;
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
+
+    /// <summary>The view model is resolved here, the first time the tab opens, not with the module.</summary>
+    public override Control CreatePage()
+    {
+        var host = new WindowsHabitsPageHost();
+        return host.Attach(new HabitsView(this, _services.GetRequiredService<HabitsViewModel>(), host));
+    }
 
     public override Task EnableAsync(CancellationToken ct)
     {
@@ -79,7 +86,7 @@ public sealed class HabitsModule : HelmModuleBase, IModuleContent, IDisposable
         try
         {
             _services.GetRequiredService<IUserNotifications>().Show(reminder.Title, reminder.Message,
-                () => _services.GetRequiredService<IShellNavigation>().ShowPage(typeof(HabitsContentPage)));
+                () => _services.GetRequiredService<IShellNavigation>().ShowTool(HabitsIds.ModuleId));
             _logger.LogInformation("Habits reminder shown: {Title}", reminder.Title);
         }
         catch (Exception ex)

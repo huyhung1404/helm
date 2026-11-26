@@ -1,20 +1,22 @@
-using System.Windows.Media;
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Helm.Modules.Tracker.Ui;
 using Microsoft.Extensions.Logging;
-using Wpf.Ui.Controls;
 
 namespace Helm.Modules.Tracker;
 
 /// <summary>
 /// Tracker on Windows. The data lives in Helm Sync and the pages work directly on <see cref="TrackerStore"/>; the only
 /// background work is the daily due-date reminder (a tray notification) while the tool is on. The menu and Quick
-/// access open <see cref="TrackerContentPage"/>, and so does Home → Utilities: its settings are a sheet inside that page
+/// access open its page, the shared <see cref="TrackerView"/>, and so does Home → Utilities: its settings are a sheet inside that page
 /// (the gear), so there is no separate settings page.
 /// </summary>
-public sealed class TrackerModule : HelmModuleBase, IModuleContent, IDisposable
+public sealed class TrackerModule : HelmModuleBase, IDisposable
 {
     private static readonly TimeSpan CheckEvery = TimeSpan.FromMinutes(10);
 
@@ -40,11 +42,17 @@ public sealed class TrackerModule : HelmModuleBase, IModuleContent, IDisposable
     public override string DisplayName => TrackerIds.DisplayName;
     public override string Description => TrackerIds.Description;
     public override ModuleGroup Group => ModuleGroup.Planning;
-    public override SymbolRegular Icon => SymbolRegular.TaskListSquareLtr24;
-    public override ImageSource IconImage => TrackerLogo.Image;
-    public override Type SettingsPageType => typeof(TrackerContentPage);
-    public Type ContentPageType => typeof(TrackerContentPage);
+    public override Symbol Icon => Symbol.TaskListSquare;
+    public override IImage IconImage => TrackerIcon.Image;
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
+
+    /// <summary>The view model is resolved here, the first time the tab opens, not with the module.</summary>
+    public override Control CreatePage()
+    {
+        var viewModel = _services.GetRequiredService<TrackerViewModel>();
+        var host = new WindowsTrackerPageHost(viewModel);
+        return host.Attach(new TrackerView(this, viewModel, host));
+    }
 
     public override Task EnableAsync(CancellationToken ct)
     {
@@ -80,7 +88,7 @@ public sealed class TrackerModule : HelmModuleBase, IModuleContent, IDisposable
         try
         {
             _services.GetRequiredService<IUserNotifications>().Show(reminder.Title, reminder.Message,
-                () => _services.GetRequiredService<IShellNavigation>().ShowPage(typeof(TrackerContentPage)));
+                () => _services.GetRequiredService<IShellNavigation>().ShowTool(TrackerIds.ModuleId));
             _logger.LogInformation("Tracker reminder shown: {Title}", reminder.Title);
         }
         catch (Exception ex)

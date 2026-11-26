@@ -1,8 +1,8 @@
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using System.Runtime.InteropServices.WindowsRuntime;
 using Helm.Core.Settings;
 using Helm.Modules.Scratch;
 using Microsoft.Extensions.Logging.Abstractions;
+using Windows.Graphics.Imaging;
 
 namespace Helm.Tests;
 
@@ -16,33 +16,33 @@ public sealed class ScratchWindowsTests : IDisposable
     public async Task A_picture_gets_a_small_jpeg_thumbnail_with_its_shape_kept()
     {
         var path = Path.Combine(_dir.Path, "wide.png");
-        WritePng(path, 800, 400, alpha: 255);
+        await WritePngAsync(path, 800, 400, alpha: 255);
         var platform = new WindowsScratchPlatform(new HelmPaths(_dir.Path), NullLogger<WindowsScratchPlatform>.Instance);
 
         var thumbnail = await platform.ThumbnailAsync(WindowsScratchPlatform.FromPath(path), CancellationToken.None);
 
         Assert.NotNull(thumbnail);
         Assert.True(thumbnail.Length <= ScratchItem.MaxThumbnailBytes);
-        var frame = BitmapDecoder.Create(new MemoryStream(thumbnail), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
-        Assert.Equal(360, frame.PixelWidth);
-        Assert.Equal(180, frame.PixelHeight);
-        Assert.IsType<JpegBitmapDecoder>(frame.Decoder);
+        var decoder = await BitmapDecoder.CreateAsync(new MemoryStream(thumbnail).AsRandomAccessStream());
+        Assert.Equal(360u, decoder.PixelWidth);
+        Assert.Equal(180u, decoder.PixelHeight);
+        Assert.Equal(BitmapDecoder.JpegDecoderId, decoder.DecoderInformation.CodecId);
     }
 
     [Fact]
     public async Task Transparent_parts_of_a_picture_become_white_in_its_thumbnail()
     {
         var path = Path.Combine(_dir.Path, "clear.png");
-        WritePng(path, 100, 100, alpha: 0);
+        await WritePngAsync(path, 100, 100, alpha: 0);
         var platform = new WindowsScratchPlatform(new HelmPaths(_dir.Path), NullLogger<WindowsScratchPlatform>.Instance);
 
         var thumbnail = await platform.ThumbnailAsync(WindowsScratchPlatform.FromPath(path), CancellationToken.None);
 
-        var frame = new FormatConvertedBitmap(BitmapDecoder.Create(new MemoryStream(thumbnail!), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0],
-            PixelFormats.Bgr24, null, 0);
-        var pixel = new byte[3];
-        frame.CopyPixels(new System.Windows.Int32Rect(50, 50, 1, 1), pixel, 3, 0);
-        Assert.All(pixel, b => Assert.True(b > 240));
+        var decoder = await BitmapDecoder.CreateAsync(new MemoryStream(thumbnail!).AsRandomAccessStream());
+        var pixels = (await decoder.GetPixelDataAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore, new BitmapTransform(),
+            ExifOrientationMode.IgnoreExifOrientation, ColorManagementMode.DoNotColorManage)).DetachPixelData();
+        var at = (50 * (int)decoder.PixelWidth + 50) * 4;
+        Assert.All(pixels[at..(at + 3)], b => Assert.True(b > 240));
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class ScratchWindowsTests : IDisposable
         Assert.Null(await platform.ThumbnailAsync(source with { Origin = null }, CancellationToken.None));
     }
 
-    private static void WritePng(string path, int width, int height, byte alpha)
+    private static async Task WritePngAsync(string path, int width, int height, byte alpha)
     {
         var pixels = new byte[width * height * 4];
         for (var i = 0; i < pixels.Length; i += 4)
@@ -68,10 +68,10 @@ public sealed class ScratchWindowsTests : IDisposable
             pixels[i + 2] = 60;
             pixels[i + 3] = alpha;
         }
-        var source = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4);
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(source));
-        using var file = File.Create(path);
-        encoder.Save(file);
+        await using var file = File.Create(path);
+        using var output = file.AsRandomAccessStream();
+        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, output);
+        encoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Straight, (uint)width, (uint)height, 96, 96, pixels);
+        await encoder.FlushAsync();
     }
 }

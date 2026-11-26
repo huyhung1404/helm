@@ -9,6 +9,5 @@ public static class ScratchServices
         services
             .AddSingleton<IScratchPlatform, WindowsScratchPlatform>()
             .AddScratchCore()
-            .AddHelmModule<ScratchModule, ScratchContentPage, ScratchViewModel>()
-            .AddSingleton<ScratchContentPage>();
+            .AddHelmModule<ScratchModule, ScratchViewModel>();
 }

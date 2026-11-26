@@ -1,9 +1,9 @@
 using Avalonia;
 using Avalonia.Media;
 
-namespace Helm.Modules.Tracker;
+namespace Helm.Modules.Tracker.Ui;
 
-/// <summary>The Tracker icon as an Avalonia vector image, drawn from the same shapes as on Windows.</summary>
+/// <summary>The Tracker icon as an Avalonia vector image, drawn from TrackerIconShape (the same picture on every platform).</summary>
 public static class TrackerIcon
 {
     public static IImage Image { get; } = Create();

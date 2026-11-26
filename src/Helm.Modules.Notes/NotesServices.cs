@@ -8,7 +8,6 @@ public static class NotesServices
     public static IServiceCollection AddNotesModule(this IServiceCollection services) =>
         services
             .AddNotesCore()
-            .AddNoteLinks(typeof(NotesContentPage))
-            .AddHelmModule<NotesModule, NotesContentPage, NotesViewModel>()
-            .AddSingleton<NotesContentPage>();
+            .AddNoteLinks(navigation => navigation.ShowTool(NotesIds.ModuleId))
+            .AddHelmModule<NotesModule, NotesViewModel>();
 }
