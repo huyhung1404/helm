@@ -22,7 +22,7 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         "scratch" => Helm.Modules.Scratch.ScratchIcon.Image,
         "ssh" => Helm.Modules.Ssh.SshIcon.Image,
         "tracker" => Helm.Modules.Tracker.TrackerIcon.Image,
-        "vocab" => Helm.Modules.Vocab.VocabIcon.Image,
+        "vocab" => Helm.Modules.Vocab.Ui.VocabIcon.Image,
         "wallet" => Helm.Modules.Wallet.WalletIcon.Image,
         "vault" => Helm.Modules.Vault.Ui.VaultIcon.Image,
         "keyboard" => Keyboard.Value,

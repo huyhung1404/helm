@@ -74,6 +74,10 @@ src/
   Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
+  Helm.Modules.Vocab.Core/   net8.0: words and their parts (on Helm Sync), the quiz, the card, MCP tools, shared view models
+  Helm.Modules.Vocab.UI/     Avalonia: the Vocabulary page (Learn, Words, Roots), its sheets and settings (every platform)
+  Helm.Modules.Vocab/        Windows: the module, the WPF page that hosts the shared view, the corner pop-up card, the Claude Code agent
+  Helm.Modules.Vocab.Android/ Android: the module, the page that hosts the shared view, the pop-up card and bubble over other apps (not in Helm.sln)
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
   Helm.Core.Linux/           net8.0, Linux for the connector: secrets under a host key (0600, optionally sealed by
                              systemd-creds), MCP on a Unix socket, plain child processes; namespaces stay Helm.Core.*

@@ -1,7 +1,7 @@
 using Avalonia;
 using Avalonia.Media;
 
-namespace Helm.Modules.Vocab;
+namespace Helm.Modules.Vocab.Ui;
 
 /// <summary>The Vocabulary icon as an Avalonia vector image, drawn from the same shapes as on Windows.</summary>
 public static class VocabIcon

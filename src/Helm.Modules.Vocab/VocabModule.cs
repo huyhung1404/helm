@@ -9,7 +9,7 @@ namespace Helm.Modules.Vocab;
 /// Vocabulary on Windows. The words live in Helm Sync and the pages work on <see cref="VocabStore"/>; the background
 /// work is the pop-up card that shows a word now and then (<see cref="VocabPopup"/>) and Claude Code breaking down new
 /// words by itself (<see cref="VocabAgentViewModel"/>, when its setting is on). The menu and Quick access open
-/// <see cref="VocabContentPage"/>; Home → Utilities opens the settings (<see cref="VocabPage"/>).
+/// <see cref="VocabContentPage"/>, and so does Home → Utilities; the settings are a sheet inside it.
 /// </summary>
 public sealed class VocabModule(VocabPopup popup, VocabAgentViewModel agent) : HelmModuleBase, IModuleContent
 {
@@ -19,7 +19,7 @@ public sealed class VocabModule(VocabPopup popup, VocabAgentViewModel agent) : H
     public override ModuleGroup Group => ModuleGroup.Learning;
     public override SymbolRegular Icon => SymbolRegular.BookLetter24;
     public override ImageSource IconImage => VocabLogo.Image;
-    public override Type SettingsPageType => typeof(VocabPage);
+    public override Type SettingsPageType => typeof(VocabContentPage);
     public Type ContentPageType => typeof(VocabContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 
