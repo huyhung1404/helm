@@ -11,7 +11,8 @@ namespace Helm.Modules.Wallet;
 /// <summary>
 /// Wallet on Android. <see cref="BankNotificationListener"/> reads the banks' notifications (once the user grants
 /// notification access) and saves their transactions, with or without the activity; the module keeps the home-screen
-/// widgets in step with the data. Back closes the open sheet before leaving the page.
+/// widgets in step with the data (and with the widget settings and the Goal widget's choice, which change on the page).
+/// Back closes the open sheet before leaving the page.
 /// </summary>
 public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandler, IDisposable
 {
@@ -35,6 +36,9 @@ public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandl
         funds.Changed += (_, _) => _widgetTimer.Change(TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
         // Money set aside moves the balance and lights the Goal widget's photo.
         goals.Changed += (_, _) => _widgetTimer.Change(TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
+        // The widget's look (settings sheet) and another goal put on the Goal widget: redraw at once.
+        viewModel.WidgetStyleChanged += (_, _) => RefreshWidgets();
+        if (viewModel.Goals is { } goalsModel) goalsModel.WidgetChanged += (_, _) => RefreshWidgets();
     }
 
     public void Dispose() => _widgetTimer.Dispose();
@@ -46,9 +50,9 @@ public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandl
     public override Symbol Icon => Symbol.Wallet;
 
     /// <summary>The same vector icon as on Windows (<see cref="WalletIconShape"/>).</summary>
-    public override IImage? IconImage => WalletIcon.Image;
+    public override IImage? IconImage => Ui.WalletIcon.Image;
 
-    public override Type PageType => typeof(WalletPage);
+    public override Type PageType => typeof(WalletContentPage);
     public Type ContentPageType => typeof(WalletContentPage);
 
     public override Task EnableAsync(CancellationToken ct)
@@ -124,12 +128,9 @@ public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandl
         }
     }
 
-    /// <summary>Android back: an open sheet closes (back to the one it was opened from) before the page does.</summary>
-    public bool HandleBack()
-    {
-        if (!_viewModel.HasPopup) return false;
-        // An editor goes back to the transaction it edits, a transaction to the list it was opened from.
-        _viewModel.DismissPopupCommand.Execute(null);
-        return true;
-    }
+    /// <summary>
+    /// Android back: the sheet on top closes first (a pop-up goes one step back, to the transaction it edits or the list it
+    /// was opened from, as a tap outside does); the page goes only when none is open.
+    /// </summary>
+    public bool HandleBack() => Helm.Core.Ui.Sheet.CloseTopmost();
 }

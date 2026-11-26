@@ -69,8 +69,9 @@ src/
   Helm.Modules.Habits/       Windows: the module, the tray reminders, the WPF page that hosts the shared view
   Helm.Modules.Habits.Android/ Android: the module, the page that hosts the shared view, the reminder alarm (not in Helm.sln)
   Helm.Modules.Wallet.Core/  net8.0: transactions (on Helm Sync), bank notification parser, statistics, shared view model
-  Helm.Modules.Wallet/       Windows: Wallet pages
-  Helm.Modules.Wallet.Android/ Android: Wallet pages, bank notification listener, "what was it?" notification, widget (not in Helm.sln)
+  Helm.Modules.Wallet.UI/    Avalonia: the Wallet page (money, debts, goals, insights), its sheets and settings (every platform)
+  Helm.Modules.Wallet/       Windows: the module, the WPF page that hosts the shared view (CSV save dialog)
+  Helm.Modules.Wallet.Android/ Android: the module, the page that hosts the shared view, bank notification listener, "what was it?" notification, widgets (not in Helm.sln)
   Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)

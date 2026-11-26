@@ -1,114 +1,53 @@
-using System.ComponentModel;
-using System.Globalization;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Media;
-using System.Windows.Threading;
 using Helm.Core.Modules;
+using Helm.Modules.Wallet.Ui;
+using Microsoft.Win32;
 
 namespace Helm.Modules.Wallet;
 
 /// <summary>
-/// Wallet itself, opened from the menu and the Quick access tile (see <see cref="IModuleContent"/>). While the tool is
-/// off the transactions stay visible but read-only, with a note pointing to the settings (Home → Utilities). The view
-/// model's pop-up and passing notices (<see cref="WalletOverlay"/>) cover the area the page scrolls in, not the menu, so
-/// the rest of Helm stays usable.
+/// Wallet itself, opened from the menu, Quick access and Home → Utilities (see <see cref="IModuleContent"/>): the shared
+/// Avalonia <see cref="WalletView"/> inside this WPF page. Its settings are the sheet behind the gear. What is Windows
+/// only is here: the save dialog of the CSV export.
 /// </summary>
-public partial class WalletContentPage : Page
+public partial class WalletContentPage : Page, IWalletPageHost
 {
-    private readonly WalletModule _module;
     private readonly WalletViewModel _viewModel;
-    private WalletOverlay? _overlay;
-    private WalletOverlayAdorner? _adorner;
 
     public WalletContentPage(WalletModule module, WalletViewModel viewModel)
     {
-        _module = module;
         _viewModel = viewModel;
-        DataContext = viewModel;
         InitializeComponent();
-        // Module, view model and page are singletons, so the subscriptions live as long as the page.
-        module.PropertyChanged += OnModuleChanged;
-        viewModel.PropertyChanged += OnViewModelChanged;
-        ApplyEnabled();
-        // Transactions the phone saved meanwhile, and "today" after midnight.
-        Loaded += (_, _) =>
+        Host.Show(() => new WalletView(module, viewModel, this));
+    }
+
+    public void Opened()
+    {
+    }
+
+    public string QuickCaptureHint => "In Quick Capture (Win+Alt+N), type /s 50k coffee for money out or /s +2tr bonus for money in.";
+
+    /// <summary>The save dialog is Windows UI; the CSV itself comes from the shared view model.</summary>
+    public void ExportCsv(string csv)
+    {
+        var dialog = new SaveFileDialog
         {
-            viewModel.Refresh();
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, UpdateOverlay);
+            FileName = $"helm-wallet-{DateTime.Now:yyyyMMdd}.csv",
+            DefaultExt = ".csv",
+            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
         };
-        Unloaded += (_, _) => HideOverlay();
-    }
-
-    /// <summary>A legend bar's width: its share of the room it has (view glue for the donut's legend).</summary>
-    public static IMultiValueConverter ShareWidth { get; } = new ShareWidthConverter();
-
-    private sealed class ShareWidthConverter : IMultiValueConverter
-    {
-        public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture) =>
-            values is [double share, double width] && width > 0 ? Math.Max(4, share * width) : 4.0;
-
-        public object[] ConvertBack(object value, Type[] targetTypes, object? parameter, CultureInfo culture) => [];
-    }
-
-    private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName is nameof(WalletViewModel.Popup) or nameof(WalletViewModel.HasToast))
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, UpdateOverlay);
-    }
-
-    /// <summary>Shows the overlay over the page's scroll area while there is a pop-up or a notice, or takes it away.</summary>
-    private void UpdateOverlay()
-    {
-        if (!_viewModel.HasPopup && !_viewModel.HasToast || !IsLoaded)
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+        try
         {
-            HideOverlay();
-            return;
+            // UTF-8 with a BOM, so Excel shows Vietnamese text correctly.
+            File.WriteAllText(dialog.FileName, csv, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+            _viewModel.ReportExport(dialog.FileName);
         }
-        if (_adorner is null)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
-            UIElement host = FindAncestor<ScrollViewer>(this) ?? (UIElement)this;
-            if (AdornerLayer.GetAdornerLayer(host) is not { } layer) return;
-            _overlay ??= new WalletOverlay(_viewModel);
-            _adorner = new WalletOverlayAdorner(host, _overlay);
-            layer.Add(_adorner);
+            _viewModel.ReportExportFailure(ex);
         }
-        // A notice alone lets clicks through to the page.
-        _adorner.IsHitTestVisible = _viewModel.HasPopup;
-        _overlay?.Place();
-    }
-
-    private void HideOverlay()
-    {
-        if (_adorner is null) return;
-        AdornerLayer.GetAdornerLayer(_adorner.AdornedElement)?.Remove(_adorner);
-        _adorner = null;
-    }
-
-    private static T? FindAncestor<T>(DependencyObject child) where T : DependencyObject
-    {
-        for (var p = VisualTreeHelper.GetParent(child); p is not null; p = VisualTreeHelper.GetParent(p))
-        {
-            if (p is T match) return match;
-        }
-        return null;
-    }
-
-    private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(IModule.IsEnabled)) Dispatcher.BeginInvoke(ApplyEnabled);
-    }
-
-    private void ApplyEnabled()
-    {
-        var on = _module.IsEnabled;
-        Body.IsEnabled = on;
-        AddButton.IsEnabled = on;
-        ToCategorizeButton.IsEnabled = on;
-        OffBar.IsOpen = !on;
-        OffBar.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
-        if (!on) _viewModel.ClosePopupCommand.Execute(null);
     }
 }

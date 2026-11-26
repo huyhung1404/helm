@@ -29,6 +29,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
   word's page and tree, Roots, and the sheets for adding words or a text, an analysis, editing and the settings. The
   settings are a sheet behind the gear (with the on/off switch), and Home → Utilities opens Vocabulary itself. The corner
   card on the PC and the card and bubble over other apps on the phone work as before.
+- **Wallet has the new look on the PC and the phone**, one page for both: the month with quick add and the transactions,
+  the Debts, Goals and Insights tabs, and every form (a transaction, a debt, a fund, a savings goal) as one sheet. The
+  settings are a sheet behind the gear; Home → Utilities opens Wallet itself. The home-screen widgets, the bank
+  notification reading and the "what was it?" notification are as before.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the
