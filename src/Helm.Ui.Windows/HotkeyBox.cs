@@ -16,6 +16,9 @@ public sealed class HotkeyBox : Button
     public static readonly StyledProperty<HotkeyGesture> GestureProperty =
         AvaloniaProperty.Register<HotkeyBox, HotkeyGesture>(nameof(Gesture), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
+    /// <summary>Looks like any Button: the theme's Button styles (ghost, the template) match by exact type.</summary>
+    protected override Type StyleKeyOverride => typeof(Button);
+
     private IDisposable? _recording;
     private string _hint = "";
 

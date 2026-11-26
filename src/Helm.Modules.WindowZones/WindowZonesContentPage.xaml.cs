@@ -1,39 +1,58 @@
-using System.ComponentModel;
-using System.Windows;
+using System.Collections.Concurrent;
+using System.IO;
 using System.Windows.Controls;
-using Helm.Core.Modules;
+using System.Windows.Media.Imaging;
+using Avalonia.Media;
+using Helm.Core.Desktop;
+using Helm.Core.Hotkeys;
+using Helm.Modules.WindowZones.Ui;
 
 namespace Helm.Modules.WindowZones;
 
 /// <summary>
-/// The zones and their windows, opened from the menu and the Quick access tile (see <see cref="IModuleContent"/>):
-/// open or close a zone, see which windows are in it, name it, pick its shortcut, draw zones. While the tool is off
-/// the zones stay visible but read-only.
+/// The zones and their windows, opened from the menu, Quick access and Home → Utilities (see <see cref="IModuleContent"/>):
+/// the shared Avalonia <see cref="WindowZonesView"/> inside this WPF page. What only Windows has comes from here: the
+/// monitors, the programs' icons and the shortcut recorder.
 /// </summary>
-public partial class WindowZonesContentPage : Page
+public partial class WindowZonesContentPage : Page, IWindowZonesPageHost
 {
-    private readonly WindowZonesModule _module;
+    private readonly IMonitorService _monitors;
+    private readonly ConcurrentDictionary<string, IImage?> _icons = new(StringComparer.OrdinalIgnoreCase);
 
-    public WindowZonesContentPage(WindowZonesModule module, WindowZonesViewModel viewModel)
+    public WindowZonesContentPage(WindowZonesViewModel viewModel, IMonitorService monitors)
     {
-        _module = module;
-        DataContext = viewModel;
+        _monitors = monitors;
         InitializeComponent();
-        // Module and page are both singletons, so the subscription lives as long as the page.
-        module.PropertyChanged += OnModuleChanged;
-        ApplyEnabled();
+        Host.Show(() => new WindowZonesView(viewModel, this));
     }
 
-    private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
+    public void Opened()
     {
-        if (e.PropertyName == nameof(IModule.IsEnabled)) Dispatcher.BeginInvoke(ApplyEnabled);
     }
 
-    private void ApplyEnabled()
+    public IReadOnlyList<MonitorInfo> Monitors() => _monitors.GetMonitors();
+
+    /// <summary>The program's icon from Windows, handed to Avalonia as a picture; cached per .exe.</summary>
+    public IImage? IconFor(string processPath) => _icons.GetOrAdd(processPath, Load);
+
+    public Avalonia.Controls.Control? CreateHotkeyPicker(HotkeyGesture gesture, Action<HotkeyGesture> changed)
     {
-        var on = _module.IsEnabled;
-        Body.IsEnabled = on;
-        OffBar.IsOpen = !on;
-        OffBar.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        var box = new Helm.Ui.Windows.HotkeyBox { Gesture = gesture, MinHeight = 40 };
+        box.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == Helm.Ui.Windows.HotkeyBox.GestureProperty) changed(box.Gesture);
+        };
+        return box;
+    }
+
+    private static IImage? Load(string path)
+    {
+        if (Helm.Core.Desktop.ShellIcons.ForFile(path) is not BitmapSource icon) return null;
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(icon));
+        using var png = new MemoryStream();
+        encoder.Save(png);
+        png.Position = 0;
+        return new Avalonia.Media.Imaging.Bitmap(png);
     }
 }

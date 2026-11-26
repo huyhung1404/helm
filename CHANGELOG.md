@@ -26,6 +26,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
   Worth knowing tab, the reply as a sheet and, until Slack is connected, a first-run card with the steps. The settings
   (connection, channels, how it sorts, when it reports, the on/off switch) are a sheet behind the gear; Home → Utilities opens
   Slack Report itself. The list that stays on screen is unchanged.
+- **Window Zones has the new look on the PC**: your screens drawn to scale with their zones, a card per zone with its
+  windows (show one, take it out), first-run steps while there are no zones, and the zone editor as a sheet over the page.
+  The settings (drag key, shortcuts, the on/off switch) are a sheet behind the gear; Home → Utilities opens Window Zones
+  itself. Edit on the screens, the drag overlay and the tab strip are unchanged.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the
