@@ -9,6 +9,6 @@ public static class MissionsServices
         services
             .AddMissionsCore()
             .AddMissionLinks(typeof(MissionsContentPage))
-            .AddAndroidModule<MissionsModule, MissionsPage>()
+            .AddAndroidModule<MissionsModule, MissionsContentPage>()
             .AddTransient<MissionsContentPage>();
 }

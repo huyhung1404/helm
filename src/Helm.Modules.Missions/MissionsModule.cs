@@ -11,7 +11,7 @@ namespace Helm.Modules.Missions;
 /// <summary>
 /// Missions on Windows. The data lives in Helm Sync and the pages work on <see cref="MissionsStore"/>; the only
 /// background work is the daily step reminder (a tray notification) while the tool is on. The menu and Quick access
-/// open <see cref="MissionsContentPage"/>; Home → Utilities opens the settings (<see cref="MissionsPage"/>).
+/// and Home → Utilities open <see cref="MissionsContentPage"/>; its settings are a sheet inside it.
 /// </summary>
 public sealed class MissionsModule : HelmModuleBase, IModuleContent, IDisposable
 {
@@ -44,7 +44,7 @@ public sealed class MissionsModule : HelmModuleBase, IModuleContent, IDisposable
     public override ModuleGroup Group => ModuleGroup.Planning;
     public override SymbolRegular Icon => SymbolRegular.Flag24;
     public override ImageSource IconImage => MissionsLogo.Image;
-    public override Type SettingsPageType => typeof(MissionsPage);
+    public override Type SettingsPageType => typeof(MissionsContentPage);
     public Type ContentPageType => typeof(MissionsContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 

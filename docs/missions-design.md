@@ -59,9 +59,9 @@ src/Helm.Modules.Missions.Core/        net8.0, references Helm.Core only
   MissionsSettings.cs                  IVersionedSettings
   MissionsIconShape.cs                 picture icon shape (flag on a path)
   MissionsCoreServices.cs              AddMissionsCore(): collections, store, MCP tools, view model
-src/Helm.Modules.Missions/             WPF: MissionsModule, MissionsPage (settings), MissionsContentPage,
-                                       MissionsLogo, CelebrationOverlay, MissionsServices
-src/Helm.Modules.Missions.Android/     Avalonia: same set, one column
+src/Helm.Modules.Missions.UI/          Avalonia, every platform: MissionsView (+ new, celebration, settings sheets), MissionsIcon
+src/Helm.Modules.Missions/             WPF: MissionsModule, MissionsContentPage (hosts the shared view), MissionsLogo, MissionsServices
+src/Helm.Modules.Missions.Android/     Android: MissionsModule, MissionsContentPage (hosts the shared view), reminders, widget
 tests/Helm.Tests/Missions/             import, store rules, pace, prompt, MCP tools
 ```
 

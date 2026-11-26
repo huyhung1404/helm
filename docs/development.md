@@ -61,8 +61,9 @@ src/
   Helm.Modules.Tracker/      Windows: Tracker page
   Helm.Modules.Tracker.Android/ Android: Tracker page and home-screen widget (not in Helm.sln)
   Helm.Modules.Missions.Core/ net8.0: missions (on Helm Sync), JSON import, prompt, pace, MCP tools, shared view model
-  Helm.Modules.Missions/     Windows: Missions pages
-  Helm.Modules.Missions.Android/ Android: Missions pages, reminders and home-screen widget (not in Helm.sln)
+  Helm.Modules.Missions.UI/  Avalonia: the Missions page, its sheets and the mission views (every platform)
+  Helm.Modules.Missions/     Windows: the module, the tray reminder, the WPF page that hosts the shared view
+  Helm.Modules.Missions.Android/ Android: the module, the page that hosts the shared view, reminders and home-screen widget (not in Helm.sln)
   Helm.Modules.Habits.Core/  net8.0: habits and their days (on Helm Sync), streaks, the year grid, reasons, MCP tools, shared view model
   Helm.Modules.Habits.UI/    Avalonia: the Habits page, its sheets and the year grid (every platform)
   Helm.Modules.Habits/       Windows: the module, the tray reminders, the WPF page that hosts the shared view

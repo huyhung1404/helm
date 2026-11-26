@@ -22,6 +22,9 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
   the ring to mark today, the ones done today folded under them, and the Report tab. Marking a day, the celebration and
   the reason for skipped days open as one sheet (the reason still cannot be skipped). The settings are a sheet behind
   the gear; Home → Utilities opens Habits itself.
+- **Missions has the new look on the PC and the phone**, one page for both: a card per mission with the step it is on, the
+  mission with its current step and roadmap, Insights (statistics and badges). A new mission or plan, the celebration and
+  the settings open as sheets; the settings hold the tool's on/off switch, and on the phone the home-screen widget.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the

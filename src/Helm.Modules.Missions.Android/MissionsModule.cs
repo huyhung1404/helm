@@ -9,20 +9,18 @@ namespace Helm.Modules.Missions;
 
 /// <summary>
 /// Missions on Android. The data lives in Helm Sync; the module sets the hourly alarm behind the daily step reminder
-/// while the tool is on, and keeps the home-screen widgets in step with the data. Back closes the celebration and the
-/// new-mission or re-plan panel before leaving the page.
+/// while the tool is on, and keeps the home-screen widgets in step with the data. Back closes the page's sheet (the
+/// celebration, a new mission or plan, the settings) before leaving the page.
 /// </summary>
 public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHandler, IDisposable
 {
-    private readonly MissionsViewModel _viewModel;
     // Steps sent to Tracker and their tasks finish together while this lives.
     private readonly MissionTaskSync _tasks;
     private readonly ILogger<MissionsModule> _logger;
     private readonly Timer _widgetTimer;
 
-    public MissionsModule(MissionsViewModel viewModel, MissionsStore store, MissionReminderService reminders, MissionTaskSync tasks, ILogger<MissionsModule> logger)
+    public MissionsModule(MissionsStore store, MissionReminderService reminders, MissionTaskSync tasks, ILogger<MissionsModule> logger)
     {
-        _viewModel = viewModel;
         _tasks = tasks;
         _logger = logger;
         // "Remind me now" on the settings page.
@@ -34,7 +32,7 @@ public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHan
 
     public void Dispose() => _widgetTimer.Dispose();
 
-    /// <summary>Whether the launcher can place the widget when asked (settings page button).</summary>
+    /// <summary>Whether the launcher can place the widget when asked (the settings sheet's widget card).</summary>
     public bool CanPinWidget => MissionsWidgets.CanRequestPin(AndroidApp.Context);
 
     /// <summary>Asks the launcher to add the Missions widget to the home screen.</summary>
@@ -60,9 +58,9 @@ public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHan
     public override Symbol Icon => Symbol.Flag;
 
     /// <summary>The same vector icon as on Windows (<see cref="MissionsIconShape"/>).</summary>
-    public override IImage? IconImage => MissionsIcon.Image;
+    public override IImage? IconImage => Ui.MissionsIcon.Image;
 
-    public override Type PageType => typeof(MissionsPage);
+    public override Type PageType => typeof(MissionsContentPage);
     public Type ContentPageType => typeof(MissionsContentPage);
 
     public override Task EnableAsync(CancellationToken ct)
@@ -98,7 +96,7 @@ public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHan
     }
 
     /// <summary>
-    /// The content page is on screen: the moment to ask for notifications (Android 13+, once) and to catch today's
+    /// The content page is on screen (opened, or the app came back to it): the moment to ask for notifications (Android 13+, once) and to catch today's
     /// reminder.
     /// </summary>
     public void PageShown()
@@ -108,16 +106,6 @@ public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHan
         MissionReminders.CheckNow(context);
     }
 
-    /// <summary>Android back: the celebration, then an open panel, close before the page does.</summary>
-    public bool HandleBack()
-    {
-        if (_viewModel.HasCelebration)
-        {
-            _viewModel.DismissCelebrationCommand.Execute(null);
-            return true;
-        }
-        if (!_viewModel.IsNewOpen) return false;
-        _viewModel.CloseNewCommand.Execute(null);
-        return true;
-    }
+    /// <summary>Android back: the sheet on top (the celebration, a new mission or plan, the settings) closes before the page does.</summary>
+    public bool HandleBack() => Helm.Core.Ui.Sheet.CloseTopmost();
 }

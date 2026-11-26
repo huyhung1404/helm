@@ -1,81 +1,65 @@
-using System.ComponentModel;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Animation;
-using System.Windows.Threading;
-using Helm.Core.Modules;
+using Helm.Modules.Missions.Ui;
+using Microsoft.Win32;
 
 namespace Helm.Modules.Missions;
 
 /// <summary>
-/// Missions itself, opened from the menu and the Quick access tile (see <see cref="IModuleContent"/>). While the tool is
-/// off the missions stay visible but read-only, with a note pointing to the settings (Home → Utilities). Plays the
-/// celebrations the view model asks for.
+/// Missions itself, opened from the menu, Quick access and Home → Utilities (see <see cref="IModuleContent"/>): the shared
+/// Avalonia <see cref="MissionsView"/> inside this WPF page. Coming back to Helm while it shows refreshes the missions
+/// (steps done on another device or by an AI agent meanwhile).
 /// </summary>
-public partial class MissionsContentPage : Page
+public partial class MissionsContentPage : Page, IMissionsPageHost
 {
-    private readonly MissionsModule _module;
     private readonly MissionsViewModel _viewModel;
-    private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(60) };
+    private MissionsView? _view;
+    private Window? _window;
 
     public MissionsContentPage(MissionsModule module, MissionsViewModel viewModel)
     {
-        _module = module;
         _viewModel = viewModel;
-        DataContext = viewModel;
         InitializeComponent();
-        // Module, view model and page are singletons, so the subscriptions live as long as the page.
-        module.PropertyChanged += OnModuleChanged;
-        viewModel.PropertyChanged += OnViewModelChanged;
-        viewModel.Celebrated += (_, kind) => Dispatcher.BeginInvoke(() => Celebrate(kind));
-        ApplyEnabled();
-        // "Started 2 hours ago" and the pace go stale; refresh while the page is on screen.
-        _clock.Tick += (_, _) => viewModel.Refresh();
+        Host.Show(() => _view = new MissionsView(module, viewModel, this));
         Loaded += (_, _) =>
         {
-            viewModel.Refresh();
-            _clock.Start();
+            _window = Window.GetWindow(this);
+            if (_window is not null) _window.Activated += OnWindowActivated;
         };
-        Unloaded += (_, _) => _clock.Stop();
-    }
-
-    private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        switch (e.PropertyName)
+        Unloaded += (_, _) =>
         {
-            // A celebration that is not from a button here (finished on another device or by an AI agent) still shows.
-            case nameof(MissionsViewModel.Celebration) when _viewModel.Celebration is not null:
-                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
-                {
-                    CelebrationPanel.BringIntoView();
-                    if (_viewModel.PlayConfetti) Confetti.Play(_viewModel.IsMissionCelebration);
-                });
-                break;
-            case nameof(MissionsViewModel.IsImportOpen) when _viewModel.IsImportOpen:
-                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => ImportBox.Focus());
-                break;
+            if (_window is not null) _window.Activated -= OnWindowActivated;
+            _window = null;
+        };
+    }
+
+    /// <summary>Back at Helm after a while (the page was left open): steps done elsewhere meanwhile.</summary>
+    private void OnWindowActivated(object? sender, EventArgs e) => _view?.Shown();
+
+    public void Opened()
+    {
+    }
+
+    /// <summary>View glue: the save dialog is Windows UI; the CSV itself comes from the shared view model.</summary>
+    public void ExportCsv(string csv)
+    {
+        var dialog = new SaveFileDialog
+        {
+            FileName = $"helm-missions-{DateTime.Now:yyyyMMdd}.csv",
+            DefaultExt = ".csv",
+            Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+        try
+        {
+            // UTF-8 with a BOM, so Excel shows Vietnamese and other non-ASCII text correctly.
+            File.WriteAllText(dialog.FileName, csv, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+            _viewModel.ReportExport(dialog.FileName);
         }
-    }
-
-    /// <summary>A step done here: a short pulse on the overview (phases and missions also get the card and confetti).</summary>
-    private void Celebrate(CelebrationKind? kind)
-    {
-        if (kind is not null || !_viewModel.PlayCelebrations) return;
-        var pulse = new DoubleAnimation(1, 1.02, TimeSpan.FromMilliseconds(140)) { AutoReverse = true, EasingFunction = new QuadraticEase() };
-        OverviewScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, pulse);
-        OverviewScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, pulse);
-    }
-
-    private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(IModule.IsEnabled)) Dispatcher.BeginInvoke(ApplyEnabled);
-    }
-
-    private void ApplyEnabled()
-    {
-        var on = _module.IsEnabled;
-        Body.IsEnabled = on;
-        OffBar.IsOpen = !on;
-        OffBar.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            _viewModel.ReportExportFailure(ex);
+        }
     }
 }
