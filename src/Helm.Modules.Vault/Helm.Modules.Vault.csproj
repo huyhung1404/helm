@@ -6,6 +6,11 @@
     <RootNamespace>Helm.Modules.Vault</RootNamespace>
   </PropertyGroup>
 
+  <!-- Locking the vault when Windows locks or sleeps (SessionSwitch, PowerModeChanged). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Win32.SystemEvents" Version="8.0.0" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vault.Core\Helm.Modules.Vault.Core.csproj" />

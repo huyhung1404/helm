@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Media;
 using Helm.Core.Desktop;
 using Helm.Core.Services;
 using Helm.Core.Settings;
@@ -86,7 +85,7 @@ public sealed class SlackBotOverlay
         try
         {
             if (flash) _window?.Flash();
-            if (_settings.Current.PlaySound) SystemSounds.Asterisk.Play();
+            if (_settings.Current.PlaySound) Helm.Core.Desktop.WindowsSounds.Asterisk();
             if (_window is { IsFolded: true })
             {
                 _window.SetFolded(false);

@@ -1,4 +1,6 @@
-using System.Windows.Automation;
+using Windows.Win32;
+using Windows.Win32.Foundation;
+using Windows.Win32.UI.Accessibility;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.Core.Desktop;
@@ -60,18 +62,30 @@ public sealed class BrowserSites(ILogger<BrowserSites> logger) : IBrowserSites
     {
         try
         {
-            var root = AutomationElement.FromHandle(hwnd);
-            AutomationElement? bar = kind == BrowserKind.Firefox
-                ? root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, "urlbar-input"))
+            // Windows' UI Automation through COM (no WPF), one client per call: cheap, and a browser that went away
+            // never leaves a stale element behind.
+            var automation = (IUIAutomation)new CUIAutomation();
+            var root = automation.ElementFromHandle(new HWND(hwnd));
+            var condition = kind == BrowserKind.Firefox
+                ? Condition(automation, UIA_PROPERTY_ID.UIA_AutomationIdPropertyId, "urlbar-input")
                 // Chromium: the first edit box of the window is the address bar (the page's own come later).
-                : root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
-            return bar?.GetCurrentPropertyValue(ValuePattern.ValueProperty) as string is { Length: > 0 } value ? value : null;
+                : Condition(automation, UIA_PROPERTY_ID.UIA_ControlTypePropertyId, (int)UIA_CONTROLTYPE_ID.UIA_EditControlTypeId);
+            var bar = root.FindFirst(TreeScope.TreeScope_Descendants, condition);
+            if (bar is null) return null;
+            var value = bar.GetCurrentPropertyValue(UIA_PROPERTY_ID.UIA_ValueValuePropertyId);
+            return value is string { Length: > 0 } text ? text : null;
         }
-        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or System.Runtime.InteropServices.COMException)
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException or InvalidCastException
+            or NullReferenceException)
         {
             logger.LogDebug(ex, "Could not read the address of {Process}", process);
             return null;
         }
+    }
+
+    private static IUIAutomationCondition Condition(IUIAutomation automation, UIA_PROPERTY_ID property, object value)
+    {
+        return automation.CreatePropertyCondition(property, value);
     }
 
     private enum BrowserKind { None, Chromium, Firefox }

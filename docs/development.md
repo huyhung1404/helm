@@ -48,10 +48,10 @@ src/
   Helm.Core/                 net8.0, no UI: module contract (IModule, ModuleRegistry<T>), settings, sync, update rules
   Helm.Shell/                net8.0: view models shared by both apps' Home and General (Updates, Sync), Bug reports (store, black box, view models)
   Helm.Shell.UI/             Avalonia: Home, General, Bug reports (the page and the report form), the shell (menu, tabs, title bar), the MCP consent question, every platform
-  Helm.Shell.Windows/        Windows: the WPF pages that host Home, General and Bug reports, the report window, the MCP consent window, this PC's pictures and MCP part
+  Helm.Shell.Windows/        Windows: Home, General and Bug reports made by key (WindowsShellPages), the report window, the MCP consent window, this PC's pictures and MCP part
   Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
-                             GDI overlay window, DPAPI, the few WPF controls the shell still uses (Ui/); namespaces stay Helm.Core.*
-  Helm.App/                  WPF-UI shell: DI host, MainWindow, tray
+                             GDI overlay window, DPAPI, the clipboard, the module contract (Avalonia types); no WPF; namespaces stay Helm.Core.*
+  Helm.App/                  Avalonia desktop app: DI host, the shell window (Helm.Shell.UI ShellView), tray, notifications
   Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
   Helm.Keyboard.Engine/      net8.0: Telex (namespace Helm.Typing), the ids Helm and the input method share
@@ -59,46 +59,46 @@ src/
                              built by scripts/build-keyboard.ps1, needs the C++ build tools
   Helm.Modules.QuickCapture.Core/ net8.0: settings, IQuickCapture, the view models of the page and the capture box
   Helm.Modules.QuickCapture.UI/ Avalonia: the Quick Capture page and the capture box
-  Helm.Modules.QuickCapture/ Windows only: the shortcut, the floating window around the box, the WPF page that hosts the shared view
+  Helm.Modules.QuickCapture/ Windows only: the shortcut, the floating window around the box, its page host (what only Windows does for the shared view)
   Helm.Modules.Keyboard.Core/ net8.0: settings, modes, the keyboard per app (on Helm Sync), IKeyboard, shared view model
   Helm.Modules.Keyboard.UI/  Avalonia: the Helm Keyboard page
-  Helm.Modules.Keyboard/     Windows only: installs the input method, EN / VI / 中 shortcut, the WPF page that hosts the shared view
+  Helm.Modules.Keyboard/     Windows only: installs the input method, EN / VI / 中 shortcut, its page host (what only Windows does for the shared view)
   Helm.Modules.Tracker.Core/ net8.0: Tracker data (on Helm Sync), reports, CSV, shared view model
   Helm.Modules.Tracker/      Windows: Tracker page
   Helm.Modules.Tracker.Android/ Android: Tracker page and home-screen widget (not in Helm.sln)
   Helm.Modules.Missions.Core/ net8.0: missions (on Helm Sync), JSON import, prompt, pace, MCP tools, shared view model
   Helm.Modules.Missions.UI/  Avalonia: the Missions page, its sheets and the mission views (every platform)
-  Helm.Modules.Missions/     Windows: the module, the tray reminder, the WPF page that hosts the shared view
+  Helm.Modules.Missions/     Windows: the module, the tray reminder, its page host (what only Windows does for the shared view)
   Helm.Modules.Missions.Android/ Android: the module, the page that hosts the shared view, reminders and home-screen widget (not in Helm.sln)
   Helm.Modules.Habits.Core/  net8.0: habits and their days (on Helm Sync), streaks, the year grid, reasons, MCP tools, shared view model
   Helm.Modules.Habits.UI/    Avalonia: the Habits page, its sheets and the year grid (every platform)
-  Helm.Modules.Habits/       Windows: the module, the tray reminders, the WPF page that hosts the shared view
+  Helm.Modules.Habits/       Windows: the module, the tray reminders, its page host (what only Windows does for the shared view)
   Helm.Modules.Habits.Android/ Android: the module, the page that hosts the shared view, the reminder alarm (not in Helm.sln)
   Helm.Modules.Wallet.Core/  net8.0: transactions (on Helm Sync), bank notification parser, statistics, shared view model
   Helm.Modules.Wallet.UI/    Avalonia: the Wallet page (money, debts, goals, insights), its sheets and settings (every platform)
-  Helm.Modules.Wallet/       Windows: the module, the WPF page that hosts the shared view (CSV save dialog)
+  Helm.Modules.Wallet/       Windows: the module, its page host (what only Windows does for the shared view) (CSV save dialog)
   Helm.Modules.Wallet.Android/ Android: the module, the page that hosts the shared view, bank notification listener, "what was it?" notification, widgets (not in Helm.sln)
   Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard, auto-type (its picker is the shared AutoTypePickerView in an Avalonia window)
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
   Helm.Modules.Vocab.Core/   net8.0: words and their parts (on Helm Sync), the quiz, the card, MCP tools, shared view models
   Helm.Modules.Vocab.UI/     Avalonia: the Vocabulary page (Learn, Words, Roots), its sheets and settings (every platform), the PC's corner card
-  Helm.Modules.Vocab/        Windows: the module, the WPF page that hosts the shared view, the corner card's window, the Claude Code agent
+  Helm.Modules.Vocab/        Windows: the module, its page host (what only Windows does for the shared view), the corner card's window, the Claude Code agent
   Helm.Modules.Vocab.Android/ Android: the module, the page that hosts the shared view, the pop-up card and bubble over other apps (not in Helm.sln)
   Helm.Modules.NovelReader.Core/ net8.0: novels (on Helm Sync), conversion, dictionaries, reading aloud, names, reports, MCP tools, shared view model
   Helm.Modules.NovelReader.UI/ Avalonia: the Novel Reader page (library, reader, sheets, settings), every platform
-  Helm.Modules.NovelReader/  Windows: the module, scraping the web, Windows voices, the WPF page that hosts the shared view
+  Helm.Modules.NovelReader/  Windows: the module, scraping the web, Windows voices, its page host (what only Windows does for the shared view)
   Helm.Modules.NovelReader.Android/ Android: the module, the page that hosts the shared view, the phone's voices, Novel Lens (not in Helm.sln)
   Helm.Modules.Ssh.Core/     net8.0: servers, keys, known hosts, sessions, the server's menu, AI agents' tools, shared view model
   Helm.Modules.Ssh.UI/       Avalonia: the SSH page (servers, connect bar, key bar, menu and settings sheets), every platform
-  Helm.Modules.Ssh/          Windows: the module, the terminal (xterm.js in WebView2, in a NativeControlHost), the WPF page that hosts the shared view
+  Helm.Modules.Ssh/          Windows: the module, the terminal (xterm.js in WebView2, in a NativeControlHost), its page host (what only Windows does for the shared view)
   Helm.Modules.Ssh.Android/  Android: the module, the page that hosts the shared view, the terminal (xterm.js in WebView) (not in Helm.sln)
   Helm.Modules.SlackBot.Core/ net8.0: Slack Report engine (reads Slack, sorts it with Claude), inbox, MCP tools, shared view models
   Helm.Modules.SlackBot.UI/  Avalonia: the Slack Report page, its reply sheet and settings sheet, the PC's always-on-top list
-  Helm.Modules.SlackBot/     Windows only: the module, the always-on-top list's window, the WPF page that hosts the shared view
+  Helm.Modules.SlackBot/     Windows only: the module, the always-on-top list's window, its page host (what only Windows does for the shared view)
   Helm.Modules.WindowZones.Core/ net8.0: zone layouts, rules, engine contracts, shared view model
   Helm.Modules.WindowZones.UI/ Avalonia: the Window Zones page, its settings sheet, the zone layout view, the full-screen editor and the tab strip
-  Helm.Modules.WindowZones/  Windows only: the module, the snapping engine and drag overlay, the Avalonia windows of the full-screen editor and the tab strip, the WPF page that hosts the shared view
+  Helm.Modules.WindowZones/  Windows only: the module, the snapping engine and drag overlay, the Avalonia windows of the full-screen editor and the tab strip, its page host (what only Windows does for the shared view)
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
   Helm.Core.Linux/           net8.0, Linux for the connector: secrets under a host key (0600, optionally sealed by
                              systemd-creds), MCP on a Unix socket, plain child processes; namespaces stay Helm.Core.*
@@ -110,7 +110,7 @@ Windows modules reference `Helm.Core.Windows`, Android modules reference `Helm.C
 
 Key infrastructure in `Helm.Core`:
 
-- `MessageLoopThread` is an STA thread with its own `HWND_MESSAGE` window and message pump. Hotkeys, low-level hooks, WinEvent hooks and each module's overlays run on these threads, never on the WPF dispatcher.
+- `MessageLoopThread` is an STA thread with its own `HWND_MESSAGE` window and message pump. Hotkeys, low-level hooks, WinEvent hooks and each module's overlays run on these threads, never on the UI (Avalonia) dispatcher.
 - `LowLevelKeyboardHook` / `LowLevelMouseHook` are ref-counted (`Acquire()`). `Intercept` runs inside the hook and can set `Handled` to swallow input. `Observed` is fed through a `Channel<T>` for heavier work.
 - `HotkeyManager` wraps `RegisterHotKey` and detects conflicts, both between modules and with other apps. It suspends itself while a hotkey picker is recording.
 - `WindowService` works with DWM *extended frame bounds*, so snapped windows sit flush without the invisible resize border.
@@ -120,7 +120,7 @@ Key infrastructure in `Helm.Core`:
 
 > **Fastest way:** open [new-tool-prompt.md](new-tool-prompt.md), fill in the tool name, what it does and its platforms (PC, Android or both), and paste the file into Claude Code. It contains every rule needed so a new tool matches the others (structure, UI, testing, release).
 
-1. Create `src/Helm.Modules.<Name>` (WPF class library referencing `Helm.Core.Windows`). Android tools follow [android.md](android.md#tools-and-platforms).
+1. Create `src/Helm.Modules.<Name>` (class library referencing `Helm.Core.Windows`; its page is Avalonia, from `Helm.Modules.<Name>.UI`). Android tools follow [android.md](android.md#tools-and-platforms).
 2. Implement the module, usually by deriving from `HelmModuleBase`:
 
    ```csharp

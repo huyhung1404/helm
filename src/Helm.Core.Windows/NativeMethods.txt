@@ -155,3 +155,19 @@ GetKeyboardLayoutList
 WM_INPUTLANGCHANGEREQUEST
 SystemParametersInfo
 GetGUIThreadInfo
+
+// UI Automation (BrowserSites: the address bar of the browser in front), through COM
+CUIAutomation
+IUIAutomation
+IUIAutomationElement
+IUIAutomationCondition
+TreeScope
+UIA_PROPERTY_ID
+UIA_CONTROLTYPE_ID
+
+// ShellIcons: an icon's pixels without WPF
+GetIconInfo
+GetObject
+GetDIBits
+BITMAP
+BITMAPINFO

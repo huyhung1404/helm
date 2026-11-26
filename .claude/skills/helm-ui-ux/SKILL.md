@@ -1,6 +1,6 @@
 ---
 name: helm-ui-ux
-description: Helm's look and feel for every UI change in Helm (Avalonia pages in Helm.Modules.<X>.UI and Helm.Ui, the WPF shell around them, the Gallery demo). Use before designing, building, restyling or reviewing any Helm page, control, sheet, popup or animation, on PC or phone.
+description: Helm's look and feel for every UI change in Helm (Avalonia pages in Helm.Modules.<X>.UI and Helm.Ui, the shell around them, the Gallery demo). Use before designing, building, restyling or reviewing any Helm page, control, sheet, popup or animation, on PC or phone.
 ---
 
 # Helm UI/UX
@@ -19,20 +19,18 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - Tabs replace everything under them, from the page title down, and scroll to the top.
 - Content page ↔ settings: a gear on the content page opens the tool's settings as a **sheet over the page** (no
   navigating away; Done / X closes it). Tracker: `TrackerSettingsView`. A tool that has moved has **no separate
-  settings page**: its `SettingsPageType` is its content page (Home → Utilities and search open that), the sheet holds
-  the tool's on/off switch as its first card, and the WPF settings page is deleted. A tool that has not moved yet keeps
-  its WPF settings page until it does.
+  settings page**: its `SettingsPageType` is its content page (Home → Utilities and search open that), and the sheet holds
+  the tool's on/off switch as its first card.
 - Confirmations (delete…) are `GlassDialogs` (a `Sheet`): the question, what happens, Cancel + the action as a pill. A
   view model gets it through `IDialogService`; the view swaps it in (`viewModel.UseDialogs(new GlassDialogs(() => this))`).
-  Never the OS or WPF-UI dialog.
+  Never the OS dialog.
 
 ## 2. Surface
 - Background: `core:Backdrop` behind every glass page (spec: `Helm.Core/Ui/BackdropSpec.cs`, the only place for its
   colours). Dark graphite (#15171C → #0B0C0F) with four faint corner glows in the Helm icon's colours: blue #0077F2
   top left, sky #06AEFF bottom left, cyan #00C6E0 top right, teal #00CFC0 bottom right; they drift slowly on a shared
   clock. Light theme: the same over #F7F8FA → #ECEFF3.
-- In the WPF shell the same background covers the whole window (`WindowBackdrop`), and the hosted page paints its part
-  lined up with it (`Backdrop.Canvas`, set by `AvaloniaHost`). No panel, border or divider between shell and page:
+- In the PC app the same background covers the whole window behind `ShellView`. No panel, border or divider between shell and page:
   the tab bar is one borderless pill (`SubtleFillColorTertiaryBrush`) with pill tabs.
 - Cards: `Border.glass` (radius 12, glass fill, thin stroke, soft shadow); `.glass.hero` (radius 16) for the one big
   card (first run). Sheets/dialogs: `Border.sheet` / `HelmSheetBackground` (solid, radius 26, 28 on top of a phone sheet, stroke): a floating card is more rounded than the cards under it, never sharper. Popup lists: radius 12.
@@ -167,11 +165,12 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - A question names the thing ("Delete this task?"), then one sentence says what is removed and what stays.
 - Vietnamese typing must work in every text field (Helm Keyboard): use the shared `TextBox`, never a custom one.
 
-## 9. Inside the WPF shell (until the shell moves to Avalonia)
-- Show a page with `AvaloniaHost.Show(() => new …View(...))`; it shows a message instead of failing.
-- Popups are drawn inside the page (`OverlayPopups`): a separate popup window opens in the wrong place after the WPF
-  window moves.
-- The WPF page sets `ScrollViewer.CanContentScroll="False"`; the Avalonia view scrolls itself.
+## 9. Inside the PC app
+- `Helm.App` is pure Avalonia (no WPF anywhere): the window holds `Helm.Shell.UI`'s `ShellView`; a tool's page comes
+  from its module's `CreatePage()`.
+- PC-only wiring lives in a `Windows<X>PageHost` in the tool's Windows project: clipboard through `WindowsClipboard`,
+  file pickers through `DesktopWindows`. The view itself stays in `.UI`.
+- Popups are drawn inside the page (`OverlayPopups`); the view scrolls itself.
 
 ## 10. Demo and check
 - Demo in Helm.Gallery (`scripts/gallery.cmd`): the real view with fake data, never an HTML mock-up or a demo-only

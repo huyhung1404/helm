@@ -1,4 +1,3 @@
-using System.Media;
 using Helm.Core.Desktop;
 using Helm.Core.Geometry;
 using Helm.Core.Hooks;
@@ -459,7 +458,7 @@ internal sealed class KeyboardEngine : IAsyncDisposable
         if (!_options.PlaySound) return;
         try
         {
-            (mode == KeyboardMode.English ? SystemSounds.Beep : SystemSounds.Asterisk).Play();
+            if (mode == KeyboardMode.English) Helm.Core.Desktop.WindowsSounds.Beep(); else Helm.Core.Desktop.WindowsSounds.Asterisk();
         }
         catch (Exception ex)
         {
