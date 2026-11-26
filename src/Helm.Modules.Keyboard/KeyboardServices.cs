@@ -14,6 +14,6 @@ public static class KeyboardServices
         services.AddSingleton<KeyboardApps>();
         services.AddSingleton<KeyboardInstaller>();
         services.AddSingleton<IKeyboard>(sp => sp.GetRequiredService<KeyboardModule>());
-        return services.AddHelmModule<KeyboardModule, KeyboardPage, KeyboardViewModel>();
+        return services.AddHelmModule<KeyboardModule, KeyboardViewModel>();
     }
 }

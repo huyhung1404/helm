@@ -1,3 +1,6 @@
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Desktop;
 using Helm.Core.Hooks;
 using Helm.Core.Hotkeys;
@@ -7,8 +10,8 @@ using Helm.Core.Settings;
 using Helm.Modules.WindowZones.Editor;
 using Helm.Modules.WindowZones.Engine;
 using Helm.Modules.WindowZones.Model;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Wpf.Ui.Controls;
 
 namespace Helm.Modules.WindowZones;
 
@@ -17,7 +20,7 @@ namespace Helm.Modules.WindowZones;
 /// drawer of windows: Ctrl+Alt+its number opens it, brings it to the front or closes it, and Win+PgDn / Win+PgUp
 /// switch between its windows like tabs.
 /// </summary>
-public sealed class WindowZonesModule : HelmModuleBase, IModuleContent, IWindowZones
+public sealed class WindowZonesModule : HelmModuleBase, IWindowZones
 {
     public const string ModuleId = WindowZonesIds.ModuleId;
     private const string EditorHotkeyId = "editor";
@@ -31,6 +34,7 @@ public sealed class WindowZonesModule : HelmModuleBase, IModuleContent, IWindowZ
     private readonly ZonesEditorController _editor;
     private readonly IUiDispatcher _ui;
     private readonly ILogger<WindowZonesModule> _logger;
+    private readonly IServiceProvider _services;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly List<HotkeyRegistration> _registrations = [];
     private WindowZonesEngine? _engine;
@@ -48,6 +52,7 @@ public sealed class WindowZonesModule : HelmModuleBase, IModuleContent, IWindowZ
         LowLevelKeyboardHook keyboardHook,
         ZonesEditorController editor,
         IUiDispatcher ui,
+        IServiceProvider services,
         ILogger<WindowZonesModule> logger)
     {
         Settings = settings.Get<WindowZonesSettings>(ModuleId);
@@ -61,6 +66,7 @@ public sealed class WindowZonesModule : HelmModuleBase, IModuleContent, IWindowZ
         _editor = editor;
         _ui = ui;
         _logger = logger;
+        _services = services;
         Settings.Changed += (_, _) => _ = ApplySettingsAsync();
         // A tab clicked in the strip: that window comes forward in its zone.
         tabStrip.TabChosen += (_, handle) => ShowWindow(handle);
@@ -72,10 +78,9 @@ public sealed class WindowZonesModule : HelmModuleBase, IModuleContent, IWindowZ
     public override string DisplayName => "Window Zones";
     public override string Description => "Draw zones on your screens and drop windows into them. Each zone keeps its windows: open or close it with a shortcut, and switch between them like tabs.";
     public override ModuleGroup Group => ModuleGroup.WindowsAndDesktop;
-    public override SymbolRegular Icon => SymbolRegular.SlideLayout24;
-    public override System.Windows.Media.ImageSource IconImage => WindowZonesLogo.Image;
-    public override Type SettingsPageType => typeof(WindowZonesContentPage);
-    public Type ContentPageType => typeof(WindowZonesContentPage);
+    public override Symbol Icon => Symbol.SlideLayout;
+    public override IImage IconImage => Ui.WindowZonesIcon.Image;
+    public override Control CreatePage() => ActivatorUtilities.CreateInstance<WindowsWindowZonesPageHost>(_services).View;
 
     public ISettingsStore<WindowZonesSettings> Settings { get; }
 

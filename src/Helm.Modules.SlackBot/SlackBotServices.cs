@@ -20,6 +20,5 @@ public static class SlackBotServices
             // AddHelmModule, with the settings view model given the module as the IModule it takes (it is portable).
             .AddSingleton<SlackBotModule>()
             .AddSingleton<IHelmModule>(sp => sp.GetRequiredService<SlackBotModule>())
-            .AddSingleton(sp => ActivatorUtilities.CreateInstance<SlackBotViewModel>(sp, sp.GetRequiredService<SlackBotModule>()))
-            .AddSingleton<SlackBotContentPage>();
+            .AddSingleton(sp => ActivatorUtilities.CreateInstance<SlackBotViewModel>(sp, sp.GetRequiredService<SlackBotModule>()));
 }

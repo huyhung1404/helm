@@ -1,13 +1,15 @@
-using System.Windows.Media;
+using Avalonia.Controls;
+using Avalonia.Media;
+using FluentIcons.Common;
 using Helm.Core.Desktop;
 using Helm.Core.Hooks;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Settings;
 using Helm.Typing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
-using Wpf.Ui.Controls;
 
 namespace Helm.Modules.Keyboard;
 
@@ -23,13 +25,14 @@ public sealed class KeyboardModule : HelmModuleBase, IKeyboard
     private readonly IBrowserSites _sites;
     private readonly LowLevelKeyboardHook _keyboard;
     private readonly ILogger<KeyboardModule> _logger;
+    private readonly IServiceProvider _services;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private KeyboardEngine? _engine;
     private HotkeyRegistration? _registration;
     private bool _enabled;
 
     public KeyboardModule(ISettingsStoreFactory settings, KeyboardApps apps, KeyboardInstaller installer, IHotkeyManager hotkeys,
-        IWindowService windows, IInputMethods inputMethods, IMonitorService monitors, IBrowserSites sites, LowLevelKeyboardHook keyboard, ILogger<KeyboardModule> logger)
+        IWindowService windows, IInputMethods inputMethods, IMonitorService monitors, IBrowserSites sites, LowLevelKeyboardHook keyboard, IServiceProvider services, ILogger<KeyboardModule> logger)
     {
         Settings = settings.Get<KeyboardSettings>(ModuleId);
         Apps = apps;
@@ -41,6 +44,7 @@ public sealed class KeyboardModule : HelmModuleBase, IKeyboard
         _sites = sites;
         _keyboard = keyboard;
         _logger = logger;
+        _services = services;
         Settings.Changed += (_, _) => _ = ApplySettingsAsync();
     }
 
@@ -48,9 +52,9 @@ public sealed class KeyboardModule : HelmModuleBase, IKeyboard
     public override string DisplayName => "Helm Keyboard";
     public override string Description => "Type Vietnamese with Telex, go round English, Vietnamese and Chinese with one shortcut, and let every app — and every web site — keep the keyboard you last used in it.";
     public override ModuleGroup Group => ModuleGroup.WindowsAndDesktop;
-    public override SymbolRegular Icon => SymbolRegular.Keyboard24;
-    public override ImageSource? IconImage => KeyboardLogo.Image;
-    public override Type SettingsPageType => typeof(KeyboardPage);
+    public override Symbol Icon => Symbol.Keyboard;
+    public override IImage IconImage => Ui.KeyboardIcon.Image;
+    public override Control CreatePage() => ActivatorUtilities.CreateInstance<WindowsKeyboardPageHost>(_services).View;
 
     public override IReadOnlyList<HotkeyDefinition> Hotkeys =>
     [

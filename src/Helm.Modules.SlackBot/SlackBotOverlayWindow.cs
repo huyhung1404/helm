@@ -27,7 +27,7 @@ public sealed class SlackBotOverlayWindow : ISlackBotListHost
     {
         _folded = folded;
         _window = new AvaloniaCornerWindow(windows, monitors, "Slack Report", null, anchor, moved);
-        _view = new SlackBotListView(viewModel, this, Logo.Value, fold)
+        _view = new SlackBotListView(viewModel, this, SlackBotIcon.Image, fold)
         {
             Margin = new Thickness(AvaloniaCornerWindow.ShadowSpace),
         };
@@ -70,20 +70,4 @@ public sealed class SlackBotOverlayWindow : ISlackBotListHost
     public bool Drag(PointerPressedEventArgs e) => _window.Drag(e);
 
     public void BackToCorner() => _window.BackToCorner();
-
-    /// <summary>The tool's icon (<see cref="SlackBotLogo"/>, drawn once at 72 px) as an Avalonia image.</summary>
-    private static readonly Lazy<Avalonia.Media.IImage> Logo = new(() =>
-    {
-        const int size = 72;
-        var visual = new System.Windows.Media.DrawingVisual();
-        using (var dc = visual.RenderOpen()) dc.DrawImage(SlackBotLogo.Image, new System.Windows.Rect(0, 0, size, size));
-        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(size, size, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-        bitmap.Render(visual);
-        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
-        using var stream = new MemoryStream();
-        encoder.Save(stream);
-        stream.Position = 0;
-        return new Avalonia.Media.Imaging.Bitmap(stream);
-    });
 }

@@ -3,8 +3,8 @@ namespace Helm.Modules.Keyboard;
 /// <summary>
 /// The Helm Keyboard icon: a bare keyboard (four keys, three keys offset below them, a space bar), with no letter on it
 /// since it types English, Vietnamese and Chinese alike, in a red-to-amber gradient with no background. Keys are in a
-/// 100 × 100 box and the rows fill its width edge to edge, like the other tool icons. PC only, so the shape lives in the
-/// PC project.
+/// 100 × 100 box and the rows fill its width edge to edge, like the other tool icons. Drawn by
+/// <see cref="Ui.KeyboardIcon"/>.
 /// </summary>
 public static class KeyboardIconShape
 {

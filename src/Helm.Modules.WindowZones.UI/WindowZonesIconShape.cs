@@ -3,8 +3,8 @@ namespace Helm.Modules.WindowZones;
 /// <summary>
 /// The Window Zones icon: a screen split into zones, a tall one on the left and two stacked on the right, in a
 /// purple-to-pink gradient, with no background. Path data is in a 100 × 100 box and the screen fills it edge to edge
-/// (2 to 98 with the stroke), like the other tool icons, so every tool icon looks the same size. PC only, so the shape
-/// lives in the PC project.
+/// (2 to 98 with the stroke), like the other tool icons, so every tool icon looks the same size. Drawn by
+/// <see cref="Ui.WindowZonesIcon"/>.
 /// </summary>
 public static class WindowZonesIconShape
 {

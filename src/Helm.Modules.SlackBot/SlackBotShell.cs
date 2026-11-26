@@ -9,7 +9,7 @@ namespace Helm.Modules.SlackBot;
 /// </summary>
 public sealed class SlackBotShell(IServiceProvider services) : ISlackBotShell
 {
-    public void ShowPage() => services.GetRequiredService<IShellNavigation>().ShowPage(typeof(SlackBotContentPage));
+    public void ShowPage() => services.GetRequiredService<IShellNavigation>().ShowTool(SlackBotIds.ModuleId);
 
     public void ResetOverlay() => services.GetRequiredService<SlackBotOverlay>().Reset();
 }

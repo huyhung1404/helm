@@ -1,7 +1,6 @@
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Threading;
+using Avalonia.Threading;
+using Helm.Core.Desktop;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.Vault.Platform;
@@ -18,16 +17,12 @@ internal sealed class SecureClipboard(ILogger<SecureClipboard> logger)
 
     public void Copy(string text, TimeSpan? clearAfter)
     {
-        var data = new DataObject();
-        data.SetData(DataFormats.UnicodeText, text);
-        if (clearAfter is not null)
+        // https://learn.microsoft.com/windows/win32/dataxchg/clipboard-formats#cloud-clipboard-and-clipboard-history-formats
+        if (!WindowsClipboard.SetText(text, excludeFromHistory: clearAfter is not null))
         {
-            // https://learn.microsoft.com/windows/win32/dataxchg/clipboard-formats#cloud-clipboard-and-clipboard-history-formats
-            data.SetData("ExcludeClipboardContentFromMonitorProcessing", new MemoryStream([0]));
-            data.SetData("CanIncludeInClipboardHistory", new MemoryStream(BitConverter.GetBytes(0)));
-            data.SetData("CanUploadToCloudClipboard", new MemoryStream(BitConverter.GetBytes(0)));
+            logger.LogWarning("Could not copy to the clipboard");
+            return;
         }
-        if (!TrySet(data)) return;
 
         _timer?.Stop();
         if (clearAfter is not { } delay || delay <= TimeSpan.Zero)
@@ -47,36 +42,41 @@ internal sealed class SecureClipboard(ILogger<SecureClipboard> logger)
         _timer?.Stop();
         _timer = null;
         if (_placed is null) return;
-        try
-        {
-            if (Clipboard.ContainsText() && Clipboard.GetText() == _placed) Clipboard.Clear();
-        }
-        catch (COMException ex)
-        {
-            logger.LogDebug(ex, "Clipboard busy; could not clear it");
-        }
+        if (WindowsClipboard.ContainsText() && WindowsClipboard.GetText() == _placed && !Empty())
+            logger.LogDebug("Clipboard busy; could not clear it");
         _placed = null;
     }
 
-    private bool TrySet(DataObject data)
+    /// <summary>Empties the clipboard (WindowsClipboard writes and reads only), retrying while another app holds it.</summary>
+    private static bool Empty()
     {
-        // Another program may hold the clipboard open for a moment.
         for (var attempt = 0; attempt < 5; attempt++)
         {
-            try
+            if (OpenClipboard(0))
             {
-                Clipboard.SetDataObject(data, copy: true);
-                return true;
+                try
+                {
+                    return EmptyClipboard();
+                }
+                finally
+                {
+                    CloseClipboard();
+                }
             }
-            catch (COMException) when (attempt < 4)
-            {
-                Thread.Sleep(40);
-            }
-            catch (COMException ex)
-            {
-                logger.LogWarning(ex, "Could not copy to the clipboard");
-            }
+            Thread.Sleep(40);
         }
         return false;
     }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool OpenClipboard(nint owner);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EmptyClipboard();
 }
