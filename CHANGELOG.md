@@ -33,6 +33,10 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
   the Debts, Goals and Insights tabs, and every form (a transaction, a debt, a fund, a savings goal) as one sheet. The
   settings are a sheet behind the gear; Home → Utilities opens Wallet itself. The home-screen widgets, the bank
   notification reading and the "what was it?" notification are as before.
+- **Bug reports has the new look on the PC and the phone**, one page for both: the list with its search and filters, the bug
+  beside it (below it on a phone) with its replies, pictures and black box, and closing or reopening a bug as a sheet over
+  the page. The report form is the same everywhere too: on the PC a card in its small window (Ctrl+Alt+F12, the title
+  bar's bug button, the tray), on the phone a full page; the phone's "Shake to report" is a sheet behind the gear.
 
 ### Removed
 - **The AI page** (Models & keys, Proxy, Features, the Skill Hub card) on the PC and **General › AI features** on the

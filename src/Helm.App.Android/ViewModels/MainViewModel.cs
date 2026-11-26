@@ -165,12 +165,12 @@ public sealed partial class MainViewModel : ObservableObject
             // A tool with its own back stack (an open item) goes back first; only on the page that shows that stack.
             if (page.Module is Helm.Core.Platform.IBackHandler handler && handler.HandleBack()) return true;
         }
-        // Bug reports: an open bug goes back to the list; the report page closes (the black box records again).
-        if (Navigator.CurrentPage is Helm.Shell.BugReports.BugReportsViewModel bugs && bugs.Selected is not null)
-        {
-            bugs.CloseDetailCommand.Execute(null);
+        // Bug reports: a sheet on top (a picture, the settings, close or reopen) closes first; an open bug goes back to the list;
+        // the report page closes (the black box records again).
+        if (Navigator.CurrentPage is Helm.Shell.BugReports.BugReportsViewModel or Helm.Shell.BugReports.BugReportFormViewModel
+            && Helm.Core.Ui.Sheet.CloseTopmost())
             return true;
-        }
+        if (Navigator.ActiveTab is { View: Helm.BugReports.Ui.BugReportsView bugsView } && bugsView.HandleBack()) return true;
         if (Navigator.CurrentPage is Helm.Shell.BugReports.BugReportFormViewModel)
         {
             _bugs.CloseReport();

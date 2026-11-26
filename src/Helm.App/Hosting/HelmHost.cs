@@ -131,7 +131,8 @@ internal static class HelmHost
         // (the menu's footer, next to What's new).
         Shell.BugReports.BugReportsServices.AddBugReports(builder.Services, Shell.BugReports.BugDeviceKind.Pc);
         builder.Services.AddSingleton<BugReports.PcBugReporter>();
-        builder.Services.AddSingleton<BugReports.BugReportsPage>();
+        builder.Services.AddSingleton<Helm.Shell.Windows.IPcBugReporting>(sp => sp.GetRequiredService<BugReports.PcBugReporter>());
+        builder.Services.AddSingleton<Helm.Shell.Windows.BugReportsPage>();
 
         return builder.Build();
     }

@@ -46,7 +46,9 @@ A few command-line flags are handy while developing:
 ```
 src/
   Helm.Core/                 net8.0, no UI: module contract (IModule, ModuleRegistry<T>), settings, sync, update rules
-  Helm.Shell/                net8.0: view models shared by both apps' Home and General (Updates, Sync)
+  Helm.Shell/                net8.0: view models shared by both apps' Home and General (Updates, Sync), Bug reports (store, black box, view models)
+  Helm.Shell.UI/             Avalonia: Home, General and Bug reports (the page and the report form), every platform
+  Helm.Shell.Windows/        Windows: the WPF pages that host Home, General and Bug reports, the report window, this PC's pictures and MCP part
   Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
                              GDI overlay window, DPAPI, shared WPF controls (Ui/, also the confetti); namespaces stay Helm.Core.*
   Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, Home/General/Diagnostics pages

@@ -1,0 +1,10 @@
+<Page x:Class="Helm.Shell.Windows.BugReportsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:uiw="clr-namespace:Helm.Ui.Windows;assembly=Helm.Ui.Windows"
+      ScrollViewer.CanContentScroll="False"
+      Title="Bug reports">
+
+    <!-- Bug reports is the shared Avalonia page (Helm.Shell.UI/BugReports/BugReportsView), the same view on every platform. -->
+    <uiw:AvaloniaHost x:Name="Host" />
+</Page>
