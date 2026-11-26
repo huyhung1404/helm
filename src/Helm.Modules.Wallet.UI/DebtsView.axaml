@@ -1,0 +1,97 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Wallet.Ui.DebtsView"
+             x:DataType="vm:DebtsViewModel">
+
+    <!-- The Debts tab: who owes whom. The totals, then one card per person with money outstanding (a tap opens their
+         history, due date and notes in a sheet), the settled ones folded away. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Wallet.UI/WalletStyles.axaml" />
+    </UserControl.Styles>
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Modules.Wallet.UI/WalletTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Grid ColumnDefinitions="*,Auto" Margin="0,22,0,16">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Classes="display" Text="Debts" />
+                <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="{Binding OpenSummary}" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="pill" VerticalAlignment="Center" Margin="12,0,0,0" Command="{Binding OpenAddCommand}" ToolTip.Tip="Money lent or borrowed"
+                    AutomationProperties.Name="Add a debt">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Add" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                    <TextBlock Classes="label" Text="Add a debt" Foreground="{DynamicResource HelmPillForeground}" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <Border Classes="glass" Margin="0,0,0,12" IsVisible="{Binding HasMessage}" core:Motion.EnterOnShow="True">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="flat" Width="36" Height="36" Padding="0" Command="{Binding DismissMessageCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- The book in three numbers -->
+        <UniformGrid x:Name="StatGrid" Columns="3" Margin="0,0,-10,6">
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Owed to me" Classes="muted" />
+                    <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Classes="stat owed" Text="{Binding OwedToMeText}" /></Viewbox>
+                </StackPanel>
+            </Border>
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="I owe" Classes="muted" />
+                    <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Classes="stat iowe" Text="{Binding IOweText}" /></Viewbox>
+                </StackPanel>
+            </Border>
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Net" Classes="muted" />
+                    <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Classes="stat" Text="{Binding NetText}" /></Viewbox>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <TextBlock Text="Outstanding" Classes="head" FontSize="18" Margin="0,16,0,12" />
+        <Border Classes="glass" IsVisible="{Binding HasNoPeople}">
+            <Grid ColumnDefinitions="Auto,*">
+                <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="18" Margin="0,0,10,0" Foreground="{DynamicResource HelmSuccess}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="Nothing outstanding: everyone is square. Lent or borrowed money? Add a debt above." Classes="muted" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+        <ItemsControl ItemsSource="{Binding People}" ItemTemplate="{StaticResource PersonCard}" />
+
+        <!-- Settled, folded away -->
+        <StackPanel IsVisible="{Binding HasSettled}" Margin="0,8,0,0">
+            <Button Classes="flat" HorizontalAlignment="Left" Padding="4,8" Command="{Binding ToggleSettledCommand}" AutomationProperties.Name="Settled">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Panel Width="12" Height="12" Classes="turn" core:Motion.Turn="{Binding ShowSettled}">
+                        <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" />
+                    </Panel>
+                    <TextBlock Text="Settled" Classes="muted" FontSize="13" />
+                </StackPanel>
+            </Button>
+            <ItemsControl ItemsSource="{Binding SettledPeople}" ItemTemplate="{StaticResource PersonCard}" IsVisible="{Binding ShowSettled}"
+                          core:Motion.EnterOnShow="True" core:Motion.FromTop="True" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="Auto,*" Margin="2,14,0,0">
+            <ic:SymbolIcon Symbol="BuildingBank" FontSize="14" Margin="0,1,8,0" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Top" />
+            <TextBlock Grid.Column="1" Classes="muted"
+                       Text="Lent or borrowed by bank transfer? Open that transaction in Money and tap “Lent, borrowed…”. It then counts neither as spending nor as income." />
+        </Grid>
+    </StackPanel>
+</UserControl>

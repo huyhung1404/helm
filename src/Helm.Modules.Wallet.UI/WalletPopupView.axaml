@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             x:Class="Helm.Modules.Wallet.Ui.WalletPopupView"
+             x:DataType="vm:WalletViewModel">
+
+    <!-- What the Wallet sheet shows (WalletViewModel.Popup): one of the transaction, fund, goal or debt sheets. WalletView
+         opens it in a Sheet while the view model has a pop-up and closes it when it has none; one pop-up opened from
+         another (a transaction from the list to categorize, its editor) comes back when that one closes. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Wallet.UI/WalletStyles.axaml" />
+    </UserControl.Styles>
+
+    <Panel x:Name="Parts" />
+</UserControl>

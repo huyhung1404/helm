@@ -171,7 +171,10 @@ public sealed partial class GoalsViewModel : ObservableObject
 
     private readonly GoalBook _book;
     private readonly WalletViewModel _owner;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
+
+    /// <summary>The confirmations open in the page's own dialog (the shared Avalonia page passes its glass sheet).</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
     private readonly IGoalPhotos? _photos;
     private readonly ISettingsStore<WalletSettings> _settings;
     private readonly IUiDispatcher _ui;

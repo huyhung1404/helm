@@ -1,0 +1,123 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             xmlns:ui="using:Helm.Modules.Wallet.Ui"
+             x:Class="Helm.Modules.Wallet.Ui.InsightsView"
+             x:DataType="vm:WalletViewModel">
+
+    <!-- The Insights tab: where the month's money went. Its numbers, the spending by category (the donut, every slice
+         named), by day (against the budget per day), the last six months (a tap opens one) and the money in by category.
+         On a wide screen the category card sits beside the bars. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Wallet.UI/WalletStyles.axaml" />
+    </UserControl.Styles>
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Modules.Wallet.UI/WalletTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Grid ColumnDefinitions="*,Auto" Margin="0,22,0,16">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Classes="display" Text="Insights" />
+                <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="{Binding MonthTitle}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0">
+                <Button Classes="ghost" Content="This month" Command="{Binding ThisMonthCommand}" IsVisible="{Binding !IsCurrentMonth}" />
+                <Button Classes="chip" Command="{Binding PreviousMonthCommand}" ToolTip.Tip="Previous month" AutomationProperties.Name="Previous month">
+                    <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+                </Button>
+                <Button Classes="chip" Command="{Binding NextMonthCommand}" IsEnabled="{Binding CanGoNext}" ToolTip.Tip="Next month" AutomationProperties.Name="Next month">
+                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- The month in numbers -->
+        <UniformGrid x:Name="StatGrid" Columns="4" Margin="0,0,-10,6">
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Spent" Classes="muted" />
+                    <TextBlock Classes="stat" Text="{Binding SpentShort}" />
+                    <TextBlock Classes="muted" Text="{Binding CompareText}" IsVisible="{Binding HasCompare}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Money in" Classes="muted" />
+                    <TextBlock Classes="stat income" Text="{Binding IncomeShort}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Net" Classes="muted" />
+                    <TextBlock Classes="stat" Classes.danger="{Binding IsNetNegative}" Text="{Binding NetShort}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="This month" Classes="muted" />
+                    <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Classes="stat" Text="{Binding CountText}" /></Viewbox>
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <Grid x:Name="Cards" ColumnDefinitions="*,16,*" RowDefinitions="Auto,Auto">
+            <!-- Where the money went -->
+            <StackPanel x:Name="LeftCards" Spacing="16">
+                <Border Classes="glass" Padding="18,16">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Spending by category" Classes="head" />
+                        <TextBlock Text="Nothing spent this month yet." Classes="muted" IsVisible="{Binding !HasSpending}" />
+                        <StackPanel IsVisible="{Binding HasSpending}" Spacing="14">
+                            <ui:DonutChart Model="{Binding SpendingDonut}" Width="210" Height="210" HorizontalAlignment="Center" AutomationProperties.Name="Spending by category"
+                                           ToolTip.Tip="Tap a slice to see its share" />
+                            <ItemsControl ItemsSource="{Binding SpendingDonut.Segments}" ItemTemplate="{StaticResource LegendRow}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                <Border Classes="glass" Padding="18,16" IsVisible="{Binding HasEarning}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Money in by category" Classes="head" />
+                        <ItemsControl ItemsSource="{Binding Earning}" ItemTemplate="{StaticResource EarningRow}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <StackPanel x:Name="RightCards" Grid.Column="2" Spacing="16">
+                <Border Classes="glass" Padding="18,16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Spending by day" Classes="head" />
+                        <TextBlock Text="Nothing spent this month yet." Classes="muted" IsVisible="{Binding !HasDailyChart}" />
+                        <ui:BarChart Model="{Binding DailyChart}" Height="210" IsVisible="{Binding HasDailyChart}" AutomationProperties.Name="Spending by day" />
+                        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding DailyChart.HasReference}">
+                            <Border Width="16" Height="2" Margin="0,0,8,0" Background="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding DailyChart.ReferenceLabel}" Classes="muted" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border Classes="glass" Padding="18,16" IsVisible="{Binding HasMonthsChart}">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Last 6 months" Classes="head" />
+                            <TextBlock Grid.Column="1" Text="Tap a month to open it" Classes="muted" VerticalAlignment="Center" />
+                        </Grid>
+                        <ui:BarChart Model="{Binding MonthsChart}" Height="200" AutomationProperties.Name="Money in and spending in the last six months" />
+                        <WrapPanel>
+                            <Border Width="12" Height="12" CornerRadius="3" Margin="0,0,6,0" VerticalAlignment="Center"
+                                    Background="{Binding MonthsChart.Color, Converter={x:Static ui:WalletConverters.Ink}}" />
+                            <TextBlock Text="{Binding MonthsChart.Name}" Classes="muted" Margin="0,0,16,0" VerticalAlignment="Center" />
+                            <Border Width="12" Height="12" CornerRadius="3" Margin="0,0,6,0" VerticalAlignment="Center"
+                                    Background="{Binding MonthsChart.Color2, Converter={x:Static ui:WalletConverters.Ink}}" />
+                            <TextBlock Text="{Binding MonthsChart.Name2}" Classes="muted" VerticalAlignment="Center" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </StackPanel>
+</UserControl>

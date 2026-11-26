@@ -1,0 +1,267 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             xmlns:ui="using:Helm.Modules.Wallet.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Wallet.Ui.GoalSheet"
+             x:DataType="vm:GoalsViewModel">
+
+    <!-- The savings-goal sheets of the Wallet pop-up: a goal (its photo, setting money aside, its history), a new goal
+         or editing one, taking money out, and recording the purchase. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Modules.Wallet.UI/WalletTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Panel>
+        <!-- ============ A goal ============ -->
+        <StackPanel x:Name="GoalSection" Spacing="16" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="{Binding Selected.PriceText, FallbackValue='', StringFormat='Costs {0}'}" Title="{Binding Selected.Name, FallbackValue=''}"
+                            CloseCommand="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+            <Panel Height="190">
+                <ui:GoalPicture Photo="{Binding Selected.Photo, FallbackValue={x:Null}}" Share="{Binding Selected.Share, FallbackValue=0}" Color="{Binding Selected.Color, FallbackValue=0}"
+                                Initial="{Binding Selected.Initial, FallbackValue=''}" CornerRadius="14" />
+                <TextBlock Text="{Binding Selected.PercentText, FallbackValue=''}" Classes="onPhoto" FontSize="32" Margin="16,0,0,10" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+            </Panel>
+            <StackPanel Spacing="3">
+                <TextBlock>
+                    <Run Text="{Binding Selected.SavedText, FallbackValue=''}" FontSize="24" FontWeight="SemiBold" />
+                    <Run Text="saved" Foreground="{DynamicResource HelmSecondaryText}" />
+                </TextBlock>
+                <TextBlock Text="{Binding Selected.LeftText, FallbackValue=''}" IsVisible="{Binding Selected.IsSaving, FallbackValue=False}" />
+                <TextBlock Text="{Binding Selected.PaceText, FallbackValue=''}" Classes="muted" IsVisible="{Binding Selected.HasPace, FallbackValue=False}" />
+                <TextBlock Text="{Binding Selected.EndedText, FallbackValue=''}" Classes="muted" IsVisible="{Binding !Selected.IsSaving, FallbackValue=False}" />
+            </StackPanel>
+
+            <!-- Set money aside: the bar shows where it would be -->
+            <Border Classes="glass" IsVisible="{Binding Selected.CanPut, FallbackValue=False}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Set money aside" Classes="head" />
+                    <Panel>
+                        <ProgressBar Classes="goal" Value="{Binding PutPreviewPercent}" Opacity="0.4" />
+                        <ProgressBar Classes="goal" Value="{Binding SelectedPercent}" Background="Transparent" />
+                    </Panel>
+                    <TextBox x:Name="PutAmountBox" Classes="glass amount" Text="{Binding PutAmount}" PlaceholderText="200k" AutomationProperties.Name="Amount to set aside">
+                        <TextBox.InnerRightContent>
+                            <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                        </TextBox.InnerRightContent>
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding SavePutCommand}" />
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <WrapPanel>
+                        <Button Classes="act" Content="+50K" Command="{Binding AddQuickCommand}" CommandParameter="50000" />
+                        <Button Classes="act" Content="+100K" Command="{Binding AddQuickCommand}" CommandParameter="100000" />
+                        <Button Classes="act" Content="+200K" Command="{Binding AddQuickCommand}" CommandParameter="200000" />
+                        <Button Classes="act" Content="+500K" Command="{Binding AddQuickCommand}" CommandParameter="500000" />
+                        <Button Classes="act" Content="{Binding RestText}" Command="{Binding PutRestCommand}" IsVisible="{Binding HasRest}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding PutHint}" Classes="hint" Classes.late="{Binding PutTooMuch}" Margin="2,-4,0,0" />
+                    <TextBlock Classes="hint" Margin="2,0,0,0" Text="It leaves your balance now but is not spending. Give up any time and it all comes back." />
+                    <Button Classes="pill" HorizontalAlignment="Stretch" Command="{Binding SavePutCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Savings" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                            <TextBlock Text="Set aside" Foreground="{DynamicResource HelmPillForeground}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!-- Enough saved: the purchase is one tap -->
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmGlassStrokeStrong}" IsVisible="{Binding Selected.ShowBuy, FallbackValue=False}">
+                <StackPanel Spacing="10">
+                    <TextBlock TextWrapping="Wrap" Text="Enough saved. Once you have bought it, tap “I bought it”: Helm writes the purchase as one spending and lets the money set aside go." />
+                    <Button Classes="pill" HorizontalAlignment="Stretch" Command="{Binding OpenBoughtCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ShoppingBag" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                            <TextBlock Text="I bought it" Foreground="{DynamicResource HelmPillForeground}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <WrapPanel>
+                <Button Classes="act" Command="{Binding ShowSelectedOnWidgetCommand}" IsVisible="{Binding CanShowSelectedOnWidget}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Apps" FontSize="14" />
+                        <TextBlock Text="Show on the Goal widget" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="act" Command="{Binding OpenTakeOutCommand}" IsVisible="{Binding Selected.IsSaving, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowUndo" FontSize="14" />
+                        <TextBlock Text="Take some out" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="act" Command="{Binding EditSelectedCommand}" IsVisible="{Binding Selected.IsSaving, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Edit" FontSize="14" />
+                        <TextBlock Text="Edit" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="act" Command="{Binding GiveUpSelectedCommand}" IsVisible="{Binding Selected.IsSaving, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="DismissCircle" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                        <TextBlock Text="Give up (the money comes back)" Foreground="{DynamicResource HelmDanger}" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="act" Command="{Binding DeleteFinishedCommand}" CommandParameter="{Binding Selected}" IsVisible="{Binding !Selected.IsSaving, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                        <TextBlock Text="Delete" Foreground="{DynamicResource HelmDanger}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+
+            <StackPanel IsVisible="{Binding Selected.HasEntries, FallbackValue=False}">
+                <TextBlock Text="History" Classes="field" />
+                <ItemsControl ItemsSource="{Binding Selected.Entries, FallbackValue={x:Null}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:GoalEntryRow">
+                            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmGlassStroke}" Padding="2,9">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock>
+                                        <Run Text="{Binding DayText}" />
+                                        <Run Text="{Binding IsOut, Converter={x:Static ui:WalletConverters.TakenOut}}" Foreground="{DynamicResource HelmSecondaryText}" />
+                                    </TextBlock>
+                                    <TextBlock Grid.Column="1" Text="{Binding AmountText}" FontWeight="SemiBold" Classes.muted="{Binding IsOut}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}"
+                    IsVisible="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).HasPopupError, FallbackValue=False}">
+                <TextBlock Text="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).PopupError, FallbackValue=''}" TextWrapping="Wrap" />
+            </Border>
+            <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Close"
+                    Command="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).ClosePopupCommand, FallbackValue={x:Null}}" />
+        </StackPanel>
+
+        <!-- ============ A new goal, or editing one ============ -->
+        <StackPanel x:Name="FormSection" Spacing="16" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="Savings goal" Title="{Binding FormTitle}"
+                            CloseCommand="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+            <StackPanel IsVisible="{Binding CanHavePhotos}">
+                <TextBlock Text="Photo" Classes="field" />
+                <Panel Height="150" Margin="0,0,0,8" IsVisible="{Binding HasFormPhoto}">
+                    <ui:GoalPicture Photo="{Binding FormPhoto}" Share="1" CornerRadius="12" />
+                </Panel>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding TakePhotoCommand}" IsVisible="{Binding CanTakePhoto}">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Camera" FontSize="14" /><TextBlock Text="Take a photo" /></StackPanel>
+                    </Button>
+                    <Button x:Name="PickPhotoButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding PickPhotoCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Image" FontSize="14" /><TextBlock Text="Pick a picture" /></StackPanel>
+                    </Button>
+                </Grid>
+                <Button Classes="act" HorizontalAlignment="Left" Margin="0,8,0,0" Command="{Binding RemoveFormPhotoCommand}" IsVisible="{Binding HasFormPhoto}">
+                    <TextBlock Text="Remove the photo" Foreground="{DynamicResource HelmDanger}" />
+                </Button>
+                <TextBlock Text="It lights up from the bottom as you save: fully at 100%." Classes="hint" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="What do you want to buy?" Classes="field" />
+                <TextBox x:Name="GoalNameBox" Classes="glass" Text="{Binding FormName}" PlaceholderText="Mini PC" MaxLength="40" AutomationProperties.Name="What you are saving for" />
+            </StackPanel>
+            <Grid x:Name="PriceRow" ColumnDefinitions="*,*" ColumnSpacing="10">
+                <StackPanel>
+                    <TextBlock Text="Price" Classes="field" />
+                    <TextBox Classes="glass amount" Text="{Binding FormPrice}" PlaceholderText="12tr" AutomationProperties.Name="Price">
+                        <TextBox.InnerRightContent>
+                            <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                        </TextBox.InnerRightContent>
+                    </TextBox>
+                    <TextBlock Text="{Binding FormPriceHint}" Classes="hint" />
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="By (optional)" Classes="field" />
+                    <core:DateTimeBox Classes="glass" Date="{Binding FormDue}" ShowTime="False" AllowEmpty="True" Lean="Future" PlaceholderText="No date" />
+                    <TextBlock Text="{Binding FormPaceHint}" Classes="hint" IsVisible="{Binding HasFormPaceHint}" />
+                </StackPanel>
+            </Grid>
+            <StackPanel IsVisible="{Binding FormIsNew}">
+                <TextBlock Text="Already saved (optional)" Classes="field" />
+                <TextBox Classes="glass amount" Text="{Binding FormStart}" PlaceholderText="0" AutomationProperties.Name="Money already saved for it">
+                    <TextBox.InnerRightContent>
+                        <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    </TextBox.InnerRightContent>
+                </TextBox>
+                <TextBlock Text="{Binding FormStartHint}" Classes="hint" />
+            </StackPanel>
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}"
+                    IsVisible="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).HasPopupError, FallbackValue=False}">
+                <TextBlock Text="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).PopupError, FallbackValue=''}" TextWrapping="Wrap" />
+            </Border>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel"
+                        Command="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="{Binding FormSaveText}" Command="{Binding SaveFormCommand}" />
+            </Grid>
+        </StackPanel>
+
+        <!-- ============ Taking money out of a goal ============ -->
+        <StackPanel x:Name="TakeOutSection" Spacing="16" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="{Binding Selected.Name, FallbackValue=''}" Title="Take money out" Subtitle="It goes back to your balance."
+                            CloseCommand="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+            <StackPanel>
+                <TextBlock Text="Amount" Classes="field" />
+                <TextBox x:Name="TakeAmountBox" Classes="glass amount" Text="{Binding TakeAmount}" AutomationProperties.Name="Amount to take out">
+                    <TextBox.InnerRightContent>
+                        <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    </TextBox.InnerRightContent>
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding SaveTakeCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <TextBlock Text="{Binding TakeHint}" Classes="hint" />
+            </StackPanel>
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}"
+                    IsVisible="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).HasPopupError, FallbackValue=False}">
+                <TextBlock Text="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).PopupError, FallbackValue=''}" TextWrapping="Wrap" />
+            </Border>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel"
+                        Command="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Take out" Command="{Binding SaveTakeCommand}" />
+            </Grid>
+        </StackPanel>
+
+        <!-- ============ The goal was bought ============ -->
+        <StackPanel x:Name="BoughtSection" Spacing="16" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="{Binding Selected.Name, FallbackValue=''}" Title="You bought it" Subtitle="Helm writes it as one spending."
+                            CloseCommand="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+            <StackPanel>
+                <TextBlock Text="What it cost" Classes="field" />
+                <TextBox x:Name="BoughtAmountBox" Classes="glass amount" Text="{Binding BoughtAmount}" AutomationProperties.Name="What it cost">
+                    <TextBox.InnerRightContent>
+                        <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    </TextBox.InnerRightContent>
+                </TextBox>
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Category" Classes="field" />
+                <ItemsControl ItemsSource="{Binding BoughtPicks}" ItemTemplate="{StaticResource PickChip}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+            <Border Classes="glass">
+                <TextBlock Text="{Binding BoughtHint}" TextWrapping="Wrap" />
+            </Border>
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}"
+                    IsVisible="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).HasPopupError, FallbackValue=False}">
+                <TextBlock Text="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).PopupError, FallbackValue=''}" TextWrapping="Wrap" />
+            </Border>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Not yet"
+                        Command="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Record purchase" Command="{Binding SaveBoughtCommand}" />
+            </Grid>
+        </StackPanel>
+    </Panel>
+</UserControl>
