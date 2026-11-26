@@ -42,7 +42,7 @@ internal sealed class AndroidHomeLinks(IModuleHost<IAndroidModule> modules, IEnu
     }
 
     /// <summary>The release page of the running version (its notes are the CHANGELOG section).</summary>
-    public void OpenWhatsNew() => launcher.OpenUrl($"{AppInfo.ReleasesUrl}/tag/v{AppInfo.Version}");
+    public void OpenWhatsNew() => launcher.OpenUrl(AppInfo.ReleaseNotesUrl);
 }
 
 /// <summary>What General's own rows do on the phone: the theme, sharing the latest log, reset.</summary>

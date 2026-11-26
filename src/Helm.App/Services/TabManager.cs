@@ -269,7 +269,6 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
     {
         if (pageType == typeof(HomePage)) return new("Home", () => new SymbolIcon(SymbolRegular.Home24));
         if (pageType == typeof(GeneralPage)) return new("General", () => new SymbolIcon(SymbolRegular.Settings24));
-        if (pageType == typeof(WhatsNewPage)) return new("What's new", () => new SymbolIcon(SymbolRegular.Megaphone24));
         if (pageType == typeof(WelcomePage)) return new("Welcome", () => new SymbolIcon(SymbolRegular.HandWave24));
         if (pageType == typeof(DiagnosticsPage)) return new("Diagnostics", () => new SymbolIcon(SymbolRegular.Bug24));
         if (pageType == typeof(BugReportsPage)) return new(Shell.BugReports.BugReportsServices.PageTitle, () => new SymbolIcon(SymbolRegular.Bug24));
@@ -305,7 +304,7 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
         if (name == "Helm.App.Views.Pages.GeneralPage") return typeof(GeneralPage);
         return Launchable().Select(l => l.PageType)
             .Concat(catalog.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
-            .Concat([typeof(WhatsNewPage), typeof(BugReportsPage)])
+            .Concat([typeof(BugReportsPage)])
             .FirstOrDefault(t => t.FullName == name);
     }
 }

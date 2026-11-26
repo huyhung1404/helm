@@ -32,6 +32,8 @@
                     <SolidColorBrush x:Key="HelmEyebrow" Color="#0B7F74" />
                     <SolidColorBrush x:Key="HelmPillBackground" Color="#1C1F28" />
                     <SolidColorBrush x:Key="HelmPillForeground" Color="#FFFFFF" />
+                    <!-- The window's close button under the mouse (the shell's own caption buttons), as Windows draws it -->
+                    <SolidColorBrush x:Key="HelmCaptionCloseHover" Color="#C42B1C" />
                     <!-- Stacked cards: a tight contact shadow, a short soft one under the bottom edge (negative spread keeps it out of the gap
                          between cards) and a thin light edge on top: they sit on the page like cards, no dark band between them. -->
                     <BoxShadows x:Key="HelmGlassShadow">0 1 1 0 #141C2A40, 0 6 14 -6 #2E1C2A40, inset 0 1 0 0 #CCFFFFFF</BoxShadows>
@@ -69,6 +71,8 @@
                     <SolidColorBrush x:Key="HelmEyebrow" Color="#2FD3C1" />
                     <SolidColorBrush x:Key="HelmPillBackground" Color="#F5F8FC" />
                     <SolidColorBrush x:Key="HelmPillForeground" Color="#161A22" />
+                    <!-- The window's close button under the mouse (the shell's own caption buttons), as Windows draws it -->
+                    <SolidColorBrush x:Key="HelmCaptionCloseHover" Color="#C42B1C" />
                     <BoxShadows x:Key="HelmGlassShadow">0 1 1 0 #40000000, 0 6 14 -6 #66000000, inset 0 1 0 0 #1AFFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmLiftShadow">0 1 1 0 #4D000000, 0 12 22 -6 #80000000, inset 0 1 0 0 #29FFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmHeroShadow">0 20 48 0 #73000000</BoxShadows>

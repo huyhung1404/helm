@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:vm="using:Helm.Shell.Views"
+             x:Class="Helm.Shell.Views.ShellView"
+             x:DataType="vm:ShellViewModel">
+
+    <!-- Helm's window: ONE surface, Helm's background (core:Backdrop) from edge to edge, with the title bar, the menu,
+         the tab pill and the page on it, and no panel, border or divider between them. The page paints its own part of
+         the same background lined up with this one (Backdrop.Canvas), so it never shows a seam. Wide: the menu beside
+         the page (or an icon rail that opens over it); narrow (a phone): the menu is a drawer, the tabs a count. -->
+    <Panel x:Name="Root">
+        <core:Backdrop />
+
+        <Grid RowDefinitions="48,*" ColumnDefinitions="Auto,*">
+            <!-- The room the menu takes beside the page (its full width pinned, the rail otherwise). -->
+            <Border x:Name="MenuSpace" Grid.Row="1" Width="{Binding Menu.ReservedWidth}">
+                <Border.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Width" Duration="0:0:0.2">
+                            <DoubleTransition.Easing>
+                                <CubicEaseOut />
+                            </DoubleTransition.Easing>
+                        </DoubleTransition>
+                    </Transitions>
+                </Border.Transitions>
+            </Border>
+
+            <Grid x:Name="PageColumn" Grid.Row="1" Grid.Column="1" RowDefinitions="Auto,*">
+                <vm:TabStripView x:Name="Strip" Margin="2,0,12,8" />
+                <ContentControl x:Name="PageHost" Grid.Row="1" ClipToBounds="True"
+                                HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+            </Grid>
+        </Grid>
+
+        <Grid x:Name="Overlay" RowDefinitions="48,*">
+            <!-- Phone: the page dims under the open drawer; a tap on it closes the drawer. -->
+            <Border x:Name="Scrim" Grid.RowSpan="2" Background="{DynamicResource HelmScrim}" Opacity="0" IsVisible="False">
+                <Border.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Opacity" Duration="0:0:0.2" />
+                    </Transitions>
+                </Border.Transitions>
+            </Border>
+            <vm:NavMenuView x:Name="Menu" Grid.Row="1" HorizontalAlignment="Left" DataContext="{Binding Menu}" />
+            <vm:ShellTitleBar x:Name="TitleBar" VerticalAlignment="Top" />
+        </Grid>
+    </Panel>
+</UserControl>

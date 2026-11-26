@@ -8,6 +8,9 @@ public static class AppInfo
     public const string IssuesUrl = RepositoryUrl + "/issues/new";
     public const string ReleasesUrl = RepositoryUrl + "/releases";
 
+    /// <summary>This version's release notes on GitHub (Home's "What's new" link on every platform).</summary>
+    public static string ReleaseNotesUrl => $"{ReleasesUrl}/tag/v{Version}";
+
     /// <summary>Semantic version from &lt;Version&gt; in Directory.Build.props (build metadata stripped).</summary>
     public static string Version { get; } = ReadVersion();
 

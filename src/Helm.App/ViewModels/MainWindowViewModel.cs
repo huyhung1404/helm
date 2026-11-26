@@ -16,12 +16,10 @@ internal sealed record NavGroup(ModuleGroup Group, IReadOnlyList<IHelmModule> Mo
 internal sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly SearchService _search;
-    private readonly IProcessLauncher _launcher;
 
-    public MainWindowViewModel(IModuleHost modules, SearchService search, IProcessLauncher launcher)
+    public MainWindowViewModel(IModuleHost modules, SearchService search)
     {
         _search = search;
-        _launcher = launcher;
         Groups = Enum.GetValues<ModuleGroup>()
             .Select(g => new NavGroup(
                 g,
@@ -41,9 +39,6 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     public IReadOnlyList<NavGroup> Groups { get; }
 
     public IReadOnlyList<SearchResult> Search(string text) => _search.Search(text);
-
-    [RelayCommand]
-    private void OpenFeedback() => _launcher.OpenUrl(AppInfo.IssuesUrl);
 
     /// <summary>
     /// Non-module pages inside groups. The Diagnostics page (Windows & Desktop) is hidden for now; it still opens with

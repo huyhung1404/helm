@@ -123,13 +123,10 @@ internal static class HelmHost
         builder.Services.AddSingleton<Helm.Shell.Windows.IShellWindowsHost, ShellWindowsHost>();
         builder.Services.AddShellWindows();
         builder.Services.AddSingleton<WelcomePage>();
-        builder.Services.AddSingleton<WhatsNewPage>();
-        builder.Services.AddSingleton<Shell.Diagnostics.IDiagnosticsSource, Helm.Shell.Windows.WindowsDiagnosticsSource>();
-        builder.Services.AddSingleton<Shell.Diagnostics.DiagnosticsViewModel>();
         builder.Services.AddSingleton<DiagnosticsPage>();
 
         // Bug reports: the black box, the synced bugs, the AI agents' bug_ tools, the report window and the page
-        // (the menu's footer, next to What's new).
+        // (the menu's footer).
         Shell.BugReports.BugReportsServices.AddBugReports(builder.Services, Shell.BugReports.BugDeviceKind.Pc);
         builder.Services.AddSingleton<BugReports.PcBugReporter>();
         builder.Services.AddSingleton<Helm.Shell.Windows.IPcBugReporting>(sp => sp.GetRequiredService<BugReports.PcBugReporter>());

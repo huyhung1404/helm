@@ -66,6 +66,7 @@
     <Compile Include="..\..\src\Helm.Gallery\ShellPagesDemo.cs" Link="ShellPagesDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\KeyboardDemo.cs" Link="KeyboardDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\QuickCaptureDemo.cs" Link="QuickCaptureDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\ShellDemo.cs" Link="ShellDemo.cs" />
   </ItemGroup>
 
 </Project>

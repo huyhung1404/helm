@@ -180,6 +180,14 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("MCP consent", "Root command", "MCP consent", _ => McpConsentDemo.Create(McpConsentStage.RootCommand), Framed: false),
         new("MCP consent", "A change", "MCP consent", _ => McpConsentDemo.Create(McpConsentStage.Change), Framed: false),
         new("MCP consent", "Dangerous", "MCP consent", _ => McpConsentDemo.Create(McpConsentStage.Dangerous), Framed: false),
+        new("Shell", "Menu open", "Helm", m => ShellDemo.Create(m, ShellStage.MenuOpen), Framed: false),
+        new("Shell", "Menu as icons", "Helm", m => ShellDemo.Create(m, ShellStage.Rail), Framed: false),
+        new("Shell", "Menu opens over the page", "Helm", m => ShellDemo.Create(m, ShellStage.Peek), Framed: false),
+        new("Shell", "Search", "Helm", m => ShellDemo.Create(m, ShellStage.Search), Framed: false),
+        new("Shell", "Search finds nothing", "Helm", m => ShellDemo.Create(m, ShellStage.SearchNothing), Framed: false),
+        new("Shell", "Phone drawer", "Helm", m => ShellDemo.Create(m, ShellStage.Drawer), Framed: false),
+        new("Shell", "Torn-off tab window", "Helm", m => ShellDemo.Create(m, ShellStage.TabWindow), Framed: false),
+        new("Shell", "Sync states", "Helm", m => ShellDemo.Create(m, ShellStage.SyncStates), Framed: false),
         new("Base", "Controls", "Controls", _ => new ControlsPage()),
     ];
 

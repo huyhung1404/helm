@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:vm="using:Helm.Shell.Views"
+             x:Class="Helm.Shell.Views.TabStripView"
+             x:DataType="vm:TabStripViewModel">
+
+    <!-- A window's tabs, like a browser's: one borderless pill barely lighter than Helm's background, pill tabs inside it,
+         the shown one a glass pill with its title in bold, then a round "+". Drag a tab along the pill to move it, off the
+         pill to give it a window of its own; middle click closes it; its context menu moves or closes it. -->
+    <UserControl.Styles>
+        <Style Selector="Border.tab">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="MinWidth" Value="96" />
+            <Setter Property="MaxWidth" Value="220" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="10,0,4,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.tab:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <Style Selector="Border.tab.active">
+            <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+            <Setter Property="BoxShadow" Value="{DynamicResource HelmGlassShadow}" />
+        </Style>
+        <Style Selector="Border.tab TextBlock.title">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Border.tab.active TextBlock.title">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}" />
+        </Style>
+        <!-- Only the shown tab and the one under the mouse offer the close button; the others keep the room. -->
+        <Style Selector="Border.tab Button.tabclose">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Border.tab:pointerover Button.tabclose, Border.tab.active Button.tabclose">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="Button.round">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Button.round:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <Style Selector="Button.round:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border x:Name="Pill" Background="{DynamicResource HelmSubtleFill}" CornerRadius="20" Padding="4" HorizontalAlignment="Left">
+        <StackPanel Orientation="Horizontal" Spacing="2">
+            <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="TabList" ItemsSource="{Binding Tabs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="2" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:TabItemViewModel">
+                            <Border Classes="tab" Classes.active="{Binding IsActive}" ToolTip.Tip="{Binding Title}"
+                                    AutomationProperties.Name="{Binding Title}">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <core:ModuleIcon Symbol="{Binding Glyph}" Image="{Binding Icon}" Size="16" Margin="0,0,8,0" />
+                                    <TextBlock Grid.Column="1" Classes="title" Text="{Binding Title}" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <Button Grid.Column="2" Classes="round tabclose" Width="24" Height="24" CornerRadius="12" Margin="6,0,0,0"
+                                            Command="{Binding CloseCommand}" ToolTip.Tip="Close tab (Ctrl+W)"
+                                            AutomationProperties.Name="{Binding CloseName}">
+                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+            <!-- Round, like the tabs: a square hover would stick out of the pill. -->
+            <Button x:Name="AddButton" Classes="round" Width="32" Height="32" CornerRadius="16"
+                    ToolTip.Tip="Open a tool in a new tab" AutomationProperties.Name="New tab">
+                <ic:SymbolIcon Symbol="Add" FontSize="16" />
+            </Button>
+        </StackPanel>
+    </Border>
+</UserControl>
