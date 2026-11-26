@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:ui="using:Helm.Modules.NovelReader.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelReaderView"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- Novel Reader itself, the same view on every platform. The library (NovelLibraryView) scrolls as a page; an open
+         novel fills the screen: its title and chapter on top, the text (NovelTextView) scrolling on its own, the player
+         (NovelPlayerBar) at the bottom, and on a wide screen the names or the wrong translations beside the text. A word,
+         a held sentence, the chapters, the reading options, a book and the settings open as sheets (NovelReaderView.Sheets.cs). -->
+    <Panel>
+        <core:Backdrop />
+
+        <!-- ================================ Library ================================ -->
+        <ScrollViewer x:Name="LibraryScroller" HorizontalScrollBarVisibility="Disabled" IsVisible="{Binding IsLibraryShown}">
+            <StackPanel x:Name="LibraryPage" Margin="40,28,40,40">
+                <!-- A phone's page has no app bar: the menu button opens the drawer -->
+                <StackPanel x:Name="MenuRow" IsVisible="False" Margin="0,0,0,12">
+                    <Button Classes="chip" HorizontalAlignment="Left" Click="Menu_Click" ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                        <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                    </Button>
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="LibraryLine" Classes="eyebrow" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                    <Button Grid.Column="1" Classes="chip" Click="Settings_Click" ToolTip.Tip="Novel Reader settings" AutomationProperties.Name="Novel Reader settings">
+                        <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                    </Button>
+                </Grid>
+
+                <ui:NovelNotices x:Name="LibraryNotices" Margin="0,12,0,0" />
+
+                <ui:NovelLibraryView x:Name="Library" Margin="0,6,0,0" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ================================ An open novel ================================ -->
+        <Grid x:Name="Reader" RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="40,20,40,18" IsVisible="{Binding IsBookOpen}">
+            <!-- The novel: back to the library, its cover and title, and what opens over the text -->
+            <Grid x:Name="ReaderHead" ColumnDefinitions="Auto,Auto,*,Auto">
+                <Button Classes="chip" VerticalAlignment="Center" Command="{Binding ShowLibraryCommand}" ToolTip.Tip="Library" AutomationProperties.Name="Back to the library">
+                    <ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" />
+                </Button>
+                <Panel Grid.Column="1" Width="30" Height="42" Margin="12,0,12,0" VerticalAlignment="Center" DataContext="{Binding OpenBookCard}" x:DataType="vm:BookCardViewModel">
+                    <Border CornerRadius="5" ClipToBounds="True" Background="{Binding Id, Converter={x:Static ui:CoverGradient.Instance}}" IsVisible="{Binding HasNoCover}">
+                        <TextBlock Text="{Binding Initials}" FontSize="11" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <Border CornerRadius="5" ClipToBounds="True" Background="{Binding Cover, Converter={x:Static ui:CoverImage.Instance}}" IsVisible="{Binding HasCover}" />
+                </Panel>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Classes="eyebrow" Text="{Binding ChapterPosition, Converter={x:Static ui:NovelText.Chapter}}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="BookTitleText" Text="{Binding BookTitle}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <StackPanel x:Name="ReaderTools" Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Button x:Name="NamesButton" Classes="chip" Click="Names_Click" ToolTip.Tip="Names of this novel, and names found in it" AutomationProperties.Name="Names">
+                        <ic:SymbolIcon Symbol="People" FontSize="16" />
+                    </Button>
+                    <Button x:Name="ReportsButton" Classes="chip" Click="Reports_Click" IsVisible="{Binding Reports, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            ToolTip.Tip="Sentences marked as translated wrong" AutomationProperties.Name="Wrong translations">
+                        <ic:SymbolIcon Symbol="Flag" FontSize="16" />
+                    </Button>
+                    <Button Classes="chip" Click="Options_Click" ToolTip.Tip="Voice, speed, text size and what the page shows" AutomationProperties.Name="Reading options">
+                        <ic:SymbolIcon Symbol="TextFont" FontSize="16" />
+                    </Button>
+                    <Button x:Name="ReaderGear" Classes="chip" Click="Settings_Click" ToolTip.Tip="Novel Reader settings" AutomationProperties.Name="Novel Reader settings">
+                        <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- The chapter: the one before, the list, the one after -->
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Margin="0,14,0,0">
+                <Button Classes="chip" Command="{Binding PreviousChapterCommand}" IsEnabled="{Binding CanGoBack}" ToolTip.Tip="Previous chapter (←)"
+                        AutomationProperties.Name="Previous chapter">
+                    <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+                </Button>
+                <Button x:Name="ChapterButton" Grid.Column="1" Classes="glass" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="14,0"
+                        Height="40" Click="Chapters_Click" ToolTip.Tip="All chapters" AutomationProperties.Name="Chapters">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock x:Name="ChapterTitle" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <ic:SymbolIcon Grid.Column="1" Symbol="TextBulletList" FontSize="16" Margin="8,0,0,0" Foreground="{DynamicResource HelmSecondaryText}" />
+                    </Grid>
+                </Button>
+                <Button Grid.Column="2" Classes="chip" Command="{Binding NextChapterCommand}" IsEnabled="{Binding CanGoForward}" ToolTip.Tip="Next chapter (→)"
+                        AutomationProperties.Name="Next chapter">
+                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+                </Button>
+            </Grid>
+
+            <ui:NovelNotices x:Name="ReaderNotices" Grid.Row="2" InReader="True" Margin="0,4,0,0" />
+
+            <Grid x:Name="ReaderBody" Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+                <ui:NovelTextView x:Name="Text" />
+                <!-- Wide screen: the names or the wrong translations beside the text (a sheet on a phone) -->
+                <Border x:Name="SidePanel" Grid.Column="1" Classes="glass" Width="360" Margin="14,0,0,0" Padding="16,14" IsVisible="False"
+                        core:Motion.EnterOnShow="True" />
+            </Grid>
+
+            <ui:NovelPlayerBar x:Name="Player" Grid.Row="4" Margin="0,10,0,0" />
+        </Grid>
+    </Panel>
+</UserControl>

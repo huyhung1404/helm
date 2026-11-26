@@ -1,0 +1,103 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:speech="using:Helm.Modules.NovelReader.Speech"
+             xmlns:ui="using:Helm.Modules.NovelReader.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelOptionsSheet"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- The reading options, at hand while reading: the voice, its speed, the sleep timer, what the page shows (and study
+         mode's rows) and the text size. Everything else is in the settings. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="READING" />
+                <TextBlock Text="Reading options" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Read aloud" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="VOICE" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}" AutomationProperties.Name="Voice">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate DataType="speech:SpeechVoice">
+                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Speed" />
+                        <TextBlock Text="Also [ and ] while reading." Classes="muted" FontSize="12" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="chip" Command="{Binding SlowerCommand}" ToolTip.Tip="Slower ([)" AutomationProperties.Name="Slower">
+                        <ic:SymbolIcon Symbol="Subtract" FontSize="14" />
+                    </Button>
+                    <TextBlock Grid.Column="2" Width="52" TextAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding SpeechRateLabel}" />
+                    <Button Grid.Column="3" Classes="chip" Command="{Binding FasterCommand}" ToolTip.Tip="Faster (])" AutomationProperties.Name="Faster">
+                        <ic:SymbolIcon Symbol="Add" FontSize="14" />
+                    </Button>
+                </Grid>
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="SLEEP TIMER" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding SleepTimerNames}" SelectedIndex="{Binding SleepTimerIndex}"
+                              AutomationProperties.Name="Sleep timer" />
+                </StackPanel>
+                <TextBlock Text="{Binding ReadyLabel}" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                           IsVisible="{Binding ReadyLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="The page" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="SHOW" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding ModeNames}" SelectedIndex="{Binding ModeIndex}"
+                              AutomationProperties.Name="What the page shows" />
+                </StackPanel>
+                <!-- Study mode: the rows shown above each Vietnamese word -->
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" IsVisible="{Binding IsStudyMode}">
+                    <ToggleButton Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="中文" IsChecked="{Binding StudyShowChinese}"
+                                  AutomationProperties.Name="Show the Chinese" />
+                    <ToggleButton Grid.Column="1" Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Pinyin"
+                                  IsChecked="{Binding StudyShowPinyin}" AutomationProperties.Name="Show the pinyin" />
+                    <ToggleButton Grid.Column="2" Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Hán Việt"
+                                  IsChecked="{Binding StudyShowHanViet}" AutomationProperties.Name="Show the Hán Việt" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Text size" />
+                        <TextBlock x:Name="SizeHint" Text="Also Ctrl + the mouse wheel, Ctrl + = and Ctrl + −." Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="chip" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Smaller text (Ctrl + −)" AutomationProperties.Name="Smaller text">
+                        <TextBlock Text="A−" FontSize="13" />
+                    </Button>
+                    <TextBlock Grid.Column="2" Width="40" TextAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold"
+                               Text="{Binding FontSize, Converter={x:Static ui:NovelText.Whole}}" />
+                    <Button Grid.Column="3" Classes="chip" Command="{Binding ZoomInCommand}" ToolTip.Tip="Larger text (Ctrl + =)" AutomationProperties.Name="Larger text">
+                        <TextBlock Text="A+" FontSize="15" />
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button x:Name="SettingsButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" AutomationProperties.Name="All settings">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Settings" FontSize="15" />
+                    <TextBlock Text="All settings" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="DoneButton" Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" />
+        </Grid>
+    </StackPanel>
+</UserControl>

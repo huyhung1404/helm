@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:rep="using:Helm.Modules.NovelReader.Reports"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelReportForm"
+             x:DataType="rep:ReportEditorViewModel">
+
+    <!-- Report a wrong translation: the sentence (one more before or after, one less), Helm's text, the right one and a
+         note; on the PC Claude Code can suggest the right one. Ctrl+Enter saves, Esc closes without saving. -->
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="WRONG TRANSLATION" />
+                <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close without saving (Esc)" AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBlock Classes="eyebrow" Text="THE SENTENCE" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                        <Button Classes="chip" Height="32" Command="{Binding AddBeforeCommand}" IsEnabled="{Binding CanAddBefore}" ToolTip.Tip="Add the sentence before"
+                                AutomationProperties.Name="Add the sentence before">
+                            <StackPanel Orientation="Horizontal" Spacing="2"><ic:SymbolIcon Symbol="ArrowLeft" FontSize="12" /><TextBlock Text="+1" FontSize="12" /></StackPanel>
+                        </Button>
+                        <Button Classes="chip" Height="32" Command="{Binding DropCommand}" IsEnabled="{Binding CanDrop}" ToolTip.Tip="One sentence less"
+                                AutomationProperties.Name="One sentence less">
+                            <TextBlock Text="−1" FontSize="12" />
+                        </Button>
+                        <Button Classes="chip" Height="32" Command="{Binding AddAfterCommand}" IsEnabled="{Binding CanAddAfter}" ToolTip.Tip="Add the sentence after"
+                                AutomationProperties.Name="Add the sentence after">
+                            <StackPanel Orientation="Horizontal" Spacing="2"><TextBlock Text="+1" FontSize="12" /><ic:SymbolIcon Symbol="ArrowRight" FontSize="12" /></StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+                <SelectableTextBlock Text="{Binding Chinese}" FontSize="18" TextWrapping="Wrap" />
+                <TextBlock Classes="eyebrow" Text="HELM SHOWS" Margin="0,4,0,0" />
+                <SelectableTextBlock Text="{Binding Helm}" TextWrapping="Wrap" Foreground="{DynamicResource HelmSecondaryText}" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel Spacing="6">
+            <TextBlock Classes="eyebrow" Text="THE RIGHT TRANSLATION" />
+            <TextBox x:Name="CorrectBox" Classes="glass" Text="{Binding Correct}" TextWrapping="Wrap" MinHeight="64" AutomationProperties.Name="The right translation" />
+        </StackPanel>
+        <StackPanel Spacing="6">
+            <TextBlock Classes="eyebrow" Text="NOTE (OPTIONAL): WHAT IS WRONG" />
+            <TextBox Classes="glass" Text="{Binding Note}" TextWrapping="Wrap" PlaceholderText="道 means nói here · the 的 phrase is reversed…" AutomationProperties.Name="Note" />
+        </StackPanel>
+
+        <!-- Claude Code's suggestion: shown when it arrives, put in the box with Use it -->
+        <Border Classes="glass" IsVisible="{Binding HasSuggestion}" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="3">
+                    <TextBlock Text="✦ Claude Code suggests" Foreground="{DynamicResource HelmEyebrow}" FontSize="12" />
+                    <SelectableTextBlock Text="{Binding Suggestion}" TextWrapping="Wrap" />
+                    <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap">
+                        <Run Text="{Binding SuggestionNote}" /><Run Text=" · " /><Run Text="{Binding ErrorKind}" />
+                    </TextBlock>
+                </StackPanel>
+                <Button Grid.Column="1" Classes="ghost" Height="36" Margin="10,0,0,0" VerticalAlignment="Top" Content="Use it" Command="{Binding UseSuggestionCommand}"
+                        ToolTip.Tip="Put the suggestion in the box for the right translation" />
+            </Grid>
+        </Border>
+        <TextBlock Text="{Binding AskStatus}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasAskStatus}" />
+        <TextBlock Text="{Binding Error}" Foreground="{DynamicResource HelmDanger}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+
+        <Grid x:Name="Footer" ColumnDefinitions="*,*,*" ColumnSpacing="8">
+            <Button x:Name="AskButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding AskAiCommand}"
+                    IsEnabled="{Binding !IsAsking}" ToolTip.Tip="Saves the report and has Claude Code suggest the right translation, with what Helm got wrong">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Sparkle" FontSize="15" />
+                    <TextBlock Text="Ask Claude Code" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="CancelButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel"
+                    Command="{Binding CloseCommand}" ToolTip.Tip="Close without saving (Esc)" />
+            <Button x:Name="SaveButton" Grid.Column="2" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding SaveCommand}"
+                    ToolTip.Tip="Save the report (Ctrl+Enter)">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Flag" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                    <TextBlock Text="Save report" Foreground="{DynamicResource HelmPillForeground}" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </StackPanel>
+</UserControl>

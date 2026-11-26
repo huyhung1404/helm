@@ -71,7 +71,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     private readonly ISettingsStore<SshSettings> _settings;
     private readonly SshDeviceKey _deviceKey;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly ILogger<SshViewModel> _logger;
     private readonly IVaultSecrets? _vault;
@@ -160,6 +160,9 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     }
 
     public ObservableCollection<SshHostRow> Hosts { get; } = [];
+
+    /// <summary>The questions (trust a server, delete one, a new key) in the page's own dialogs: the shared Avalonia page asks in a glass sheet.</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
 
     /// <summary>The menu of the server shown (see <see cref="SshMenu"/>).</summary>
     public SshMenuViewModel Menu { get; }

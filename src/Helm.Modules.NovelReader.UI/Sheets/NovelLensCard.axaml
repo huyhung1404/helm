@@ -1,0 +1,44 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelLensCard">
+
+    <!-- Novel Lens (Android): a 译 button over the Fanqie app reads its page in study form. Its state, turning it on (and
+         hidden again before a banking app), the novel its names come from, and where Next taps. -->
+    <Border Classes="glass">
+        <StackPanel Spacing="12">
+            <StackPanel Spacing="2">
+                <TextBlock Text="Novel Lens" Classes="head" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="While the Fanqie app (番茄小说) is open, a 译 button floats over it. Press it: Helm reads the page shown (recognised on the phone, offline) and covers the screen with it, each word with its Chinese, pinyin, Hán Việt and Vietnamese. Next turns Fanqie's page and reads the new one. Nothing of the pages is saved." />
+            </StackPanel>
+            <TextBlock x:Name="State" TextWrapping="Wrap" />
+            <Grid x:Name="Buttons" ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button x:Name="OnButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Turn on Novel Lens" />
+                <Button x:Name="OffButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Turn off Novel Lens" />
+            </Grid>
+            <StackPanel x:Name="Options" Spacing="12">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="NAMES FROM" />
+                    <ComboBox x:Name="BookBox" Classes="glass" HorizontalAlignment="Stretch" AutomationProperties.Name="Names from" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="The names you fixed for this novel are used on the lens's pages too, with the names for every novel. Tap a word on the lens to save a name or a meaning." />
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="A novel you read only in Fanqie: give it a novel here, by its title, to keep its names (it has no text in Novel Reader)." />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox x:Name="NewTitle" Classes="glass" PlaceholderText="The novel's title" AutomationProperties.Name="New novel for names" />
+                        <Button x:Name="CreateButton" Grid.Column="1" Classes="ghost" Content="Create" />
+                    </Grid>
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Where Next taps" />
+                        <TextBlock x:Name="TapLabel" Grid.Column="1" Classes="secondary" />
+                    </Grid>
+                    <TextBlock Classes="secondary" FontSize="12" TextWrapping="Wrap" Text="From the left edge (Back taps the same distance from the right)." />
+                    <Slider x:Name="TapSlider" Minimum="0.6" Maximum="0.98" SmallChange="0.02" TickFrequency="0.02" IsSnapToTickEnabled="True" AutomationProperties.Name="Where Next taps" />
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

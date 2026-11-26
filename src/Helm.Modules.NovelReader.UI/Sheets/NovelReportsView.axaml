@@ -1,0 +1,113 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:rep="using:Helm.Modules.NovelReader.Reports"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelReportsView"
+             x:DataType="rep:TranslationReportsViewModel">
+
+    <!-- Sentences marked as translated wrong (this novel's, or all of them): copied or saved as one Markdown document, and
+         on the PC Claude Code suggests the right translation of each. They sync between devices. -->
+    <UserControl.Styles>
+        <Style Selector="Border.reportrow">
+            <Setter Property="Padding" Value="0,10" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="{Binding Summary, Converter={x:Static core:UpperCase.Instance}}" TextWrapping="Wrap" />
+                <TextBlock Text="Wrong translations" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close wrong translations">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="All my novels" />
+                <TextBlock Text="Off: only this novel's." Classes="muted" FontSize="12" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowAllNovels}" OnContent="" OffContent="" AutomationProperties.Name="All my novels" />
+        </Grid>
+
+        <Grid x:Name="DocButtons" ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CopyAllCommand}" IsEnabled="{Binding HasRows}"
+                    ToolTip.Tip="The listed reports as Markdown, to paste where the translation is improved" AutomationProperties.Name="Copy as document">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Copy" FontSize="15" />
+                    <TextBlock Text="Copy" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="SaveButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="Save_Click"
+                    IsEnabled="{Binding HasRows}" ToolTip.Tip="Save the listed reports as a Markdown file">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Save" FontSize="15" />
+                    <TextBlock Text="Save" />
+                </StackPanel>
+            </Button>
+        </Grid>
+        <!-- Claude Code on this PC suggests the right translation of each report -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding CanAsk}">
+            <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding AskForRestCommand}" IsEnabled="{Binding !IsAsking}"
+                    ToolTip.Tip="Suggests the right translation of every listed report that has none yet (through Helm's MCP tools, on your Claude plan)">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Sparkle" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                    <TextBlock Text="{Binding AskLabel, StringFormat='{}{0} for the rest'}" Foreground="{DynamicResource HelmPillForeground}" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="1" Classes="ghost" Content="Stop" Command="{Binding StopAskingCommand}" IsVisible="{Binding IsAsking}" />
+        </Grid>
+        <TextBlock Text="{Binding AskStatus}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasAskStatus}" />
+        <TextBlock Text="{Binding Status}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasStatus}" />
+        <TextBlock Classes="muted" TextWrapping="Wrap" IsVisible="{Binding !HasRows}"
+                   Text="Tap a word Helm translates wrong, then Report the sentence. Each report keeps the Chinese, Helm's text and the right one." />
+
+        <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="rep:ReportRowViewModel">
+                    <Border Classes="reportrow">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{Binding Where}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Chinese}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Helm}" Classes="muted" TextWrapping="Wrap" TextDecorations="Strikethrough" IsVisible="{Binding HasCorrect}" />
+                                <TextBlock Text="{Binding Helm}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding !HasCorrect}" />
+                                <TextBlock Text="{Binding Correct}" Foreground="{DynamicResource HelmEyebrow}" TextWrapping="Wrap" IsVisible="{Binding HasCorrect}" />
+                                <TextBlock Text="{Binding Note}" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
+                                <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding IsRightNow}">
+                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="12" Margin="0,0,4,0" Foreground="{DynamicResource HelmSuccess}" />
+                                    <TextBlock Grid.Column="1" Text="Helm gets it right now" Foreground="{DynamicResource HelmSuccess}" FontSize="12" />
+                                </Grid>
+                                <!-- The AI's suggestion, taken as the right translation with Use -->
+                                <Border Classes="glass" Padding="10,8" Margin="0,4,0,0" IsVisible="{Binding HasSuggestion}" BoxShadow="">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Suggestion, StringFormat='✦ {0}'}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding SuggestionNote}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Classes="ghost" Height="32" Margin="8,0,0,0" VerticalAlignment="Top" Content="Use" IsVisible="{Binding CanUseSuggestion}"
+                                                ToolTip.Tip="Take the suggestion as the right translation" AutomationProperties.Name="Use the suggestion"
+                                                Command="{Binding $parent[UserControl].((rep:TranslationReportsViewModel)DataContext).UseSuggestionCommand}" CommandParameter="{Binding}" />
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="chip" Width="36" Height="36" Padding="0" VerticalAlignment="Top" ToolTip.Tip="Edit" AutomationProperties.Name="Edit"
+                                    Command="{Binding $parent[UserControl].((rep:TranslationReportsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}">
+                                <ic:SymbolIcon Symbol="Edit" FontSize="14" />
+                            </Button>
+                            <Button Grid.Column="2" Classes="chip" Width="36" Height="36" Padding="0" VerticalAlignment="Top" ToolTip.Tip="Delete" AutomationProperties.Name="Delete"
+                                    Command="{Binding $parent[UserControl].((rep:TranslationReportsViewModel)DataContext).DeleteCommand}" CommandParameter="{Binding}">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

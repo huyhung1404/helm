@@ -1,0 +1,272 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Ssh"
+             xmlns:ui="using:Helm.Modules.Ssh.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Ssh.Ui.SshView"
+             x:DataType="vm:SshViewModel">
+
+    <!-- SSH itself, the same view on every platform, top to bottom: which server (one card each, the one shown outlined),
+         connecting to it (a password when it needs one, the server's menu, installing this device's key), the shell or
+         what AI agents run there, and the terminal filling the rest; on a phone a key bar under it has the keys a phone
+         keyboard lacks. The servers, this device's key and the known server keys are in the settings sheet (the gear). -->
+    <UserControl.Styles>
+        <!-- A key of the key bar -->
+        <Style Selector=":is(Button).key">
+            <Setter Property="MinWidth" Value="44" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, monospace" />
+        </Style>
+        <Style Selector="Ellipse.unseen">
+            <Setter Property="Width" Value="7" />
+            <Setter Property="Height" Value="7" />
+            <Setter Property="Fill" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+        <Grid x:Name="Page" RowDefinitions="Auto,*,Auto" Margin="40,28,40,24">
+            <StackPanel>
+                <!-- A phone's page has no app bar: the menu button opens the drawer -->
+                <StackPanel x:Name="MenuRow" IsVisible="False" Margin="0,0,0,12">
+                    <Button Classes="chip" HorizontalAlignment="Left" Click="Menu_Click" ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                        <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                    </Button>
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="TopLine" Classes="eyebrow" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                    <Button Grid.Column="1" Classes="chip" Click="Settings_Click" ToolTip.Tip="Servers, this device's key and the terminal" AutomationProperties.Name="SSH settings">
+                        <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                    </Button>
+                </Grid>
+
+                <Border x:Name="OffBar" Classes="glass" Margin="0,16,0,0" IsVisible="False">
+                    <StackPanel>
+                        <TextBlock Text="SSH is turned off" Classes="head" />
+                        <TextBlock Text="Your servers are kept. Turn SSH on in its settings (the gear) to connect." Classes="muted" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <!-- What happened: a refused key, a server that could not be reached, a key that changed -->
+                <Border Classes="glass" Margin="0,16,0,0" core:Motion.EnterOnShow="True" IsVisible="{Binding HasMessage}" BorderBrush="{DynamicResource HelmDanger}">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="flat" Width="36" Height="36" Padding="0" Margin="8,0,0,0" Command="{Binding DismissMessageCommand}"
+                                    ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                            </Button>
+                        </Grid>
+                        <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding OpenVaultCommand}" IsVisible="{Binding CanOpenVault}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="LockOpen" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                                <TextBlock Text="Open Vault" Foreground="{DynamicResource HelmPillForeground}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- First run: the way in, step by step (1 is the only thing to do now) -->
+                <Border Classes="glass hero enter" Margin="0,22,0,0" Padding="28,26" IsVisible="{Binding !HasHosts}">
+                    <StackPanel Spacing="18">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="START HERE" />
+                            <TextBlock Text="Your servers' terminals, from any device" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <UniformGrid x:Name="FirstRunSteps" Columns="3">
+                            <Border Classes="glass" Margin="0,0,10,10" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="eyebrow" Text="1" />
+                                    <TextBlock Text="Add a server" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="FirstStepText" Classes="muted" TextWrapping="Wrap" Text="Its address, and how Helm signs in: this device's key, a password, or Vault." />
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="eyebrow" Text="2" />
+                                    <TextBlock Text="Connect" FontWeight="SemiBold" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="Helm checks the server's key every time and asks before trusting a new one." />
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="eyebrow" Text="3" />
+                                    <TextBlock Text="Work in its terminal" FontWeight="SemiBold" />
+                                    <TextBlock Classes="muted" TextWrapping="Wrap" Text="The session keeps running while you use the rest of Helm." />
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+                        <Grid x:Name="FirstRunButtons" ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button x:Name="ImportFirstButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="Import_Click"
+                                    ToolTip.Tip="Adds the servers in .ssh\config with their key files, and trusts the server keys in .ssh\known_hosts">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ic:SymbolIcon Symbol="ArrowDownload" FontSize="16" />
+                                    <TextBlock Text="Import from SSH config" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="AddFirstButton" Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AddServer_Click"
+                                    AutomationProperties.Name="Add my first server">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Add my first server" Foreground="{DynamicResource HelmPillForeground}" />
+                                    <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 1. Which server: all of them in one row, the one shown outlined -->
+                <StackPanel x:Name="Picker" IsVisible="{Binding HasHosts}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Margin="0,22,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
+                            <ItemsControl x:Name="HostList" ItemsSource="{Binding Hosts}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="10" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:SshHostRow">
+                                        <Button Classes="glass fade server" MinWidth="180" MaxWidth="260" Padding="12,10" Click="Host_Click" AutomationProperties.Name="{Binding Title}">
+                                            <Grid ColumnDefinitions="Auto,*">
+                                                <Border Width="34" Height="34" CornerRadius="9" Margin="0,0,10,0" Background="{DynamicResource HelmGlassHover}"
+                                                        BorderBrush="{DynamicResource HelmGlassStroke}" BorderThickness="1">
+                                                    <TextBlock Text="{Binding Title, Converter={x:Static ui:SshText.Initial}}" FontWeight="Bold" FontSize="15" Foreground="{DynamicResource HelmEyebrow}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Target}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" IsVisible="{Binding !IsConnected}" />
+                                                    <TextBlock Text="{Binding State}" FontSize="12" Foreground="{DynamicResource HelmSuccess}" IsVisible="{Binding IsConnected}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button x:Name="NewServerButton" Classes="ghost" MinHeight="56" Click="AddServer_Click" IsVisible="False" AutomationProperties.Name="Add a server">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Add" FontSize="14" /><TextBlock Text="Server" /></StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- 2. Connect: the server's name, a password when it needs one, and what a connected server offers -->
+                    <Border Classes="glass" Margin="0,8,0,0" Padding="16,12">
+                        <Grid x:Name="ConnectGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+                            <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                                <Ellipse Width="9" Height="9" Margin="0,0,10,0" VerticalAlignment="Center" Fill="{DynamicResource HelmSuccess}" IsVisible="{Binding IsConnected}" />
+                                <Ellipse Width="9" Height="9" Margin="0,0,10,0" VerticalAlignment="Center" Fill="{DynamicResource HelmSecondaryText}" Opacity="0.5" IsVisible="{Binding !IsConnected}" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding SelectedHost.Title, FallbackValue=''}" Classes="head" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap">
+                                        <Run Text="{Binding SelectedHost.Target, FallbackValue=''}" /><Run Text="  ·  " /><Run Text="{Binding SessionStatus}" />
+                                    </TextBlock>
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel x:Name="ConnectActions" Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBox x:Name="PasswordBox" Classes="glass" Width="220" PasswordChar="●" PlaceholderText="{Binding PasswordPrompt}" IsVisible="{Binding NeedsPassword}"
+                                         AutomationProperties.Name="{Binding PasswordPrompt}" KeyDown="Password_KeyDown" />
+                                <Button x:Name="ConnectButton" Classes="pill" IsEnabled="{Binding CanConnect}" IsVisible="{Binding !IsConnected}" Click="Connect_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="PlugConnected" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                                        <TextBlock Text="Connect" Foreground="{DynamicResource HelmPillForeground}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="ServerMenuButton" Classes="ghost" IsVisible="{Binding IsConnected}" Click="ServerMenu_Click"
+                                        ToolTip.Tip="What this server's menu offers; a choice runs in the terminal" AutomationProperties.Name="Server menu">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="AppsList" FontSize="16" />
+                                        <TextBlock Classes="label" Text="Menu" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="InstallKeyButton" Classes="ghost" Command="{Binding InstallKeyCommand}" IsVisible="{Binding CanInstallKey}"
+                                        ToolTip.Tip="Add this device's key to the server's authorized_keys, then sign in with it instead of the password"
+                                        AutomationProperties.Name="Install this device's key">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="Key" FontSize="16" />
+                                        <TextBlock Classes="label" Text="Install key" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="DisconnectButton" Classes="ghost" Command="{Binding DisconnectCommand}" IsVisible="{Binding IsConnected}"
+                                        ToolTip.Tip="Close the session" AutomationProperties.Name="Disconnect">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="PlugDisconnected" FontSize="16" />
+                                        <TextBlock Classes="label" Text="Disconnect" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 3. The shell, and what AI agents run on this server: a tab once one ran something -->
+                    <Grid x:Name="TabsRow" ColumnDefinitions="Auto,*,Auto" Margin="0,14,0,0" IsVisible="{Binding HasAgentTab}">
+                        <Border Classes="glass" Padding="3" CornerRadius="10" BoxShadow="">
+                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                <RadioButton x:Name="ShellTab" Classes="seg" GroupName="SshTab" IsChecked="{Binding ShowingShell}" ToolTip.Tip="Your shell on this server">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="WindowConsole" FontSize="14" />
+                                        <TextBlock Text="Terminal" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton x:Name="AgentTab" Classes="seg" GroupName="SshTab" IsChecked="{Binding ShowingAgent}" ToolTip.Tip="What AI agents run on this server, with their output">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="Bot" FontSize="14" />
+                                        <TextBlock Text="{Binding AgentTabTitle}" />
+                                        <Ellipse Classes="unseen" VerticalAlignment="Center" IsVisible="{Binding AgentUnseen}" ToolTip.Tip="New since you last looked" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock x:Name="AgentNote" Grid.Column="1" Classes="muted" FontSize="12" VerticalAlignment="Center" Margin="12,0" TextWrapping="Wrap"
+                                   Text="Read only. Your shell keeps running in Terminal." IsVisible="{Binding ShowingAgent}" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowingAgent}">
+                            <Button Classes="ghost" Command="{Binding StopAgentCommand}" IsVisible="{Binding AgentRunning}"
+                                    ToolTip.Tip="Stop what the AI agent runs on this server now; it is told you stopped it" AutomationProperties.Name="Stop the agent's run">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="RecordStop" FontSize="15" Foreground="{DynamicResource HelmDanger}" />
+                                    <TextBlock Classes="label" Text="Stop" Foreground="{DynamicResource HelmDanger}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="chip" Command="{Binding ClearAgentCommand}" ToolTip.Tip="Empty this tab" AutomationProperties.Name="Clear the AI agent tab">
+                                <ic:SymbolIcon Symbol="Broom" FontSize="15" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- The terminal fills the rest; before a session, what to do -->
+            <Panel Grid.Row="1" Margin="0,12,0,0" IsVisible="{Binding HasHosts}">
+                <Border x:Name="TerminalFrame" CornerRadius="12" ClipToBounds="True" BorderThickness="1" BorderBrush="{DynamicResource HelmGlassStroke}" />
+                <StackPanel x:Name="NoSession" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="420" Spacing="12" IsVisible="{Binding !HasSession}">
+                    <ic:SymbolIcon Symbol="WindowConsole" FontSize="40" HorizontalAlignment="Center" Foreground="{DynamicResource HelmSecondaryText}" Opacity="0.6" />
+                    <TextBlock Classes="muted" TextAlignment="Center" TextWrapping="Wrap"
+                               Text="Connect to see the server's terminal here. The session keeps running while you use the rest of Helm." />
+                </StackPanel>
+            </Panel>
+
+            <!-- The keys a phone keyboard lacks -->
+            <ScrollViewer x:Name="KeyBar" Grid.Row="2" Margin="0,8,0,0" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" IsVisible="False">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ToggleButton Classes="chip key" Content="Ctrl" IsChecked="{Binding CtrlArmed}" Click="Ctrl_Click" ToolTip.Tip="The next key with Ctrl" AutomationProperties.Name="Control key" />
+                    <Button Classes="chip key" Content="Esc" Tag="esc" Click="Key_Click" />
+                    <Button Classes="chip key" Content="Tab" Tag="tab" Click="Key_Click" />
+                    <Button Classes="chip key" Tag="up" Click="Key_Click" AutomationProperties.Name="Up"><ic:SymbolIcon Symbol="ArrowUp" FontSize="15" /></Button>
+                    <Button Classes="chip key" Tag="down" Click="Key_Click" AutomationProperties.Name="Down"><ic:SymbolIcon Symbol="ArrowDown" FontSize="15" /></Button>
+                    <Button Classes="chip key" Tag="left" Click="Key_Click" AutomationProperties.Name="Left"><ic:SymbolIcon Symbol="ArrowLeft" FontSize="15" /></Button>
+                    <Button Classes="chip key" Tag="right" Click="Key_Click" AutomationProperties.Name="Right"><ic:SymbolIcon Symbol="ArrowRight" FontSize="15" /></Button>
+                    <Button Classes="chip key" Content="|" Tag="|" Click="Char_Click" AutomationProperties.Name="Pipe" />
+                    <Button Classes="chip key" Content="~" Tag="~" Click="Char_Click" AutomationProperties.Name="Tilde" />
+                    <Button Classes="chip key" Content="/" Tag="/" Click="Char_Click" AutomationProperties.Name="Slash" />
+                    <Button Classes="chip key" Content="-" Tag="-" Click="Char_Click" AutomationProperties.Name="Dash" />
+                    <Button Classes="chip key" Content="Home" Tag="home" Click="Key_Click" />
+                    <Button Classes="chip key" Content="End" Tag="end" Click="Key_Click" />
+                    <Button Classes="chip key" Click="Paste_Click" ToolTip.Tip="Paste" AutomationProperties.Name="Paste"><ic:SymbolIcon Symbol="ClipboardPaste" FontSize="15" /></Button>
+                    <Button Classes="chip key" Click="Keyboard_Click" ToolTip.Tip="Show the keyboard" AutomationProperties.Name="Show the keyboard"><ic:SymbolIcon Symbol="Keyboard" FontSize="15" /></Button>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Panel>
+</UserControl>

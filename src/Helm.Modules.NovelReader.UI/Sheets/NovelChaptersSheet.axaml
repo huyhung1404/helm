@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelChaptersSheet"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- The chapters of the open novel, the one being read chosen and in view; type to find one; tap one to open it. -->
+    <UserControl.Styles>
+        <Style Selector="ListBox.glass">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.glass ListBoxItem">
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
+        <Style Selector="ListBox.glass ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <Style Selector="ListBox.glass ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="{Binding BookTitle, Converter={x:Static core:UpperCase.Instance}}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="Chapters" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+        <TextBox x:Name="FilterBox" Classes="glass" PlaceholderText="Find a chapter — its number or a word of its title" AutomationProperties.Name="Find a chapter" />
+        <ListBox x:Name="ChapterList" Classes="glass" Height="460" AutomationProperties.Name="Chapters">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="vm:ChapterItem">
+                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </StackPanel>
+</UserControl>

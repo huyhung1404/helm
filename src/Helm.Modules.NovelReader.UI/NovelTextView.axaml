@@ -1,0 +1,122 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:ui="using:Helm.Modules.NovelReader.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelTextView"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- The chapter's text: tap (click) a word to fix it, double-tap a sentence to read aloud from it, hold a word to have
+         its sentence explained, right-click a paragraph for its menu; on a wide screen ▶ in the margin reads from that
+         paragraph. Reading aloud follows the sentence being read until the reader scrolls by hand; then one tap brings it
+         back. -->
+    <UserControl.Styles>
+        <!-- A paragraph: the one read aloud is filled, where reading stopped has a bar -->
+        <Style Selector="Border.paragraph">
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.2" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.paragraph.heading">
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <Style Selector="Border.paragraph.resume">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Border.paragraph.speaking">
+            <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+        <Style Selector="ui|SegmentText.heading">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- ▶ in the margin: shown while the mouse is over its paragraph -->
+        <Style Selector="Grid.para Button.here">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="Grid.para:pointerover Button.here">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" Padding="0,0,14,0" core:ScrollFade.Enabled="True">
+            <ItemsControl x:Name="ParagraphList" ItemsSource="{Binding Paragraphs}" Padding="0,4,0,56">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:ParagraphViewModel">
+                        <Grid Classes="para" ColumnDefinitions="Auto,*" Background="Transparent">
+                            <Button Classes="flat here" Width="30" Height="30" Padding="0" VerticalAlignment="Top" Margin="0,6,2,0"
+                                    IsVisible="{Binding $parent[ui:NovelTextView].ShowsPlayHere}" IsEnabled="{Binding !IsSceneBreak}"
+                                    Click="ReadFromHere_Click" ToolTip.Tip="Read aloud from here" AutomationProperties.Name="Read aloud from here">
+                                <ic:SymbolIcon Symbol="Play" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" />
+                            </Button>
+                            <Border Grid.Column="1" Classes="paragraph" Classes.heading="{Binding IsHeading}" Classes.resume="{Binding IsResumePoint}"
+                                    Classes.speaking="{Binding IsSpeaking}">
+                                <StackPanel>
+                                    <TextBlock Text="Continue reading here" FontSize="12" Foreground="{DynamicResource HelmEyebrow}" Margin="0,0,0,2">
+                                        <TextBlock.IsVisible>
+                                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                <Binding Path="IsResumePoint" />
+                                                <Binding Path="!IsSpeaking" />
+                                            </MultiBinding>
+                                        </TextBlock.IsVisible>
+                                    </TextBlock>
+                                    <ui:SegmentText Line="{Binding Line}" Highlight="{Binding HighlightSegments}" Sentences="{Binding Sentences}" Classes.heading="{Binding IsHeading}"
+                                                    IsVisible="{Binding !$parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).IsStudyMode}"
+                                                    FontSize="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).FontSize}"
+                                                    RelativeLineHeight="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).LineSpacing}"
+                                                    HoverHighlight="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).HoverHighlight}"
+                                                    GrammarColors="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).GrammarColors}" />
+                                    <!-- Study mode: each word with its Chinese, pinyin and Hán Việt above the Vietnamese -->
+                                    <ui:StudyText Line="{Binding Line}" Readings="{Binding Readings}" Highlight="{Binding HighlightSegments}" Sentences="{Binding Sentences}"
+                                                  IsVisible="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).IsStudyMode}"
+                                                  TextSize="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).FontSize}"
+                                                  ShowChinese="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).StudyShowChinese}"
+                                                  ShowPinyin="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).StudyShowPinyin}"
+                                                  ShowHanViet="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).StudyShowHanViet}"
+                                                  HoverHighlight="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).HoverHighlight}"
+                                                  GrammarColors="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).GrammarColors}" />
+                                    <TextBlock Text="{Binding Chinese}" Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0" IsVisible="{Binding ShowChinese}"
+                                               FontSize="{Binding $parent[ui:NovelTextView].((vm:NovelReaderViewModel)DataContext).FontSize}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Scrolled away while listening: one tap back to the sentence being read -->
+        <Button Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,22,10" Command="{Binding FollowReadingCommand}"
+                IsVisible="{Binding ShowBackToReading}" core:Motion.EnterOnShow="True" AutomationProperties.Name="Back to reading position">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <ic:SymbolIcon Symbol="Location" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                <TextBlock Classes="label" Text="Back to reading position" Foreground="{DynamicResource HelmPillForeground}" />
+            </StackPanel>
+        </Button>
+
+        <!-- Words just sent to Vocabulary, with Hoàn tác for a few seconds -->
+        <Border Classes="sheet" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8,0,8,10" Padding="16,4,4,4" CornerRadius="14"
+                DataContext="{Binding HeldSentence}" x:DataType="vm:HeldSentenceViewModel" IsVisible="{Binding HasToast}" core:Motion.EnterOnShow="True">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Text="{Binding Toast}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="300" />
+                <Button Grid.Column="1" Classes="flat" Margin="8,0,0,0" Command="{Binding UndoCommand}" IsVisible="{Binding CanUndo}">
+                    <TextBlock Text="Hoàn tác" FontWeight="SemiBold" Foreground="{DynamicResource HelmEyebrow}" />
+                </Button>
+                <Button Grid.Column="2" Classes="flat" Width="36" Height="36" Padding="0" Command="{Binding DismissToastCommand}" ToolTip.Tip="Dismiss"
+                        AutomationProperties.Name="Dismiss">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                </Button>
+            </Grid>
+        </Border>
+    </Panel>
+</UserControl>

@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelWordSheet"
+             x:DataType="vm:WordEditorViewModel">
+
+    <!-- The tapped word: its Chinese (widen or narrow it a character at a time), pinyin, Hán Việt and the meanings known;
+         save it as a name or as a meaning, read aloud from its sentence, or report the sentence as translated wrong.
+         Enter saves a name, Ctrl+Enter a meaning. -->
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="2">
+                <TextBlock Classes="eyebrow" Text="A WORD" />
+                <SelectableTextBlock Text="{Binding Chinese}" FontSize="26" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+        <!-- One more or one less character on either side -->
+        <Grid ColumnDefinitions="*,*,*,*,Auto" ColumnSpacing="6">
+            <Button Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ExtendLeftCommand}" IsEnabled="{Binding CanExtendLeft}"
+                    ToolTip.Tip="One more character on the left" AutomationProperties.Name="Widen left">
+                <StackPanel Orientation="Horizontal" Spacing="2"><ic:SymbolIcon Symbol="ArrowLeft" FontSize="13" /><TextBlock Text="+1" FontSize="12" /></StackPanel>
+            </Button>
+            <Button Grid.Column="1" Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ShrinkLeftCommand}" IsEnabled="{Binding CanShrink}"
+                    ToolTip.Tip="One character less on the left" AutomationProperties.Name="Narrow left">
+                <StackPanel Orientation="Horizontal" Spacing="2"><TextBlock Text="−1" FontSize="12" /><ic:SymbolIcon Symbol="ArrowRight" FontSize="13" /></StackPanel>
+            </Button>
+            <Button Grid.Column="2" Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ShrinkRightCommand}" IsEnabled="{Binding CanShrink}"
+                    ToolTip.Tip="One character less on the right" AutomationProperties.Name="Narrow right">
+                <StackPanel Orientation="Horizontal" Spacing="2"><ic:SymbolIcon Symbol="ArrowLeft" FontSize="13" /><TextBlock Text="−1" FontSize="12" /></StackPanel>
+            </Button>
+            <Button Grid.Column="3" Classes="chip" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ExtendRightCommand}" IsEnabled="{Binding CanExtendRight}"
+                    ToolTip.Tip="One more character on the right" AutomationProperties.Name="Widen right">
+                <StackPanel Orientation="Horizontal" Spacing="2"><TextBlock Text="+1" FontSize="12" /><ic:SymbolIcon Symbol="ArrowRight" FontSize="13" /></StackPanel>
+            </Button>
+            <Button Grid.Column="4" Classes="chip" Command="{Binding CopyChineseCommand}" ToolTip.Tip="Copy the Chinese" AutomationProperties.Name="Copy the Chinese">
+                <ic:SymbolIcon Symbol="Copy" FontSize="14" />
+            </Button>
+        </Grid>
+        <StackPanel Spacing="2">
+            <TextBlock Text="{Binding Pinyin}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding Pinyin, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Text="{Binding HanViet}" Classes="muted" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding SavedAs}" Foreground="{DynamicResource HelmEyebrow}" TextWrapping="Wrap" IsVisible="{Binding HasSaved}" />
+        </StackPanel>
+        <!-- The meanings the dictionaries know: tap one to take it -->
+        <ItemsControl ItemsSource="{Binding Meanings}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                    <Button Classes="chip" Height="32" Margin="0,0,6,6" Content="{Binding}" CommandParameter="{Binding}"
+                            Command="{Binding $parent[UserControl].((vm:WordEditorViewModel)DataContext).PickMeaningCommand}" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Spacing="6">
+            <TextBlock Classes="eyebrow" Text="VIETNAMESE" />
+            <TextBox x:Name="DraftBox" Classes="glass" Text="{Binding Draft}" PlaceholderText="The name or the meaning — Enter saves a name" KeyDown="Draft_KeyDown"
+                     AutomationProperties.Name="Meaning" />
+            <TextBlock Text="{Binding Error}" Foreground="{DynamicResource HelmDanger}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+        </StackPanel>
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="For all my novels" />
+                <TextBlock Text="Off: only this novel uses it." Classes="muted" FontSize="12" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ForAllNovels}" OnContent="" OffContent="" AutomationProperties.Name="For all my novels" />
+        </Grid>
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding SaveNameCommand}"
+                    ToolTip.Tip="A name wins over the phrases around it (Enter)">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="PersonAdd" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                    <TextBlock Text="Save as name" Foreground="{DynamicResource HelmPillForeground}" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save as meaning"
+                    Command="{Binding SavePhraseCommand}" ToolTip.Tip="The meaning of this phrase (Ctrl+Enter)" />
+        </Grid>
+        <Grid x:Name="MoreButtons" ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button x:Name="ReadButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ReadFromHereCommand}"
+                    ToolTip.Tip="Read aloud from the sentence this word is in" AutomationProperties.Name="Read aloud from here">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Play" FontSize="15" />
+                    <TextBlock Text="Read from here" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding RemoveCommand}"
+                    IsVisible="{Binding HasSaved}" ToolTip.Tip="Remove the saved name or meaning">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Delete" FontSize="15" Foreground="{DynamicResource HelmDanger}" />
+                    <TextBlock Text="Remove" Foreground="{DynamicResource HelmDanger}" />
+                </StackPanel>
+            </Button>
+        </Grid>
+        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ReportSentenceCommand}" IsVisible="{Binding CanReport}"
+                ToolTip.Tip="Mark the sentence this word is in as translated wrong, with the right translation" AutomationProperties.Name="Report sentence">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <ic:SymbolIcon Symbol="Flag" FontSize="15" />
+                <TextBlock Text="Report the sentence as translated wrong" />
+            </StackPanel>
+        </Button>
+    </StackPanel>
+</UserControl>

@@ -1,0 +1,135 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.NovelReader.Ui.NovelNamesView"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- The open novel's names: the ones saved (search, edit in place, delete; export or import a Names.txt; undo the ones
+         a scan added) and the ones a scan found (save one, or say it is not a name). Beside the text on a wide screen, a
+         sheet on a phone. -->
+    <UserControl.Styles>
+        <Style Selector="Border.namerow">
+            <Setter Property="Padding" Value="0,10" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="{Binding BookTitle, Converter={x:Static core:UpperCase.Instance}}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="Names" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close names">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <Border Classes="glass" Padding="3" CornerRadius="10" BoxShadow="" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+                <RadioButton x:Name="SavedTab" Classes="seg" GroupName="NamesTab" IsChecked="True" Content="Saved" IsCheckedChanged="Tab_Changed" />
+                <RadioButton x:Name="FoundTab" Classes="seg" GroupName="NamesTab" Content="Found" IsCheckedChanged="Tab_Changed" />
+            </StackPanel>
+        </Border>
+
+        <!-- SAVED -->
+        <StackPanel x:Name="SavedPanel" Spacing="10" core:Motion.EnterOnShow="True">
+            <TextBox Classes="glass" Text="{Binding EntryFilter}" PlaceholderText="Search names" AutomationProperties.Name="Search names" />
+            <Grid x:Name="FileButtons" ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="False">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Export" Click="Export_Click"
+                        ToolTip.Tip="This novel's names as a QuickTranslator Names.txt" />
+                <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Import" Click="Import_Click"
+                        ToolTip.Tip="Names from a QuickTranslator Names.txt, into this novel" />
+            </Grid>
+            <!-- Names the scan added: undo them all at once -->
+            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding UndoFoundNamesCommand}" IsVisible="{Binding HasFoundNames}"
+                    ToolTip.Tip="Remove every name the scan added to this novel (the ones you edited stay)" AutomationProperties.Name="Undo found names">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="ArrowUndo" FontSize="15" />
+                    <TextBlock Text="{Binding FoundNameCount, StringFormat='Undo the found names ({0})'}" />
+                </StackPanel>
+            </Button>
+            <TextBlock x:Name="NoNames" Classes="muted" TextWrapping="Wrap" IsVisible="False"
+                       Text="No names yet. Tap a word in the text and save it as a name, or let a scan find them (Found)." />
+            <ItemsControl ItemsSource="{Binding Entries}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:EntryRowViewModel">
+                        <Border Classes="namerow">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding Chinese}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Vietnamese}" TextWrapping="Wrap" IsVisible="{Binding IsNotEditing}" />
+                                    <TextBox Classes="glass" Text="{Binding Draft}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Meaning">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding $parent[UserControl].((vm:NovelReaderViewModel)DataContext).SaveEntryCommand}"
+                                                        CommandParameter="{Binding}" />
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                    <TextBlock Text="{Binding KindLabel}" Classes="muted" FontSize="12" />
+                                </StackPanel>
+                                <Panel Grid.Column="1" VerticalAlignment="Top">
+                                    <Button Classes="chip" Width="36" Height="36" Padding="0" IsVisible="{Binding IsNotEditing}" ToolTip.Tip="Edit" AutomationProperties.Name="Edit"
+                                            Command="{Binding $parent[UserControl].((vm:NovelReaderViewModel)DataContext).EditEntryCommand}" CommandParameter="{Binding}">
+                                        <ic:SymbolIcon Symbol="Edit" FontSize="14" />
+                                    </Button>
+                                    <Button Classes="chip" Width="36" Height="36" Padding="0" IsVisible="{Binding IsEditing}" ToolTip.Tip="Save" AutomationProperties.Name="Save"
+                                            Command="{Binding $parent[UserControl].((vm:NovelReaderViewModel)DataContext).SaveEntryCommand}" CommandParameter="{Binding}">
+                                        <ic:SymbolIcon Symbol="Checkmark" FontSize="14" />
+                                    </Button>
+                                </Panel>
+                                <Button Grid.Column="2" Classes="chip" Width="36" Height="36" Padding="0" VerticalAlignment="Top" ToolTip.Tip="Delete"
+                                        AutomationProperties.Name="{Binding Chinese, StringFormat='Delete {0}'}"
+                                        Command="{Binding $parent[UserControl].((vm:NovelReaderViewModel)DataContext).DeleteEntryCommand}" CommandParameter="{Binding}">
+                                    <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- FOUND: a scan of the whole novel; sure names are added, doubtful ones listed here -->
+        <StackPanel x:Name="FoundPanel" Spacing="10" IsVisible="False" core:Motion.EnterOnShow="True">
+            <Grid x:Name="ScanButtons" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding FindNamesCommand}" IsEnabled="{Binding !IsFindingNames}"
+                        ToolTip.Tip="Look through the whole novel: sure names are added, doubtful ones are listed here (how: Novel Reader settings)">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="PeopleSearch" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Text="Scan for names" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="1" Classes="ghost" Content="Stop" Command="{Binding StopNameScanCommand}" IsVisible="{Binding IsAgentScanning}" />
+            </Grid>
+            <TextBlock Text="{Binding SuggestionStatus}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding SuggestionStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <ItemsControl ItemsSource="{Binding Suggestions}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:SuggestionRowViewModel">
+                        <Border Classes="namerow">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding Chinese}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="{Binding CountLabel}" Classes="muted" ToolTip.Tip="Times it appears" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
+                                    <TextBox Classes="glass" Text="{Binding Vietnamese}" AutomationProperties.Name="Name" />
+                                    <Button Grid.Column="1" Classes="chip" ToolTip.Tip="Save as a name of this novel" AutomationProperties.Name="Save as a name"
+                                            Command="{Binding $parent[UserControl].((vm:NovelReaderViewModel)DataContext).AddSuggestionCommand}" CommandParameter="{Binding}">
+                                        <ic:SymbolIcon Symbol="PersonAdd" FontSize="14" Foreground="{DynamicResource HelmEyebrow}" />
+                                    </Button>
+                                    <Button Grid.Column="2" Classes="chip" ToolTip.Tip="Not a name" AutomationProperties.Name="Not a name"
+                                            Command="{Binding $parent[UserControl].((vm:NovelReaderViewModel)DataContext).DismissSuggestionCommand}" CommandParameter="{Binding}">
+                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

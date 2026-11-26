@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Novel Reader page, ONE view for every platform (Windows through Helm.Ui.Windows, Android, later macOS/iOS): the
+       library (adding a novel, its preview, the covers), the reader (the text, the player, reading aloud), the sheets (a
+       word, a held sentence, the chapters, the reading options, the names, the wrong translations, a book) and the
+       settings sheet. What differs per platform (file pickers, scraping the web on the PC, the phone's voices, Novel
+       Lens) comes through INovelReaderPageHost. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.NovelReader.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.NovelReader.Core\Helm.Modules.NovelReader.Core.csproj" />
+  </ItemGroup>
+
+</Project>

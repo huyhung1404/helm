@@ -38,6 +38,8 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Missions.UI\Helm.Modules.Missions.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.SlackBot.UI\Helm.Modules.SlackBot.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.WindowZones.UI\Helm.Modules.WindowZones.UI.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.NovelReader.UI\Helm.Modules.NovelReader.UI.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Ssh.UI\Helm.Modules.Ssh.UI.csproj" />
   </ItemGroup>
 
   <!-- The Gallery's in-memory stand-ins, so a page runs with its real view model here too. -->
@@ -52,6 +54,8 @@
     <Compile Include="..\..\src\Helm.Gallery\BugReportsDemo.cs" Link="BugReportsDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\SlackBotDemo.cs" Link="SlackBotDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\WindowZonesDemo.cs" Link="WindowZonesDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\NovelDemo.cs" Link="NovelDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\SshDemo.cs" Link="SshDemo.cs" />
   </ItemGroup>
 
 </Project>
