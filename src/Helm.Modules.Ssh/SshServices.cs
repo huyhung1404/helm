@@ -9,8 +9,7 @@ public static class SshServices
     public static IServiceCollection AddSshModule(this IServiceCollection services) =>
         services
             .AddSshCore()
-            .AddHelmModule<SshModule, SshContentPage, SshViewModel>()
-            .AddSingleton<SshContentPage>()
+            .AddHelmModule<SshModule, SshViewModel>()
             // The AI agents' tools for the servers' menus: MCP runs on Windows only.
             .AddSingleton<IMcpToolProvider, SshMcpTools>();
 }

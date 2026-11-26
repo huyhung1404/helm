@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform;
@@ -301,7 +302,7 @@ internal sealed class WindowsTerminal : NativeControlHost, ISshTerminal
         string text;
         try
         {
-            text = System.Windows.Clipboard.ContainsText() ? System.Windows.Clipboard.GetText() : "";
+            text = TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard ? await clipboard.TryGetTextAsync().ConfigureAwait(true) ?? "" : "";
         }
         catch (ExternalException)
         {
