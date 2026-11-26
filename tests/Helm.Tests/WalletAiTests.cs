@@ -384,33 +384,6 @@ public sealed class WalletAiTests : IDisposable
         Assert.Null(_store.Get(id)!.CategoryId);
     }
 
-    [Fact]
-    public async Task Ask_Helm_opened_about_a_transaction_carries_it_and_only_the_wallet_tools()
-    {
-        var id = New(-120_000, "NGUYEN VAN NAM chuyen tien");
-        var keys = new AiKeyStore(new MemorySynced<AiKey>());
-        keys.Add(AiProviders.Claude, "Helm", ClaudeKey);
-        var call = new ToolCall("1", "wallet_update_transaction", JsonDocument.Parse(
-            $$"""{"id":"{{id}}","category":"Food & drinks","description":"Ăn trưa với Nam","summary":"Ăn trưa với Nam · Ăn uống"}""").RootElement.Clone());
-        _api.Steps.Enqueue(new AssistantStep("", [call], new AssistantUsage(100, 10, 0, 0), false));
-        var assistant = new HelmAssistant(keys, _features, new AiUsageBook(_usage),
-            [new WalletMcpTools(new DebtBook(new MemorySynced<WalletDebt>(), _store), _store), new OtherTool()], [_api], _ => true);
-        var context = WalletAskContext.For(id, _store.Get(id)!, Ict);
-        Assert.Contains("khoản này là gì?", context.Title);
-
-        // Words that name no tool group: the context's group still comes.
-        var reply = await assistant.Start(context: context).SendAsync("cùng Nam", _ => Task.FromResult(true), CancellationToken.None);
-
-        Assert.Null(reply.Problem);
-        Assert.Contains(id, _api.LastUser);
-        Assert.Contains("The user says: cùng Nam", _api.LastUser);
-        Assert.Contains(_api.LastTools, t => t == "wallet_update_transaction");
-        Assert.DoesNotContain(_api.LastTools, t => t.StartsWith("tracker_", StringComparison.Ordinal));
-        Assert.Equal(WalletCategories.Food, _store.Get(id)!.CategoryId);
-        await Assert.Single(reply.Done).UndoAsync(CancellationToken.None);
-        Assert.Null(_store.Get(id)!.CategoryId);
-    }
-
     private static JsonElement Args(object value) => JsonDocument.Parse(JsonSerializer.Serialize(value)).RootElement.Clone();
 
     // ---- doubles ----------------------------------------------------------------------------------------------

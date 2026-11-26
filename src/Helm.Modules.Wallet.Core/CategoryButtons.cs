@@ -6,11 +6,8 @@ public sealed record CategoryButton(string Label, string? CategoryId, string? Ne
 
 public static class CategoryButtons
 {
-    /// <summary>The voice button of the "What was it?" notification, before the categories: opens Ask Helm listening.</summary>
-    public const string SayLabel = "Nói";
-
-    /// <summary>The categories the notification offers beside <see cref="SayLabel"/>: the two likeliest.</summary>
-    public const int NotificationCount = 2;
+    /// <summary>The categories the notification offers: the three likeliest (Android shows three buttons).</summary>
+    public const int NotificationCount = 3;
 
     /// <summary>The notification's category buttons: the <see cref="NotificationCount"/> likeliest (<see cref="For"/>).</summary>
     public static IReadOnlyList<CategoryButton> ForNotification(IReadOnlyList<CategoryInfo> suggestions, CategoryProposal? proposal,

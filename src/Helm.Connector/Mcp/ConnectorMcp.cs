@@ -27,7 +27,7 @@ internal static class ConnectorMcp
     public static IReadOnlyList<McpTool> Tools(IEnumerable<IMcpToolProvider> providers, ConfirmationGate gate) =>
         [.. providers.SelectMany(p => p.Tools).Select(t => t.Destructive ? gate.Guard(t) : t)];
 
-    /// <param name="methods">More host methods beside the gate's (Fairy Core's jobs, <see cref="Fairy.FairyRoute.Methods"/>).</param>
+    /// <param name="methods">More host methods beside the gate's (none since the phone's jobs went with Ask Helm).</param>
     public static McpServer Server(IEnumerable<IMcpToolProvider> providers, ConfirmationGate gate, ILogger logger,
         IEnumerable<KeyValuePair<string, Func<JsonObject?, CancellationToken, Task<JsonNode?>>>>? methods = null) =>
         new(Tools(providers, gate), AppInfo.Version, Instructions, logger, consent: null)

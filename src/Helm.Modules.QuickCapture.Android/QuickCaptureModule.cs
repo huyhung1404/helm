@@ -14,30 +14,17 @@ namespace Helm.Modules.QuickCapture;
 /// <see cref="QuickCaptureActivity"/>, a small dialog over the current app. While the tool is off, both are hidden
 /// (their components are disabled), so Helm does not show up in the share sheet.
 /// </summary>
-public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger, AskHelmOpeners openers) : AndroidModuleBase, Helm.Core.Platform.IBackHandler
+public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : AndroidModuleBase
 {
     public const string ModuleId = "quick-capture";
 
     /// <summary>Stable component names: Android remembers enabled states and pinned tiles by name.</summary>
     public const string ActivityName = "com.huyhung1404.helm.QuickCaptureActivity";
     public const string TileName = "com.huyhung1404.helm.QuickCaptureTile";
-    public const string AskHelmActivityName = Helm.Ai.Assistant.AskHelmContext.ActivityName;
-    public const string AskHelmTileName = "com.huyhung1404.helm.AskHelmTile";
-
-    /// <summary>The text selection menu's entries ("Helm", "Helm: Dịch", "Helm: Sửa", "Helm: Viết lại", "Helm: Kiểm tra tin").</summary>
-    public const string AskHelmSelectionName = "com.huyhung1404.helm.AskHelmSelection";
-    public const string AskHelmTranslateName = "com.huyhung1404.helm.AskHelmTranslate";
-    public const string AskHelmFixName = "com.huyhung1404.helm.AskHelmFix";
-    public const string AskHelmRewriteName = "com.huyhung1404.helm.AskHelmRewrite";
-    public const string AskHelmCheckName = "com.huyhung1404.helm.AskHelmCheck";
-
-    /// <summary>The other ways to open Ask Helm (<see cref="AskHelmOpeners"/>): its own launcher icon and its widget.</summary>
-    public const string AskHelmLauncherName = "com.huyhung1404.helm.AskHelmLauncher";
-    public const string AskHelmWidgetName = "com.huyhung1404.helm.AskHelmWidget";
 
     public override string Id => ModuleId;
     public override string DisplayName => "Quick Capture";
-    public override string Description => "Save a note, a task or a debt from any app: Share → Save to Helm, or the Quick Settings tile. Ask Helm, its second tile, takes it by voice.";
+    public override string Description => "Save a note, a task or a debt from any app: Share → Save to Helm, or the Quick Settings tile.";
     public override ModuleGroup Group => ModuleGroup.Planning;
     public override Symbol Icon => Symbol.Flash;
 
@@ -45,23 +32,16 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger, AskHe
     public override Avalonia.Media.IImage? IconImage => QuickCaptureIcon.Image;
     public override Type PageType => typeof(QuickCapturePage);
 
-    /// <summary>The shown page's own back (Ways to open goes back to the page); set while the page is on screen.</summary>
-    internal Func<bool>? PageBack { get; set; }
-
-    public bool HandleBack() => PageBack?.Invoke() == true;
-
     public override Task EnableAsync(CancellationToken ct)
     {
         StatusMessage = null;
         SetComponents(true);
-        openers.Start();
         return Task.CompletedTask;
     }
 
     public override Task DisableAsync()
     {
         SetComponents(false);
-        openers.Stop();
         return Task.CompletedTask;
     }
 
@@ -82,8 +62,7 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger, AskHe
         {
             var context = AndroidApp.Context;
             var state = enabled ? ComponentEnabledState.Enabled : ComponentEnabledState.Disabled;
-            foreach (var name in new[] { ActivityName, TileName, AskHelmActivityName, AskHelmTileName,
-                AskHelmSelectionName, AskHelmTranslateName, AskHelmFixName, AskHelmRewriteName, AskHelmCheckName })
+            foreach (var name in new[] { ActivityName, TileName })
                 context.PackageManager?.SetComponentEnabledSetting(new ComponentName(context, name), state, ComponentEnableOption.DontKillApp);
         }
         catch (Exception ex)

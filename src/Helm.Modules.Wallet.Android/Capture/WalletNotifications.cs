@@ -64,8 +64,7 @@ internal static class WalletNotifications
 
             var id = NotificationId(transactionId);
             var title = transaction.Bank.Length > 0 ? $"{WalletFormat.Signed(transaction.Amount)} · {transaction.Bank}" : WalletFormat.Signed(transaction.Amount);
-            // "Nói" first (the user says what it was and Ask Helm fills it in), then the two likeliest categories.
-            var mic = CanAskHelm(context);
+            // The likeliest categories, AI's proposal first.
             var buttons = CategoryButtons.ForNotification(suggestions, proposal, category ?? (wanted => suggestions.FirstOrDefault(c => c.Id == wanted)));
             var guess = proposal is null ? null : buttons.FirstOrDefault()?.NewName ?? buttons.FirstOrDefault()?.Label;
             var question = guess is null ? "What was it?" : $"What was it? Maybe {guess}.";
@@ -81,8 +80,6 @@ internal static class WalletNotifications
                 .SetShowWhen(true);
             if (OpenWalletIntent(context, id) is { } open) builder.SetContentIntent(open);
             var icon = Icon.CreateWithResource(context, R.Drawable(context, "wallet_notification"));
-            if (mic && AskHelmIntent(context, transactionId, transaction, id) is { } ask)
-                builder.AddAction(new Notification.Action.Builder(icon, CategoryButtons.SayLabel, ask).Build());
             for (var i = 0; i < buttons.Count; i++)
             {
                 var intent = new Intent(context, Java.Lang.Class.FromType(typeof(WalletCategoryReceiver)))
@@ -99,36 +96,6 @@ internal static class WalletNotifications
         {
             Log(ex, "Could not ask for the category of a transaction");
         }
-    }
-
-    /// <summary>Whether Ask Helm's card can open here: Quick Capture is on (its activity enabled) and it has a way to answer.</summary>
-    private static bool CanAskHelm(Context context)
-    {
-        try
-        {
-            var state = context.PackageManager?.GetComponentEnabledSetting(new ComponentName(context.PackageName!, AskHelmContext.ActivityName));
-            if (state is ComponentEnabledState.Disabled or ComponentEnabledState.DisabledUser) return false;
-            return HelmAndroidServices.Current.GetService<HelmAssistant>()?.Unavailable() is null;
-        }
-        catch (Exception ex)
-        {
-            Log(ex, "Could not tell whether Ask Helm can open");
-            return false;
-        }
-    }
-
-    /// <summary>Opens Ask Helm's card about this transaction; it clears this notification once the answer saved it.</summary>
-    private static PendingIntent? AskHelmIntent(Context context, string transactionId, WalletTransaction transaction, int notificationId)
-    {
-        var ask = WalletAskContext.For(transactionId, transaction);
-        var intent = new Intent()
-            .SetClassName(context.PackageName!, AskHelmContext.ActivityName)
-            .AddFlags(ActivityFlags.NewTask)
-            .PutExtra(AskHelmContext.ExtraTitle, ask.Title)
-            .PutExtra(AskHelmContext.ExtraPrompt, ask.Prompt)
-            .PutExtra(AskHelmContext.ExtraGroups, string.Join(",", ask.Groups))
-            .PutExtra(AskHelmContext.ExtraNotification, notificationId);
-        return PendingIntent.GetActivity(context, notificationId * 4 + 3, intent, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
     }
 
     /// <summary>Whether the "what was it?" notification of a transaction is still shown (AI's answer updates only that).</summary>

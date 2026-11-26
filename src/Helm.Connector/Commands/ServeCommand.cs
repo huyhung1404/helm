@@ -1,5 +1,4 @@
 using Helm.Ai.Assistant;
-using Helm.Connector.Fairy;
 using Helm.Connector.Hosting;
 using Helm.Connector.Mcp;
 using Helm.Connector.Sync;
@@ -51,16 +50,13 @@ internal sealed class ServeCommand : ICliCommand
 
         // One gate for every connection: the yes may come on another one (helm-connector confirm) than the call.
         var gate = new ConfirmationGate(logger: loggers.CreateLogger<ConfirmationGate>());
-        // The phone's agent jobs go to Fairy Core when it connects (and only with AI synced: the jobs live in ai.*).
-        var fairy = selection.Has("ai.") ? new FairyRoute(services.GetServices<IMcpToolProvider>, Environment.MachineName) : null;
         var mcp = new McpPart(new McpSocketHost(ConnectorPaths.McpSocket(paths, env),
-            () => ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), gate, loggers.CreateLogger<McpServer>(), fairy?.Methods()),
+            () => ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), gate, loggers.CreateLogger<McpServer>()),
             loggers.CreateLogger<McpSocketHost>()));
         // Parts registered in the container join them.
         IServePart[] parts =
         [
             new HoldWatcher(engine, health, loggers.CreateLogger<HoldWatcher>()), mcp,
-            .. fairy is null ? [] : new IServePart[] { new FairyLink(fairy, () => FairyWorker(services, fairy, loggers), loggers.CreateLogger<FairyLink>()) },
             .. services.GetServices<IServePart>(),
         ];
         var started = DateTimeOffset.UtcNow;
@@ -137,14 +133,5 @@ internal sealed class ServeCommand : ICliCommand
         try { ServeState.Remove(paths); }
         catch (IOException) { }
         return ConnectorApp.Ok;
-    }
-
-    /// <summary>The phone's agent jobs, as a Helm PC takes them (ai.jobs, ai.workers), run by Fairy Core.</summary>
-    private static AgentJobWorker FairyWorker(IServiceProvider services, FairyRoute fairy, ILoggerFactory loggers)
-    {
-        var engine = services.GetRequiredService<SyncEngine>();
-        return new AgentJobWorker(services.GetRequiredService<ISyncedCollection<AiJobRecord>>(), services.GetRequiredService<ISyncedCollection<AiWorkerRecord>>(),
-            fairy, () => engine.DeviceId, fairy.Device, fairy.Ready, logger: loggers.CreateLogger<AgentJobWorker>(),
-            photos: new BlobJobPhotos(services.GetRequiredService<BlobStore>(), loggers.CreateLogger<BlobJobPhotos>()));
     }
 }

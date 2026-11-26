@@ -291,21 +291,22 @@ public sealed class AskHelmPhotoTests
         Assert.Equal("Bản tin sáng · 06:30", AiBriefChip.Label(chip!.Latest.Value, Now, Ict));
     }
 
-    // ---- W6: "Nói" and the two likeliest categories ------------------------------------------------------------
+    // ---- W6: the three likeliest categories (the "Nói" button went with Ask Helm) -------------------------------
 
     [Fact]
-    public void The_notification_offers_Noi_and_exactly_the_two_likeliest_categories()
+    public void The_notification_offers_exactly_the_three_likeliest_categories()
     {
-        var suggestions = _wallet.Suggest(new WalletTransaction { Amount = -45_000, Description = "QUAN PHO THIN" }, 3);
-        Assert.Equal(3, suggestions.Count);
+        var suggestions = _wallet.Suggest(new WalletTransaction { Amount = -45_000, Description = "QUAN PHO THIN" }, 4);
+        Assert.True(suggestions.Count >= 3);
 
         var buttons = CategoryButtons.ForNotification(suggestions, null, _wallet.Category);
-        Assert.Equal(suggestions.Take(2).Select(s => s.Id), buttons.Select(b => b.CategoryId));
+        Assert.Equal(suggestions.Take(3).Select(s => s.Id), buttons.Select(b => b.CategoryId));
 
-        // AI's pick first, still two in all.
+        // AI's pick first, still three in all.
         var picked = CategoryButtons.ForNotification(suggestions, new CategoryProposal(WalletCategories.Travel, null, CategoryKind.Expense, true), _wallet.Category);
-        Assert.Equal([WalletCategories.Travel, suggestions[0].Id], picked.Select(b => b.CategoryId));
-        Assert.Equal("Nói", CategoryButtons.SayLabel);
+        Assert.Equal(3, picked.Count);
+        Assert.Equal(WalletCategories.Travel, picked[0].CategoryId);
+        Assert.Equal(suggestions[0].Id, picked[1].CategoryId);
     }
 
     // ---- doubles ------------------------------------------------------------------------------------------------

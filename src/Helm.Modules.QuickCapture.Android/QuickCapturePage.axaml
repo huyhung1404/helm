@@ -9,9 +9,6 @@
                    Module="{Binding Module}">
 
     <Panel>
-        <!-- Ask Helm › Ways to open, in place of the sections below while it is open. -->
-        <vm:AskHelmWaysView x:Name="WaysView" IsVisible="False" />
-
         <StackPanel x:Name="MainPanel" Spacing="14">
             <Border Classes="glass" IsVisible="{Binding HasMessage}" core:Motion.EnterOnShow="True">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
@@ -36,15 +33,6 @@
                         <Button x:Name="AddTileButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,6,0,0"
                                 Content="Add to Quick Settings" Click="AddTile_Click" IsVisible="False" />
                     </StackPanel>
-                    <Button Classes="rowhit" Padding="0" Click="Ways_Click" AutomationProperties.Name="Ways to open Ask Helm">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <TextBlock Text="Ways to open Ask Helm" />
-                                <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Edge handle, home-screen widget, its own app icon" />
-                            </StackPanel>
-                            <ic:SymbolIcon Grid.Column="1" Symbol="ChevronRight" FontSize="16" VerticalAlignment="Center" Foreground="{DynamicResource HelmSecondaryText}" />
-                        </Grid>
-                    </Button>
                 </StackPanel>
             </Border>
 
