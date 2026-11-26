@@ -60,6 +60,7 @@
     <Compile Include="..\..\src\Helm.Gallery\SshDemo.cs" Link="SshDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\VocabDemo.cs" Link="VocabDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\WalletDemo.cs" Link="WalletDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\ShellDemo.cs" Link="ShellDemo.cs" />
   </ItemGroup>
 
 </Project>

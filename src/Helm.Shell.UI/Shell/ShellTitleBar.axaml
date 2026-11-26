@@ -1,0 +1,215 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
+             xmlns:vm="using:Helm.Shell.Views"
+             x:Class="Helm.Shell.Views.ShellTitleBar"
+             x:DataType="vm:ShellViewModel"
+             ClipToBounds="False">
+
+    <!-- The title bar, on Helm's background like everything else: Helm's icon and name over the menu, the search box over
+         the page, then the sync glyph, the bug button and the window buttons. The bar itself drags the window (element
+         role TitleBar, once the window extends into its decorations); what can be clicked on it says so (role User). -->
+    <UserControl.Styles>
+        <Style Selector="Button.bar">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="chrome:WindowDecorationProperties.ElementRole" Value="User" />
+        </Style>
+        <Style Selector="Button.bar:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <Style Selector="Button.bar:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+        </Style>
+
+        <!-- The window's own buttons: full height, square, as Windows draws them. -->
+        <Style Selector="Button.caption">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Width" Value="46" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.caption:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <Style Selector="Button.caption.close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmCaptionCloseHover}" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <!-- The search box: a glass field, a little lower than a page's (36) to sit in the bar. -->
+        <Style Selector="TextBox.search">
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="6,0,10,0" />
+        </Style>
+
+        <!-- A search result: no look of its own; the highlighted one (arrow keys, mouse) is a glass row. -->
+        <Style Selector="Button.result">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Focusable" Value="False" />
+        </Style>
+        <Style Selector="Button.result:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.result.highlighted /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <Style Selector="Button.result.highlighted TextBlock.title">
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+
+        <!-- The sync glyph: the same glyph in every state, only its colour changes (as on Android): accent and turning while
+             syncing, green for a moment when a sync finishes, red on a problem, faded when offline or not set up. -->
+        <Style Selector="ic|SymbolIcon.syncglyph.muted">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+        <Style Selector="ic|SymbolIcon.syncglyph.done">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <Style Selector="ic|SymbolIcon.syncglyph.problem">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="ic|SymbolIcon.syncglyph.turning">
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+            <Style.Animations>
+                <Animation Duration="0:0:1.1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="360" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+
+        <Style Selector=":is(UserControl).narrow Border#SearchArea">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border x:Name="Bar" Height="48" Background="Transparent" chrome:WindowDecorationProperties.ElementRole="TitleBar">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+            <!-- Phone: the menu is a drawer behind this button. -->
+            <Button x:Name="MenuButton" Classes="bar" Margin="8,0,0,0" IsVisible="False" Command="{Binding Menu.ToggleDrawerCommand}"
+                    ToolTip.Tip="Menu" AutomationProperties.Name="Open the menu">
+                <ic:SymbolIcon Symbol="LineHorizontal3" FontSize="20" />
+            </Button>
+
+            <!-- Helm's icon and name, as wide as the menu below them; hovering the icon opens a collapsed menu. -->
+            <Panel x:Name="Brand" Grid.Column="1">
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="18,0,12,0" VerticalAlignment="Center">
+                    <Image x:Name="TitleIcon" Width="18" Height="18" VerticalAlignment="Center" ToolTip.Tip="Menu"
+                           RenderOptions.BitmapInterpolationMode="HighQuality" />
+                    <TextBlock x:Name="AppTitle" Text="{Binding AppName}" FontSize="12.5" VerticalAlignment="Center"
+                               Foreground="{DynamicResource HelmSecondaryText}" />
+                </StackPanel>
+            </Panel>
+
+            <!-- Phone: the shown page's name instead of the search box. -->
+            <TextBlock x:Name="PageTitle" Grid.Column="2" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" IsVisible="False" Margin="2,0,8,0" />
+
+            <Border x:Name="SearchArea" Grid.Column="2" MaxWidth="520" HorizontalAlignment="Stretch" Margin="4,0,16,0">
+                <Panel>
+                    <TextBox x:Name="SearchBox" Classes="glass search" Text="{Binding Search.Query}" VerticalAlignment="Center"
+                             PlaceholderText="Search for settings" AutomationProperties.Name="Search for settings"
+                             chrome:WindowDecorationProperties.ElementRole="User">
+                        <TextBox.InnerLeftContent>
+                            <ic:SymbolIcon Symbol="Search" FontSize="16" Margin="10,0,2,0" Foreground="{DynamicResource HelmSecondaryText}" />
+                        </TextBox.InnerLeftContent>
+                    </TextBox>
+
+                    <!-- The results float under the box, over the page: a rounded list card. -->
+                    <Canvas x:Name="ResultsLayer">
+                        <Border x:Name="Results" Canvas.Top="44" IsVisible="{Binding Search.IsOpen}" Padding="6"
+                                Background="{DynamicResource HelmSheetBackground}" BorderBrush="{DynamicResource HelmGlassStroke}"
+                                BorderThickness="1" CornerRadius="12" BoxShadow="{DynamicResource HelmHeroShadow}"
+                                core:Motion.EnterOnShow="True" core:Motion.FromTop="True"
+                                chrome:WindowDecorationProperties.ElementRole="User">
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding Search.Results}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:SearchResultViewModel">
+                                            <Button Classes="result" Classes.highlighted="{Binding IsHighlighted}"
+                                                    Command="{Binding $parent[vm:ShellTitleBar].((vm:ShellViewModel)DataContext).Search.ChooseCommand, FallbackValue={x:Null}}"
+                                                    CommandParameter="{Binding}" AutomationProperties.Name="{Binding Title}">
+                                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                                    <core:ModuleIcon Symbol="{Binding Glyph}" Image="{Binding Icon}" Size="18" />
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Classes="title" Text="{Binding Title}" FontSize="13.5" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Classes="muted" Text="{Binding Location}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Classes="muted" Text="{Binding Search.NoResultsText}" IsVisible="{Binding Search.HasNoResults}"
+                                           Margin="10,8" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </Canvas>
+                </Panel>
+            </Border>
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" Margin="0,0,6,0" VerticalAlignment="Center">
+                <!-- Sync: its state at a glance on every page; click to sync now (or to set it up). -->
+                <Button x:Name="SyncButton" Classes="bar" DataContext="{Binding Sync}" Command="{Binding SyncNowCommand}"
+                        ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="Sync now" AutomationProperties.HelpText="{Binding ToolTip}">
+                    <ic:SymbolIcon x:Name="SyncGlyph" Symbol="ArrowSync" Width="20" Height="20" FontSize="18" Classes="syncglyph"
+                                   RenderTransformOrigin="50%,50%" Classes.turning="{Binding IsSyncing}" Classes.done="{Binding JustSynced}"
+                                   Classes.muted="{Binding IsMuted}" Classes.problem="{Binding HasProblem}">
+                        <ic:SymbolIcon.RenderTransform>
+                            <RotateTransform />
+                        </ic:SymbolIcon.RenderTransform>
+                    </ic:SymbolIcon>
+                </Button>
+                <!-- Report a bug (also Ctrl+Alt+F12 anywhere, and the tray menu): the black box freezes as it opens. -->
+                <Button x:Name="BugButton" Classes="bar" Command="{Binding ReportBugCommand}" ToolTip.Tip="Report a bug (Ctrl+Alt+F12)"
+                        AutomationProperties.Name="Report a bug">
+                    <ic:SymbolIcon Symbol="Bug" FontSize="18" />
+                </Button>
+                <!-- Phone: the open tabs, counted; tap to switch. -->
+                <Button x:Name="TabsButtonPart" Classes="bar" IsVisible="False" ToolTip.Tip="Open tabs" AutomationProperties.Name="Open tabs">
+                    <Border BorderBrush="{DynamicResource HelmSecondaryText}" BorderThickness="1.5" CornerRadius="5" Width="20" Height="20">
+                        <TextBlock x:Name="TabCount" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </Button>
+            </StackPanel>
+
+            <StackPanel x:Name="WindowButtons" Grid.Column="4" Orientation="Horizontal">
+                <Button Classes="caption" chrome:WindowDecorationProperties.ElementRole="MinimizeButton" ToolTip.Tip="Minimize"
+                        AutomationProperties.Name="Minimize">
+                    <ic:SymbolIcon Symbol="Subtract" FontSize="16" />
+                </Button>
+                <Button Classes="caption" chrome:WindowDecorationProperties.ElementRole="MaximizeButton" ToolTip.Tip="Maximize"
+                        AutomationProperties.Name="Maximize">
+                    <ic:SymbolIcon x:Name="MaximizeGlyph" Symbol="Maximize" FontSize="14" />
+                </Button>
+                <Button Classes="caption close" chrome:WindowDecorationProperties.ElementRole="CloseButton" ToolTip.Tip="Close"
+                        AutomationProperties.Name="Close">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

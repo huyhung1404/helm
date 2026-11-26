@@ -109,7 +109,7 @@ internal partial class MainWindow : FluentWindow
         var index = Array.FindIndex(args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
         if (index < 0 || index + 1 >= args.Length) return null;
         var name = args[index + 1];
-        var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(WhatsNewPage), typeof(BugReportsPage) }
+        var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(BugReportsPage) }
             .Concat(_viewModel.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
             .Concat(_viewModel.Groups.SelectMany(g => g.Modules).OfType<IModuleContent>().Select(m => m.ContentPageType));
         return candidates.FirstOrDefault(t => t.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase)) ?? typeof(HomePage);
@@ -191,11 +191,8 @@ internal partial class MainWindow : FluentWindow
 
         // "Welcome to Helm" (WelcomePage) is hidden for now; re-add:
         // Navigation.FooterMenuItems.Add(NavItem("Welcome to Helm", SymbolRegular.HandWave24, typeof(WelcomePage)));
-        Navigation.FooterMenuItems.Add(NavItem("What's new", SymbolRegular.Megaphone24, typeof(WhatsNewPage)));
+        // No "What's new" (Home's link opens the release notes) and no "Give feedback" (the title bar's bug button).
         Navigation.FooterMenuItems.Add(NavItem(Shell.BugReports.BugReportsServices.PageTitle, SymbolRegular.Bug24, typeof(BugReportsPage)));
-        var feedback = new NavigationViewItem { Content = "Give feedback", Icon = new SymbolIcon(SymbolRegular.PersonFeedback24) };
-        feedback.Click += (_, _) => _viewModel.OpenFeedbackCommand.Execute(null);
-        Navigation.FooterMenuItems.Add(feedback);
     }
 
     private NavigationViewItem NavItem(string title, SymbolRegular icon, Type pageType) => NavItem(title, new SymbolIcon(icon), pageType);

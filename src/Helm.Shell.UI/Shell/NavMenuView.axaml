@@ -1,0 +1,175 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:vm="using:Helm.Shell.Views"
+             x:Class="Helm.Shell.Views.NavMenuView"
+             x:DataType="vm:NavMenuViewModel">
+
+    <!-- The menu reads top to bottom: Home, the tools under small group names, then Bug reports and General, then the
+         switch between "open beside the page" and "icons only". Calm: no fills, no dividers; the open page's row is a
+         glass row with the strong stroke and accent text. Collapsed (class rail) only the icons stay, each group's name
+         becomes a short line of the same height, so opening the menu never moves the row under the mouse. -->
+    <UserControl.Styles>
+        <Style Selector="Button.navrow">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.navrow /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{TemplateBinding Background}" />
+            <Setter Property="BorderBrush" Value="{TemplateBinding BorderBrush}" />
+        </Style>
+        <Style Selector="Button.navrow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.navrow:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+        </Style>
+        <Style Selector="Button.navrow.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        </Style>
+        <Style Selector="Button.navrow.active TextBlock.navlabel">
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.navrow.off core|ModuleIcon, Button.navrow.off TextBlock.navlabel">
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="TextBlock.navlabel">
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="Button.navrow.quiet TextBlock.navlabel">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Button.navrow.quiet ic|SymbolIcon">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="TextBlock.group">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LetterSpacing" Value="0.6" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
+
+        <!-- Icons only: labels and group names go, a short line marks each group. -->
+        <Style Selector=":is(UserControl).rail TextBlock.navlabel, :is(UserControl).rail TextBlock.group">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Border.groupline">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector=":is(UserControl).rail Border.groupline">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+
+        <!-- Open over the page (peeking, the phone's drawer): a solid sheet with its shadow; beside the page: nothing. -->
+        <Style Selector="Border#Surface">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="0,18,18,0" />
+        </Style>
+        <Style Selector="Border#Surface.overlay">
+            <Setter Property="Background" Value="{DynamicResource HelmSheetBackground}" />
+            <Setter Property="BoxShadow" Value="{DynamicResource HelmHeroShadow}" />
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="vm:NavItemViewModel">
+            <Button Classes="navrow" Classes.active="{Binding IsActive}" Classes.off="{Binding IsOff}"
+                    Command="{Binding $parent[vm:NavMenuView].((vm:NavMenuViewModel)DataContext).OpenCommand, FallbackValue={x:Null}}"
+                    CommandParameter="{Binding}" ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="{Binding Title}">
+                <Grid ColumnDefinitions="38,*">
+                    <core:ModuleIcon Symbol="{Binding Glyph}" Image="{Binding Icon}" Size="18" HorizontalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Classes="navlabel" Text="{Binding Title}" Margin="4,0,10,0" />
+                </Grid>
+            </Button>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <Panel>
+        <Border x:Name="Surface" Classes.overlay="{Binding IsOverlay}" Width="{Binding ShownWidth}" HorizontalAlignment="Left"
+                ClipToBounds="False">
+            <Border.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Width" Duration="0:0:0.2">
+                        <DoubleTransition.Easing>
+                            <CubicEaseOut />
+                        </DoubleTransition.Easing>
+                    </DoubleTransition>
+                </Transitions>
+            </Border.Transitions>
+            <Panel ClipToBounds="True">
+                <DockPanel x:Name="Rows" Margin="8,4,8,10">
+                    <!-- Phone: the drawer starts with Helm's name, where the title bar was. -->
+                    <StackPanel x:Name="DrawerHeader" DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Height="52" Margin="12,4,0,4"
+                                IsVisible="{Binding IsDrawer}">
+                        <Image x:Name="DrawerIcon" Width="22" Height="22" VerticalAlignment="Center" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                        <TextBlock Text="Helm" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Home: always first. -->
+                    <ContentControl DockPanel.Dock="Top" Content="{Binding Home}" Margin="0,0,0,2" />
+
+                    <!-- Bug reports and General: always at the bottom; then how the menu shows itself. -->
+                    <StackPanel DockPanel.Dock="Bottom" Spacing="2" Margin="0,8,0,0">
+                        <ContentControl Content="{Binding BugReports}" />
+                        <ContentControl Content="{Binding General}" />
+                        <Button x:Name="PinButton" Classes="navrow quiet" Command="{Binding TogglePinnedCommand}" Margin="0,6,0,0"
+                                IsVisible="{Binding !IsDrawer}" ToolTip.Tip="{Binding PinToolTip}" AutomationProperties.Name="{Binding PinLabel}">
+                            <Grid ColumnDefinitions="38,*">
+                                <ic:SymbolIcon Symbol="{Binding PinGlyph}" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Classes="navlabel" Text="{Binding PinLabel}" Margin="4,0,10,0" />
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- No scroll bar (a calm menu; the wheel and a finger scroll it): the faded edge says more is there. -->
+                    <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden" core:ScrollFade.Enabled="True">
+                        <ItemsControl ItemsSource="{Binding Groups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:NavGroupViewModel">
+                                    <StackPanel Spacing="2">
+                                        <Panel Height="30" AutomationProperties.Name="{Binding Title}">
+                                            <TextBlock Classes="group" Text="{Binding Title, Converter={x:Static core:UpperCase.Instance}}"
+                                                       Margin="12,0,10,6" VerticalAlignment="Bottom" TextTrimming="CharacterEllipsis" />
+                                            <Border Classes="groupline" Width="16" Height="1" HorizontalAlignment="Left" Margin="12,0,0,0"
+                                                    VerticalAlignment="Center" Background="{DynamicResource HelmGlassStroke}" />
+                                        </Panel>
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Spacing="2" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Panel>
+        </Border>
+
+        <!-- The right edge: drag to change the open width (wide window, open). -->
+        <Border x:Name="Grip" Width="8" HorizontalAlignment="Left" Background="Transparent" Cursor="SizeWestEast"
+                ToolTip.Tip="Drag to resize the menu" IsVisible="False" />
+    </Panel>
+</UserControl>

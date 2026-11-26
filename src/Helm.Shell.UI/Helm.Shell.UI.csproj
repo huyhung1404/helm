@@ -16,4 +16,9 @@
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Helm's icon in the shell's title bar (Shell/ShellTitleBar). -->
+    <AvaloniaResource Include="..\Helm.App\Assets\helm.png" Link="Assets\helm.png" />
+  </ItemGroup>
+
 </Project>
