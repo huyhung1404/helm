@@ -25,7 +25,6 @@ internal static class HomeDemo
         Tool("quick-capture", "Quick Capture", "Planning"),
         Tool("tracker", "Tracker", "Planning"),
         Tool("slackbot", "Slack Bot", "Planning", on: false),
-        Tool("weekly-report", "Weekly Report", "Planning", on: false),
         Tool("novel-reader", "Novel Reader", "Money & Media"),
         Tool("scratch", "Scratch", "Money & Media"),
         Tool("vocab", "Vocabulary", "Money & Media"),

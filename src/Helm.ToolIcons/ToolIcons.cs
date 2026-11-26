@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Media;
 using Helm.Modules.Keyboard;
 using Helm.Modules.SlackBot;
-using Helm.Modules.WeeklyReport;
 using Helm.Modules.WindowZones;
 
 namespace Helm.ToolIcons;
@@ -30,7 +29,6 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         "keyboard" => Keyboard.Value,
         "window-zones" => WindowZones.Value,
         "slackbot" => SlackBot.Value,
-        "weekly-report" => WeeklyReport.Value,
         _ => null,
     };
 
@@ -52,18 +50,6 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         var gradient = Gradient(size, WindowZonesIconShape.GradientStart, WindowZonesIconShape.GradientEnd);
         var group = Box(size);
         group.Children.Add(new GeometryDrawing { Pen = new Pen(gradient, WindowZonesIconShape.Stroke, lineJoin: PenLineJoin.Round), Geometry = Geometry.Parse(WindowZonesIconShape.Zones) });
-        return new DrawingImage(group);
-    });
-
-    private static readonly Lazy<IImage> WeeklyReport = new(() =>
-    {
-        const double size = WeeklyReportIconShape.Size;
-        var gradient = Gradient(size, WeeklyReportIconShape.GradientStart, WeeklyReportIconShape.GradientEnd);
-        var group = Box(size);
-        var (x, y, w, h, r) = WeeklyReportIconShape.Page;
-        group.Children.Add(new GeometryDrawing { Pen = new Pen(gradient, WeeklyReportIconShape.Stroke), Geometry = new RectangleGeometry(new Rect(x, y, w, h), r, r) });
-        foreach (var (bx, by, bw, bh) in WeeklyReportIconShape.Bars)
-            group.Children.Add(new GeometryDrawing { Brush = gradient, Geometry = new RectangleGeometry(new Rect(bx, by, bw, bh), 3, 3) });
         return new DrawingImage(group);
     });
 
