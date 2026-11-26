@@ -47,6 +47,7 @@
     <Compile Include="..\..\src\Helm.Gallery\ScratchDemo.cs" Link="ScratchDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\HabitsDemo.cs" Link="HabitsDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\MissionsDemo.cs" Link="MissionsDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\BugReportsDemo.cs" Link="BugReportsDemo.cs" />
   </ItemGroup>
 
 </Project>

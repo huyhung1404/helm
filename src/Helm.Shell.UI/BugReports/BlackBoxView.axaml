@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:b="using:Helm.BugReports.Ui"
+             x:Class="Helm.BugReports.Ui.BlackBoxView"
+             x:DataType="b:BlackBoxSheetModel">
+
+    <!-- The black box sheet: what happened in the 60 s before a report (or added details, a reopen), filtered by kind,
+         and Helm's state at that moment. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Shell.UI/BugReports/BugTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel Spacing="16">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="eyebrow" Text="{Binding Title, Converter={x:Static core:UpperCase.Instance}}" />
+                <TextBlock Text="What happened before" FontSize="22" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Summary}" Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" Click="Close_Click" ToolTip.Tip="Close" AutomationProperties.Name="Close">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+            </Button>
+        </Grid>
+
+        <!-- Which events -->
+        <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+            <Border Classes="glass" Padding="3" CornerRadius="10" BoxShadow="" HorizontalAlignment="Left">
+                <StackPanel x:Name="Filters" Orientation="Horizontal" Spacing="2">
+                    <RadioButton Classes="seg" GroupName="BlackBoxFilter" Content="All" Tag="All" IsChecked="True" IsCheckedChanged="Filter_Changed" />
+                    <RadioButton Classes="seg" GroupName="BlackBoxFilter" Content="Input" Tag="Input" IsCheckedChanged="Filter_Changed" />
+                    <RadioButton Classes="seg" GroupName="BlackBoxFilter" Content="Pages" Tag="Navigation" IsCheckedChanged="Filter_Changed" />
+                    <RadioButton Classes="seg" GroupName="BlackBoxFilter" Content="Errors" Tag="Errors" IsCheckedChanged="Filter_Changed" />
+                    <RadioButton Classes="seg" GroupName="BlackBoxFilter" Content="Log" Tag="Log" IsCheckedChanged="Filter_Changed" />
+                    <RadioButton Classes="seg" GroupName="BlackBoxFilter" Content="Freezes" Tag="Performance" IsCheckedChanged="Filter_Changed" />
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+
+        <Border Classes="glass" BoxShadow="" Padding="10,10,14,10">
+            <Panel>
+                <TextBlock Text="Nothing of this kind in these 60 seconds." Classes="muted" Margin="4" IsVisible="{Binding IsEmpty}" />
+                <ItemsControl ItemsSource="{Binding Events}" ItemTemplate="{StaticResource BlackBoxEvent}" AutomationProperties.Name="Events" />
+            </Panel>
+        </Border>
+
+        <!-- Helm, the device and sync then -->
+        <StackPanel Spacing="8" IsVisible="{Binding HasEnvironment}">
+            <TextBlock Text="Environment" Classes="head" />
+            <Border Classes="glass" BoxShadow="">
+                <ItemsControl ItemsSource="{Binding Environment}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="b:BugEnvLine">
+                            <Grid ColumnDefinitions="96,*" ColumnSpacing="10" Margin="0,3">
+                                <TextBlock Text="{Binding Key}" Classes="muted" />
+                                <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" FontSize="13" TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </StackPanel>
+
+        <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" Click="Close_Click" />
+    </StackPanel>
+</UserControl>

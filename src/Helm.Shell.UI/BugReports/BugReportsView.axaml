@@ -1,0 +1,152 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:b="using:Helm.BugReports.Ui"
+             xmlns:bugs="using:Helm.Shell.BugReports"
+             x:Class="Helm.BugReports.Ui.BugReportsView"
+             x:DataType="bugs:BugReportsViewModel">
+
+    <!-- Bug reports, the same view on every platform: the bugs of every device (search, filters) and the one opened.
+         Wide: the list on the left, the bug on the right. Narrow (a phone): the list is the page; a bug opens in its
+         place and Back (or "All bugs") returns. -->
+    <UserControl.Styles>
+        <Style Selector="Border.glass.chosen">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        </Style>
+        <Style Selector="Button.filter">
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="12,5" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+        <Grid x:Name="Page" ColumnDefinitions="380,*" RowDefinitions="Auto,*" ColumnSpacing="28" Margin="40,28,40,0">
+
+            <!-- Where things stand, and the one main action -->
+            <StackPanel x:Name="Header" Grid.ColumnSpan="2" Margin="0,0,0,20">
+                <StackPanel x:Name="MenuRow" IsVisible="False" Margin="0,0,0,12">
+                    <Button Classes="chip" HorizontalAlignment="Left" Click="Menu_Click" ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                        <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                    </Button>
+                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="eyebrow" Text="{Binding Summary, Converter={x:Static core:UpperCase.Instance}}" TextWrapping="Wrap" />
+                        <TextBlock Classes="display" Text="Bug reports" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                        <Button x:Name="ReportButton" Classes="pill" Click="Report_Click" AutomationProperties.Name="Report a bug">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <ic:SymbolIcon Symbol="Bug" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                                <TextBlock Classes="label" Text="Report a bug" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="SettingsButton" Classes="chip" Click="Settings_Click" IsVisible="False"
+                                ToolTip.Tip="Bug reports settings" AutomationProperties.Name="Bug reports settings">
+                            <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+
+            <!-- The bugs -->
+            <Grid x:Name="ListPane" Grid.Row="1" RowDefinitions="Auto,*">
+                <StackPanel Spacing="10" Margin="0,0,14,12" IsVisible="{Binding HasAnyBug}">
+                    <TextBox Classes="glass" PlaceholderText="Search bugs — a word or #B12" Text="{Binding Query}" AutomationProperties.Name="Search bugs">
+                        <TextBox.InnerLeftContent>
+                            <ic:SymbolIcon Symbol="Search" FontSize="15" Margin="12,0,0,0" Foreground="{DynamicResource HelmSecondaryText}" />
+                        </TextBox.InnerLeftContent>
+                    </TextBox>
+                    <ScrollViewer x:Name="FilterScroller" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding FilterCounts}" Margin="0,0,0,-6" AutomationProperties.Name="Filter">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="bugs:FilterCount">
+                                    <Button Classes="chip filter" Classes.selected="{Binding IsSelected}" Content="{Binding Text}" CommandParameter="{Binding Filter}"
+                                            Command="{Binding $parent[ItemsControl].((bugs:BugReportsViewModel)DataContext).SetFilterCommand}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+                <ScrollViewer x:Name="ListScroller" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" Padding="0,0,14,14" core:ScrollFade.Enabled="True">
+                    <StackPanel>
+                        <!-- Nothing to show: say what to do next -->
+                        <Border Classes="glass" IsVisible="{Binding IsEmpty}" core:Motion.EnterOnShow="True">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                <ic:SymbolIcon Symbol="Bug" FontSize="22" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock x:Name="EmptyTitle" Classes="head" Text="No bugs here" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="EmptyText" Classes="muted" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <ItemsControl x:Name="BugList" ItemsSource="{Binding Bugs}" AutomationProperties.Name="Bugs">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="bugs:BugRowViewModel">
+                                    <Border Classes="glass lift fade" Padding="0" Margin="0,0,0,10">
+                                        <Button Classes="rowhit" Padding="16,12" Command="{Binding $parent[ItemsControl].((bugs:BugReportsViewModel)DataContext).SelectCommand}"
+                                                CommandParameter="{Binding}" AutomationProperties.Name="{Binding Title}">
+                                            <StackPanel Spacing="6">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                    <WrapPanel>
+                                                        <Border Classes="tag" b:BugLook.Tone="{Binding Status}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                <ic:SymbolIcon Symbol="{Binding Status, Converter={x:Static b:BugLook.Icon}}" FontSize="11" />
+                                                                <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <Border Classes="tag" b:BugLook.Tone="{Binding Severity}">
+                                                            <TextBlock Text="{Binding SeverityText}" />
+                                                        </Border>
+                                                        <Border Classes="tag" IsVisible="{Binding IsAsking}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                <ic:SymbolIcon Symbol="Bot" FontSize="11" Foreground="{DynamicResource HelmEyebrow}" />
+                                                                <TextBlock Text="Asks you" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource HelmEyebrow}" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </WrapPanel>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Code}" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
+                                                               Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Classes="muted" Text="{Binding MetaLine}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- The bug opened -->
+            <Grid x:Name="DetailPane" Grid.Row="1" Grid.Column="1" RowDefinitions="Auto,*">
+                <Button x:Name="BackButton" Classes="ghost" HorizontalAlignment="Left" Margin="0,0,0,14" Click="Back_Click" IsVisible="False"
+                        AutomationProperties.Name="All bugs">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="All bugs" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Border x:Name="PickHint" Grid.Row="1" Classes="glass" VerticalAlignment="Top" Margin="0,0,14,0" IsVisible="False">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <ic:SymbolIcon Symbol="ArrowLeft" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Classes="muted" FontSize="13.5" VerticalAlignment="Center"
+                                   Text="Pick a bug on the left to see its conversation, its pictures and its black box." />
+                    </Grid>
+                </Border>
+                <ScrollViewer x:Name="DetailScroller" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" Padding="0,0,14,28" core:ScrollFade.Enabled="True"
+                              IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <b:BugDetailView x:Name="DetailView" DataContext="{Binding Selected}" />
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Panel>
+</UserControl>

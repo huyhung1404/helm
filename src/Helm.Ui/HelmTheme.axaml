@@ -20,6 +20,8 @@
                     <SolidColorBrush x:Key="HelmWarningBackground" Color="#FFF4CE" />
                     <SolidColorBrush x:Key="HelmInfoBackground" Color="#F2F2F2" />
                     <SolidColorBrush x:Key="HelmDanger" Color="#C42B1C" />
+                    <!-- Something waiting or slow (a fix to check, a freeze), in text and icons -->
+                    <SolidColorBrush x:Key="HelmCaution" Color="#9D5D00" />
                     <SolidColorBrush x:Key="HelmScrim" Color="#66000000" />
                     <!-- Glass pages (Backdrop + Border.glass; the backdrop itself is Helm.Core BackdropSpec), Helm icon colours -->
                     <SolidColorBrush x:Key="HelmSheetBackground" Color="#FCFDFE" />
@@ -57,6 +59,7 @@
                     <SolidColorBrush x:Key="HelmWarningBackground" Color="#433519" />
                     <SolidColorBrush x:Key="HelmInfoBackground" Color="#2E2E2E" />
                     <SolidColorBrush x:Key="HelmDanger" Color="#FF99A4" />
+                    <SolidColorBrush x:Key="HelmCaution" Color="#F5C451" />
                     <SolidColorBrush x:Key="HelmScrim" Color="#99000000" />
                     <SolidColorBrush x:Key="HelmSheetBackground" Color="#1B1E24" />
                     <SolidColorBrush x:Key="HelmGlass" Color="#14FFFFFF" />

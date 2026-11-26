@@ -1,0 +1,293 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:b="using:Helm.BugReports.Ui"
+             xmlns:bugs="using:Helm.Shell.BugReports"
+             x:Class="Helm.BugReports.Ui.BugDetailView"
+             x:DataType="bugs:BugDetailViewModel">
+
+    <!-- One bug, opened beside the list (PC) or in its place (phone): where it stands and what to do about it first, then
+         the conversation with its pictures and black boxes, adding details, and the newest black box. Closing,
+         reopening, a black box and a picture open as sheets. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Shell.UI/BugReports/BugTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="Button.wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.avatar">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.asks">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="16">
+        <!-- What it is -->
+        <StackPanel Spacing="8">
+            <TextBlock Classes="eyebrow" Text="{Binding Meta, Converter={x:Static core:UpperCase.Instance}}" TextWrapping="Wrap" />
+            <SelectableTextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <WrapPanel>
+                <Border Classes="tag">
+                    <TextBlock Text="{Binding Code}" FontFamily="Cascadia Mono, Consolas, monospace" Foreground="{DynamicResource HelmSecondaryText}" />
+                </Border>
+                <Border Classes="tag" b:BugLook.Tone="{Binding Bug.Status}">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <ic:SymbolIcon Symbol="{Binding Bug.Status, Converter={x:Static b:BugLook.Icon}}" FontSize="11" />
+                        <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="tag" b:BugLook.Tone="{Binding Bug.Severity}">
+                    <TextBlock Text="{Binding SeverityText}" />
+                </Border>
+                <Border Classes="tag" IsVisible="{Binding Bug.FromCrash}">
+                    <TextBlock Text="From a crash" Foreground="{DynamicResource HelmDanger}" />
+                </Border>
+            </WrapPanel>
+        </StackPanel>
+
+        <!-- Where it stands: an agent on it, a fix to check, closed -->
+        <Border Classes="glass" IsVisible="{Binding IsFixing}" core:Motion.EnterOnShow="True">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <ic:SymbolIcon Symbol="Bot" FontSize="20" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="{Binding FixingText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Classes="muted" Text="It comes back to you to check once the agent has a fix." />
+                    </StackPanel>
+                </Grid>
+                <Button Classes="ghost wide" Command="{Binding TakeBackCommand}" ToolTip.Tip="Stop waiting for the agent: the bug is open again">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowUndo" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="Take it back" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+        <Border Classes="glass asks" IsVisible="{Binding IsToVerify}" core:Motion.EnterOnShow="True">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <ic:SymbolIcon Symbol="Clock" FontSize="20" Foreground="{DynamicResource HelmCaution}" VerticalAlignment="Top" />
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Text="Is it fixed?" Classes="head" />
+                        <TextBlock Text="{Binding VerifyText}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button x:Name="StillBrokenButton" Classes="ghost wide" Content="Still broken" Click="StillBroken_Click" />
+                    <Button Grid.Column="1" Classes="pill wide" Command="{Binding ConfirmFixedCommand}" AutomationProperties.Name="It is fixed">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Checkmark" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                            <TextBlock Text="It is fixed" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+        <Border Classes="glass" IsVisible="{Binding IsClosed}" core:Motion.EnterOnShow="True">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="20" Foreground="{DynamicResource HelmSuccess}" VerticalAlignment="Top" />
+                    <TextBlock Grid.Column="1" Text="{Binding ClosedText}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                </Grid>
+                <Button Classes="ghost wide" Click="Reopen_Click" AutomationProperties.Name="Reopen">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowReset" FontSize="16" VerticalAlignment="Center" />
+                        <TextBlock Text="Reopen" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- The agent's question, waiting for an answer -->
+        <Border x:Name="QuestionCard" Classes="glass asks" IsVisible="{Binding IsAsking}" core:Motion.EnterOnShow="True">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                    <ic:SymbolIcon Symbol="Bot" FontSize="20" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Text="Claude Code asks" Classes="eyebrow" />
+                        <SelectableTextBlock Text="{Binding Question}" FontSize="15" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+                <TextBox x:Name="AnswerBox" Classes="glass" MinHeight="72" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top" Padding="12,10"
+                         PlaceholderText="Your answer" Text="{Binding AnswerText}" AutomationProperties.Name="Your answer" />
+                <ItemsControl ItemsSource="{Binding AnswerImages}" ItemTemplate="{StaticResource PendingThumb}" IsVisible="{Binding HasAnswerImages}" Tag="answer">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <CheckBox Content="Attach the black box (last 60 s)" IsChecked="{Binding AnswerWithBlackBox}" />
+                <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+                    <Button Classes="ghost wide" Click="AnswerPicture_Click" AutomationProperties.Name="Add a picture to the answer">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ImageAdd" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text="Picture" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Classes="pill wide" Command="{Binding AnswerCommand}" AutomationProperties.Name="Answer">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Send" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                            <TextBlock Text="Answer" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- What can be done with it -->
+        <StackPanel Spacing="6">
+            <WrapPanel>
+                <Button Classes="act" Click="Close_Click" IsVisible="{Binding !IsClosed}" ToolTip.Tip="Close this bug" AutomationProperties.Name="Close this bug">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Checkmark" FontSize="15" VerticalAlignment="Center" />
+                        <TextBlock Classes="label" Text="Close" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="act" Command="{Binding CopyForClaudeCommand}" ToolTip.Tip="The bug and its black box as Markdown, to paste into any AI chat"
+                        AutomationProperties.Name="Copy for Claude Code">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Copy" FontSize="15" VerticalAlignment="Center" />
+                        <TextBlock Classes="label" Text="Copy for Claude Code" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="act" Click="BlackBox_Click" IsVisible="{Binding HasBlackBox}" ToolTip.Tip="Every event of the newest black box"
+                        AutomationProperties.Name="Black box">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="History" FontSize="15" VerticalAlignment="Center" />
+                        <TextBlock Classes="label" Text="Black box" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+            <TextBlock Text="{Binding Status}" Classes="muted" core:Motion.EnterOnShow="True"
+                       IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <!-- The conversation -->
+        <StackPanel Spacing="10">
+            <TextBlock Text="Conversation" Classes="head" />
+            <ItemsControl ItemsSource="{Binding Entries}" AutomationProperties.Name="Conversation">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="bugs:BugEntryViewModel">
+                        <Panel>
+                            <!-- A status change: a line between the messages -->
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="10,2,4,12" IsVisible="{Binding IsStatus}">
+                                <ic:SymbolIcon Symbol="Clock" FontSize="13" Margin="0,2,0,0" VerticalAlignment="Top" Foreground="{DynamicResource HelmSecondaryText}" />
+                                <TextBlock Grid.Column="1" Classes="muted" FontSize="13" TextWrapping="Wrap">
+                                    <Run Text="{Binding Text}" /><Run Text=" · " /><Run Text="{Binding When}" />
+                                </TextBlock>
+                            </Grid>
+                            <!-- A message: the report, details, a note, a question or an answer -->
+                            <Border Classes="glass" Margin="0,0,0,10" IsVisible="{Binding IsMessage}" Classes.asks="{Binding IsQuestion}">
+                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                    <Border Classes="avatar">
+                                        <Panel>
+                                            <TextBlock Text="{Binding Initial}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       IsVisible="{Binding !ByAgent}" />
+                                            <ic:SymbolIcon Symbol="Bot" FontSize="16" Foreground="{DynamicResource HelmEyebrow}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           IsVisible="{Binding ByAgent}" />
+                                        </Panel>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <WrapPanel>
+                                            <TextBlock Text="{Binding Author}" FontWeight="SemiBold" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding When}" Classes="muted" Margin="0,0,8,0" VerticalAlignment="Center" TextWrapping="NoWrap" />
+                                            <Border Classes="tag" IsVisible="{Binding Badge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                <TextBlock Text="{Binding Badge}" Foreground="{DynamicResource HelmEyebrow}" />
+                                            </Border>
+                                        </WrapPanel>
+                                        <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                        <Button Classes="act entrybox" HorizontalAlignment="Left" Margin="0,2,0,0" IsVisible="{Binding HasBlackBox}"
+                                                ToolTip.Tip="Show this black box" AutomationProperties.Name="{Binding BlackBoxText}">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+                                                <ic:SymbolIcon Symbol="History" FontSize="14" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" Text="{Binding BlackBoxText}" FontSize="12.5" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Button>
+                                        <ItemsControl ItemsSource="{Binding Images}" ItemTemplate="{StaticResource BugThumb}" Margin="0,2,0,-8" IsVisible="{Binding HasImages}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Panel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Adding details -->
+            <Border Classes="glass" IsVisible="{Binding CanAddDetails}">
+                <StackPanel Spacing="10">
+                    <TextBox x:Name="DetailsBox" Classes="bare" MinHeight="56" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"
+                             PlaceholderText="Add details to this bug" Text="{Binding DetailsText}" AutomationProperties.Name="Add details" />
+                    <ItemsControl ItemsSource="{Binding DetailImages}" ItemTemplate="{StaticResource PendingThumb}" IsVisible="{Binding HasDetailImages}" Tag="details">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                    <CheckBox Content="Attach the black box (last 60 s)" IsChecked="{Binding AttachBlackBox}" />
+                    <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+                        <Button Classes="ghost wide" Click="DetailsPicture_Click" AutomationProperties.Name="Add a picture to the details">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="ImageAdd" FontSize="16" VerticalAlignment="Center" />
+                                <TextBlock Text="Picture" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Classes="pill wide" Command="{Binding AddDetailsCommand}" AutomationProperties.Name="Add details">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Add" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                                <TextBlock Text="Add" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- The newest black box: the steps that led here; every event in its sheet -->
+        <StackPanel Spacing="10">
+            <TextBlock Text="Black box" Classes="head" />
+            <TextBlock Text="Reading the black box…" Classes="muted" IsVisible="{Binding IsLoadingBlackBox}" />
+            <TextBlock Text="No black box with this bug." Classes="muted" IsVisible="{Binding !HasBlackBox}" />
+            <Border Classes="glass" IsVisible="{Binding HasBlackBox}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="{Binding BlackBoxText}" Classes="muted" />
+                    <StackPanel Spacing="4" IsVisible="{Binding Steps.Count, Converter={x:Static b:BugLook.Any}}">
+                        <TextBlock Classes="eyebrow" Text="STEPS, FROM WHAT YOU DID" />
+                        <ItemsControl ItemsSource="{Binding Steps}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,2">
+                                        <Border Width="5" Height="5" CornerRadius="3" Margin="0,7,0,0" VerticalAlignment="Top" Background="{DynamicResource HelmEyebrow}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding}" FontSize="13" TextWrapping="Wrap" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <Button Classes="ghost wide" Click="BlackBox_Click" AutomationProperties.Name="Every event">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="History" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text="Every event and the environment" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

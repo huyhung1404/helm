@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             x:Class="Helm.BugReports.Ui.BugReportsSettingsView">
+
+    <!-- The gear of Bug reports (a phone): how to report from anywhere. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="BUG REPORTS" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Click="Close_Click" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+            </Button>
+        </Grid>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Classes="head" Text="Reporting" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <StackPanel>
+                        <TextBlock Text="Shake to report" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                   Text="Shake the phone while Helm is open. The Quick Settings tile works from anywhere." />
+                    </StackPanel>
+                    <ToggleSwitch x:Name="ShakeSwitch" Grid.Column="1" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Shake to report" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" Click="Close_Click" />
+    </StackPanel>
+</UserControl>

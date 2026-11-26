@@ -345,6 +345,9 @@ public sealed class BugRowViewModel(string id, BugReport bug, int replies, DateT
 
     /// <summary>"Tracker · Home PC · 3 min".</summary>
     public string Meta => $"{Tool} · {Device} · {Ago}";
+
+    /// <summary>"Tracker · Home PC · 3 min · 2 replies".</summary>
+    public string MetaLine => HasReplies ? $"{Meta} · {RepliesText}" : Meta;
 }
 
 /// <summary>One entry of a bug's conversation as shown.</summary>
@@ -381,6 +384,9 @@ public sealed class BugEntryViewModel(string id, BugEntry entry, BugStore store,
     public IReadOnlyList<BugImageItem> Images { get; } = [.. entry.Images.Select(i => new BugImageItem(i, store))];
 
     public bool HasImages => Images.Count > 0;
+
+    /// <summary>This entry's own black box (from the sync server if this device does not have it yet); null without one.</summary>
+    public Task<BlackBoxSnapshot?> LoadBlackBoxAsync(CancellationToken ct = default) => store.ReadBlackBoxAsync(Entry, ct);
 }
 
 /// <summary>One bug opened on the page: its conversation, black box, environment and what can be done with it.</summary>
@@ -716,6 +722,14 @@ public sealed partial class BugReportsViewModel : ObservableObject
     [ObservableProperty]
     private bool _isEmpty;
 
+    /// <summary>"4 not closed · 1 question for you · 1 fix to check" (the page's top line).</summary>
+    [ObservableProperty]
+    private string _summary = "";
+
+    /// <summary>Any bug at all, under any filter (an empty list then means "pick another filter", not "report one").</summary>
+    [ObservableProperty]
+    private bool _hasAnyBug;
+
     [ObservableProperty]
     private BugRowViewModel? _selectedRow;
 
@@ -771,6 +785,15 @@ public sealed partial class BugReportsViewModel : ObservableObject
             Bugs.Add(new BugRowViewModel(b.Id, b.Value, _store.Entries(b.Id).Count(e => e.Value.Kind != BugEntryKind.Report && e.Value.Kind != BugEntryKind.Status), now));
         FilterCounts = [.. Filters.Select(f => new FilterCount(f, all.Count(b => BugText.Matches(f, b.Value.Status)), f == Filter))];
         OpenCount = all.Count(b => b.Value.Status != BugStatus.Closed);
+        var asking = all.Count(b => b.Value.PendingQuestion is not null && b.Value.Status != BugStatus.Closed);
+        var toCheck = all.Count(b => b.Value.Status == BugStatus.ToVerify);
+        Summary = string.Join(" · ", new[]
+        {
+            OpenCount == 0 ? "nothing open" : $"{OpenCount} not closed",
+            asking switch { 0 => null, 1 => "1 question for you", _ => $"{asking} questions for you" },
+            toCheck switch { 0 => null, 1 => "1 fix to check", _ => $"{toCheck} fixes to check" },
+        }.OfType<string>());
+        HasAnyBug = all.Count > 0;
         IsEmpty = Bugs.Count == 0;
         if (selectedId is not null)
         {

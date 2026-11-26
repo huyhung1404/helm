@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             x:Class="Helm.BugReports.Ui.BugReopenView">
+
+    <!-- "Still broken" / "Reopen" as a sheet: what still happens (needed), with the black box of the last 60 s. -->
+    <UserControl.Styles>
+        <Style Selector="Button.wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <StackPanel Spacing="4">
+            <TextBlock x:Name="Heading" Text="Reopen this bug?" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Classes="secondary" TextWrapping="Wrap"
+                       Text="It goes back to Open with what you write, so the next agent sees why the fix did not work." />
+        </StackPanel>
+
+        <TextBox x:Name="Why" Classes="glass" MinHeight="96" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top" Padding="12,10"
+                 PlaceholderText="What still happens" AutomationProperties.Name="What still happens" TextChanged="Why_TextChanged" />
+
+        <CheckBox x:Name="WithBox" IsChecked="True">
+            <StackPanel>
+                <TextBlock Text="Attach the black box" />
+                <TextBlock Text="What Helm did in the last 60 seconds. Nothing you type is recorded." Classes="muted" />
+            </StackPanel>
+        </CheckBox>
+
+        <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+            <Button Classes="ghost wide" Content="Cancel" Click="Cancel_Click" />
+            <Button x:Name="ReopenButton" Grid.Column="1" Classes="pill wide" IsEnabled="False" Click="Confirm_Click" AutomationProperties.Name="Reopen">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="ArrowReset" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                    <TextBlock Text="Reopen" Foreground="{DynamicResource HelmPillForeground}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+    </StackPanel>
+</UserControl>
