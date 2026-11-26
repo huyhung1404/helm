@@ -3,6 +3,15 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.92.1] - 2026-11-26
+
+### Fixed
+- **Home no longer blinks and slows Helm down.** It rebuilt every card each time sync ran (every few seconds while Workspace is
+  busy), so Habits and the other cards flickered and Helm kept a CPU core busy. Home now redraws a card only when what it shows
+  changed.
+- **Helm Keyboard starts again.** Since 0.86.2 it failed at start ("must run on the 'Helm.Keyboard' thread"), so the EN / VI / 中
+  shortcut and the keyboard remembered per app and per web site did nothing.
+
 ## [0.92.0] - 2026-11-25
 
 ### Changed
