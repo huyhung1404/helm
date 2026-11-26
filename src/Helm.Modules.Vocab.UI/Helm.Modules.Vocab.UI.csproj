@@ -4,7 +4,8 @@
        Learn (the guessing card and its answer bar), Words (add, what waits for the agent, the list, a word's page with
        its tree), Roots (families, root practice), and the sheets (settings, analysis, add text, edit, a new analysis,
        the card's menu). What differs per platform (the pop-up's own settings, the phone's menu, where else words are
-       added) comes through IVocabPageHost. The pop-up card and the Android overlay are not here: they are OS windows. -->
+       added) comes through IVocabPageHost. The PC's corner card is here too (VocabPopupCard; its window is in
+       Helm.Modules.Vocab); the Android overlay is not: it is drawn with Android views. -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <SupportedOSPlatformVersion></SupportedOSPlatformVersion>

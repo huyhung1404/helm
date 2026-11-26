@@ -78,8 +78,8 @@ src/
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
   Helm.Modules.Vocab.Core/   net8.0: words and their parts (on Helm Sync), the quiz, the card, MCP tools, shared view models
-  Helm.Modules.Vocab.UI/     Avalonia: the Vocabulary page (Learn, Words, Roots), its sheets and settings (every platform)
-  Helm.Modules.Vocab/        Windows: the module, the WPF page that hosts the shared view, the corner pop-up card, the Claude Code agent
+  Helm.Modules.Vocab.UI/     Avalonia: the Vocabulary page (Learn, Words, Roots), its sheets and settings (every platform), the PC's corner card
+  Helm.Modules.Vocab/        Windows: the module, the WPF page that hosts the shared view, the corner card's window, the Claude Code agent
   Helm.Modules.Vocab.Android/ Android: the module, the page that hosts the shared view, the pop-up card and bubble over other apps (not in Helm.sln)
   Helm.Modules.NovelReader.Core/ net8.0: novels (on Helm Sync), conversion, dictionaries, reading aloud, names, reports, MCP tools, shared view model
   Helm.Modules.NovelReader.UI/ Avalonia: the Novel Reader page (library, reader, sheets, settings), every platform

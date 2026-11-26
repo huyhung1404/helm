@@ -28,7 +28,9 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **Vocabulary has the new look on the PC and the phone**, one page for both: Learn with its answer bar, Words with a
   word's page and tree, Roots, and the sheets for adding words or a text, an analysis, editing and the settings. The
   settings are a sheet behind the gear (with the on/off switch), and Home → Utilities opens Vocabulary itself. The corner
-  card on the PC and the card and bubble over other apps on the phone work as before.
+  card on the PC has the new look too (a glass card like the phone's) and works as before: it never takes the keyboard
+  except while you type a pinyin, fades at rest, and "Open in Helm" shows the word's whole tree. The card and bubble over
+  other apps on the phone work as before.
 - **Wallet has the new look on the PC and the phone**, one page for both: the month with quick add and the transactions,
   the Debts, Goals and Insights tabs, and every form (a transaction, a debt, a fund, a savings goal) as one sheet. The
   settings are a sheet behind the gear; Home → Utilities opens Wallet itself. The home-screen widgets, the bank

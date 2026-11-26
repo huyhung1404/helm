@@ -49,6 +49,16 @@ internal enum VocabStage
     Waiting,
     /// <summary>No word at all.</summary>
     FirstRun,
+    /// <summary>The PC's corner card: a word to guess.</summary>
+    CardWord,
+    /// <summary>The corner card with its answer.</summary>
+    CardAnswer,
+    /// <summary>The corner card on a Chinese word, asking for its pinyin.</summary>
+    CardAsksPinyin,
+    /// <summary>The corner card on a Chinese word, its pinyin typed with the tones wrong.</summary>
+    CardPinyin,
+    /// <summary>The corner card with Full details open.</summary>
+    CardFull,
 }
 
 /// <summary>
@@ -83,6 +93,8 @@ internal static class VocabDemo
         var quiz = new VocabQuiz(store, new Random(3));
         var agent = new VocabAgentViewModel(new DemoAgent(), store, quiz, settings, ui);
         var voice = new VocabVoice(() => null, null);
+        if (stage is VocabStage.CardWord or VocabStage.CardAnswer or VocabStage.CardAsksPinyin or VocabStage.CardPinyin or VocabStage.CardFull)
+            return PopupCard(store, quiz, voice, words, stage);
         var vm = new VocabViewModel(store, quiz, settings, agent, ui, new YesDialogs(), new NoClipboard(), voice, new VocabTextsViewModel(store, ui));
         var view = new VocabView(module, vm, new Host());
 
@@ -164,6 +176,52 @@ internal static class VocabDemo
                 break;
         }
         return view;
+    }
+
+    /// <summary>The PC's corner card (the real view the pop-up window shows), in the bottom-right corner of a screen.</summary>
+    private static Control PopupCard(VocabStore store, VocabQuiz quiz, VocabVoice voice, Dictionary<string, string> words, VocabStage stage)
+    {
+        var card = new VocabCardViewModel(store, quiz, voice: voice, options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, TypePinyin: true))
+        {
+            ShowYouGlish = true,
+        };
+        var word = stage is VocabStage.CardAsksPinyin or VocabStage.CardPinyin ? "补救" : "relative";
+        card.Show(words[word], store.GetWord(words[word]));
+        if (stage == VocabStage.CardPinyin)
+        {
+            card.Typed = "bu3jiu2";
+            card.CheckCommand.Execute(null);
+        }
+        else if (stage is VocabStage.CardAnswer or VocabStage.CardFull)
+        {
+            card.RevealCommand.Execute(null);
+        }
+        var view = new VocabPopupCard(card, new PopupHost(), stage is VocabStage.CardWord or VocabStage.CardAsksPinyin ? 0.85 : 1)
+        {
+            Width = 320,
+            Margin = new Avalonia.Thickness(24),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom,
+        };
+        if (stage == VocabStage.CardFull) view.ToggleFull();
+        return new Panel { Children = { new Helm.Core.Ui.Backdrop(), view } };
+    }
+
+    private sealed class PopupHost : IVocabPopupHost
+    {
+        public void Close() { }
+
+        public void OpenWord(string id) { }
+
+        public void TakeKeyboard() { }
+
+        public void ReturnKeyboard() { }
+
+        public void Drag(Avalonia.Input.PointerPressedEventArgs e) { }
+
+        public void BackToCorner() { }
+
+        public double FullHeight => 460;
     }
 
     private static void Pick(VocabViewModel vm, string form) =>
