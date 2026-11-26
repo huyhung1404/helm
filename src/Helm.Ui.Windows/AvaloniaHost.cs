@@ -81,8 +81,8 @@ public sealed class AvaloniaHost : ContentControl
             {
                 InputManager.Current.PostProcessInput -= ForwardSwallowedKey;
                 InputManager.Current.PostProcessInput += ForwardSwallowedKey;
-                // Shown (again): the page comes in like everything else in Helm (the WPF tab's own slide does not reach it).
-                if (Inner.Content is Avalonia.Controls.Control shown) Helm.Core.Ui.Motion.Enter(shown);
+                // Shown (again): the page comes into focus over its backdrop (the WPF tab's own slide does not reach it).
+                if (Inner.Content is Avalonia.Controls.Control shown) Helm.Core.Ui.Motion.EnterPage(shown);
                 // The child window does not follow WPF render transforms such as the tab's slide-in and stays where the
                 // animation started: re-place it once the animation is over (a layout pass re-syncs it).
                 var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };

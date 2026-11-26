@@ -10,8 +10,9 @@ namespace Helm.Core.Ui;
 /// <summary>
 /// How things come on screen in Helm: they grow into place (a popup scale, from a little smaller to full size) as
 /// they appear, quickly and eased. <see cref="Enter"/> plays it once; <c>core:Motion.EnterOnShow="True"</c> plays it
-/// every time a control is shown again (a tab, a folded section, a task opened, a page shown in the WPF shell). A
-/// section that opens downwards grows from its top edge (<see cref="FromTopProperty"/>); a dialog from its centre.
+/// every time a control is shown again (a tab, a folded section, a task opened). A section that opens downwards grows
+/// from its top edge (<see cref="FromTopProperty"/>); a dialog from its centre. A whole page opened in the shell does not
+/// grow: it comes into focus over its still backdrop (<see cref="EnterPage"/>).
 /// </summary>
 public static class Motion
 {
@@ -81,4 +82,62 @@ public static class Motion
         var animation = new Animation { Duration = Duration, Easing = new CubicEaseOut(), FillMode = FillMode.Backward, Children = { start, end } };
         _ = animation.RunAsync(control);
     }
+
+    /// <summary>How far out of focus a page starts (<see cref="EnterPage"/>).</summary>
+    public const double PageBlur = 16;
+
+    /// <summary>
+    /// A whole page coming on screen (a tool opened in the shell): its <see cref="Backdrop"/> stays put and everything on
+    /// it comes into focus, from blurred and clear to sharp. Nothing scales: a page that shrinks or fades as a whole shows
+    /// the empty (black) window behind it at its edges. Returns what was animated.
+    /// </summary>
+    public static IReadOnlyList<Control> EnterPage(Control page)
+    {
+        var targets = PageLayers(page);
+        foreach (var target in targets)
+        {
+            var start = new KeyFrame
+            {
+                Cue = new Cue(0),
+                Setters = { new Setter(Visual.OpacityProperty, 0d), new Setter(Visual.EffectProperty, new BlurEffect { Radius = PageBlur }) },
+            };
+            var end = new KeyFrame
+            {
+                Cue = new Cue(1),
+                Setters = { new Setter(Visual.OpacityProperty, 1d), new Setter(Visual.EffectProperty, new BlurEffect { Radius = 0 }) },
+            };
+            // Backward: the start shows before the first frame; afterwards the page has no effect left (a blur of 0 still costs).
+            var animation = new Animation { Duration = Duration, Easing = new CubicEaseOut(), FillMode = FillMode.Backward, Children = { start, end } };
+            _ = animation.RunAsync(target);
+        }
+        return targets;
+    }
+
+    /// <summary>The layers drawn over the page's backdrop (its siblings), or the page itself when it has none.</summary>
+    internal static IReadOnlyList<Control> PageLayers(Control page)
+    {
+        if (FindBackdrop(page) is { Parent: Panel panel } backdrop)
+            return [.. panel.Children.Where(c => !ReferenceEquals(c, backdrop))];
+        return [page];
+    }
+
+    private static Backdrop? FindBackdrop(Control control)
+    {
+        // A page puts its backdrop near the top (UserControl → Panel → Backdrop); look a few levels down only.
+        var level = new List<Control> { control };
+        for (var depth = 0; depth < 4 && level.Count > 0; depth++)
+        {
+            if (level.OfType<Backdrop>().FirstOrDefault() is { } found) return found;
+            level = [.. level.SelectMany(Children)];
+        }
+        return null;
+    }
+
+    private static IEnumerable<Control> Children(Control control) => control switch
+    {
+        Panel panel => panel.Children,
+        ContentControl { Content: Control child } => [child],
+        Decorator { Child: { } child } => [child],
+        _ => [],
+    };
 }

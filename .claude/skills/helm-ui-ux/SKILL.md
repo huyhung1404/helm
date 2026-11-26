@@ -96,9 +96,12 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 
 ## 6. Motion: never static, never in the way
 - Things grow into place (popup scale ~0.94 → 1 with opacity, 260 ms, cubic ease-out), not a plain fade:
-  `core:Motion.EnterOnShow="True"` on anything shown again (tabs, folded sections, an opened task, edit forms, option
+  `core:Motion.EnterOnShow="True"` on anything shown again inside a page (tabs, folded sections, an opened task, edit forms, option
   rows, messages); add `core:Motion.FromTop="True"` for a section opening under its header. `Motion.Enter(control)`
   in code (a list just picked, a sheet: phone sheets grow from the bottom edge). `Classes="enter"` for first load.
+- **A whole page never grows or fades as a whole** (a page in the shell sits in a child window with nothing behind it:
+  black shows at its edges). A page opened in the shell comes into focus: `Motion.EnterPage(page)` keeps its
+  `core:Backdrop` still and takes what is on it from blurred (16) and clear to sharp, 260 ms (`AvaloniaHost` does it).
 - ComboBox lists grow open from the top (`ComboBox.glass:dropdownopen` style) and open under the field with the left
   edges lined up (`Placement=BottomEdgeAlignedLeft` on its Popup; the default centres a list wider than the field).
 - Disclosure arrows point **right when closed, turn a quarter to point down when open, and turn back**: a
