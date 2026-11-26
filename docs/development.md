@@ -50,7 +50,7 @@ src/
   Helm.Shell.UI/             Avalonia: Home, General, Bug reports (the page and the report form), Welcome and Diagnostics, every platform
   Helm.Shell.Windows/        Windows: the WPF pages that host Home, General and Bug reports, the report window, this PC's pictures and MCP part
   Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
-                             GDI overlay window, DPAPI, shared WPF controls (Ui/, also the confetti); namespaces stay Helm.Core.*
+                             GDI overlay window, DPAPI, the few WPF controls the shell still uses (Ui/); namespaces stay Helm.Core.*
   Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, the WPF pages that host Welcome and Diagnostics
   Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
