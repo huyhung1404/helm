@@ -1,0 +1,93 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Ssh"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Ssh.Ui.SshMenuSheet"
+             x:DataType="vm:SshMenuViewModel">
+
+    <!-- The server's menu (docs/ssh-menu.md): what it offers, as the server grouped it; an item with parameters opens its
+         form; a choice is typed into the terminal and the sheet closes. A dangerous item asks first. -->
+    <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <StackPanel>
+                <TextBlock x:Name="Server" Classes="eyebrow" Text="SERVER MENU" />
+                <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding LoadCommand}" ToolTip.Tip="Read the menu again" AutomationProperties.Name="Read the menu again">
+                <ic:SymbolIcon Symbol="ArrowSync" FontSize="14" />
+            </Button>
+            <Button x:Name="CloseButton" Grid.Column="2" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close the menu">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <StackPanel Spacing="8" IsVisible="{Binding IsLoading}">
+            <TextBlock Text="Reading the server's menu…" Classes="muted" />
+            <ProgressBar IsIndeterminate="True" Height="4" MinHeight="4" CornerRadius="2" />
+        </StackPanel>
+        <Border Classes="glass" IsVisible="{Binding HasProblem}" BorderBrush="{DynamicResource HelmDanger}">
+            <TextBlock Text="{Binding Problem}" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- The items, as the server grouped them -->
+        <ItemsControl ItemsSource="{Binding Entries}" IsVisible="{Binding IsListOpen}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:MenuEntry">
+                    <StackPanel>
+                        <TextBlock Classes="eyebrow" Text="{Binding Group, Converter={x:Static core:UpperCase.Instance}}" Margin="2,10,0,6" IsVisible="{Binding StartsGroup}" />
+                        <Border Classes="glass lift" Margin="0,0,0,8" Padding="0">
+                            <Button Classes="rowhit" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="14,10" Click="Item_Click"
+                                    AutomationProperties.Name="{Binding Title}">
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Description}" Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasDescription}" />
+                                    </StackPanel>
+                                    <ic:SymbolIcon Grid.Column="1" Symbol="Warning" FontSize="15" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource HelmDanger}"
+                                                   IsVisible="{Binding IsDangerous}" ToolTip.Tip="Asks before it runs, with the command" />
+                                    <ic:SymbolIcon Grid.Column="2" Symbol="ChevronRight" FontSize="14" Margin="10,0,0,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource HelmSecondaryText}" IsVisible="{Binding HasParams}" />
+                                </Grid>
+                            </Button>
+                        </Border>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- An item with parameters: its form -->
+        <StackPanel Spacing="12" IsVisible="{Binding IsFormOpen}">
+            <StackPanel Spacing="2">
+                <TextBlock Text="{Binding Selected.Title, FallbackValue=''}" Classes="head" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Selected.Description, FallbackValue=''}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding Selected.HasDescription, FallbackValue=False}" />
+            </StackPanel>
+            <ItemsControl ItemsSource="{Binding Fields}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:MenuParamField">
+                        <StackPanel Spacing="6" Margin="0,0,0,10">
+                            <TextBlock Classes="eyebrow" Text="{Binding Title, Converter={x:Static core:UpperCase.Instance}}" />
+                            <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding Value}" IsVisible="{Binding IsChoice}"
+                                      AutomationProperties.Name="{Binding Title}" />
+                            <TextBox Classes="glass" Text="{Binding Value}" IsVisible="{Binding IsText}" AutomationProperties.Name="{Binding Title}" />
+                            <ToggleSwitch IsChecked="{Binding BoolValue}" OnContent="" OffContent="" IsVisible="{Binding IsBool}" AutomationProperties.Name="{Binding Title}" />
+                            <TextBlock Text="{Binding Error}" Foreground="{DynamicResource HelmDanger}" FontSize="12" TextWrapping="Wrap"
+                                       IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Back" Command="{Binding BackCommand}" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding RunCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Play" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Text="Run" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </StackPanel>
+
+        <TextBlock Text="Runs in the terminal, as if typed. Ctrl+C stops it." Classes="muted" FontSize="12" IsVisible="{Binding IsReady}" />
+    </StackPanel>
+</UserControl>

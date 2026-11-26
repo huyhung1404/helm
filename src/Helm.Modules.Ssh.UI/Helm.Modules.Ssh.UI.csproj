@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The SSH page, ONE view for every platform (Windows through Helm.Ui.Windows, Android, later macOS/iOS): the servers,
+       connecting, the shell and the AI agent tab, the key bar a phone keyboard lacks, the server's menu and the settings
+       sheet. The terminal itself (xterm.js in WebView2 on Windows, in Android's WebView) is a platform piece that comes
+       through ISshPageHost.CreateTerminal. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.Ssh.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Ssh.Core\Helm.Modules.Ssh.Core.csproj" />
+  </ItemGroup>
+
+</Project>

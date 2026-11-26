@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Scratch.UI\Helm.Modules.Scratch.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Habits.UI\Helm.Modules.Habits.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.NovelReader.UI\Helm.Modules.NovelReader.UI.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Ssh.UI\Helm.Modules.Ssh.UI.csproj" />
   </ItemGroup>
 
   <!-- The Gallery's in-memory stand-ins, so a page runs with its real view model here too. -->
@@ -47,6 +48,7 @@
     <Compile Include="..\..\src\Helm.Gallery\ScratchDemo.cs" Link="ScratchDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\HabitsDemo.cs" Link="HabitsDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\NovelDemo.cs" Link="NovelDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\SshDemo.cs" Link="SshDemo.cs" />
   </ItemGroup>
 
 </Project>

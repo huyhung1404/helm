@@ -61,6 +61,16 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Novel Reader", "A novel", "Novel Reader", m => NovelDemo.Create(m, NovelStage.Book), Framed: false),
         new("Novel Reader", "Settings", "Novel Reader", m => NovelDemo.Create(m, NovelStage.Settings), Framed: false),
         new("Novel Reader", "Settings (phone)", "Novel Reader", m => NovelDemo.Create(m, NovelStage.SettingsPhone), Framed: false),
+        new("SSH", "Connected", "SSH", m => SshDemo.Create(m, SshStage.Connected), Framed: false),
+        new("SSH", "Connected (phone)", "SSH", m => SshDemo.Create(m, SshStage.Phone), Framed: false),
+        new("SSH", "Password", "SSH", m => SshDemo.Create(m, SshStage.Password), Framed: false),
+        new("SSH", "AI agent tab", "SSH", m => SshDemo.Create(m, SshStage.Agent), Framed: false),
+        new("SSH", "Server menu", "SSH", m => SshDemo.Create(m, SshStage.Menu), Framed: false),
+        new("SSH", "Menu item form", "SSH", m => SshDemo.Create(m, SshStage.MenuForm), Framed: false),
+        new("SSH", "Server key changed", "SSH", m => SshDemo.Create(m, SshStage.KeyChanged), Framed: false),
+        new("SSH", "First run", "SSH", m => SshDemo.Create(m, SshStage.FirstRun), Framed: false),
+        new("SSH", "Settings", "SSH", m => SshDemo.Create(m, SshStage.Settings), Framed: false),
+        new("SSH", "Edit a server", "SSH", m => SshDemo.Create(m, SshStage.EditServer), Framed: false),
         new("Base", "Controls", "Controls", _ => new ControlsPage()),
     ];
 
