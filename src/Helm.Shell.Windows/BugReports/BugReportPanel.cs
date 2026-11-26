@@ -36,7 +36,6 @@ public sealed class BugReportPanel
     /// <param name="openBug">"Open the bug": shows it on the Bug reports page (the window closes too).</param>
     public BugReportPanel(BugReportFormViewModel form, IWindowService windows, IMonitorService monitors, Action<string> openBug)
     {
-        HelmAvalonia.EnsureStarted();
         _form = form;
         _windows = windows;
         _monitors = monitors;

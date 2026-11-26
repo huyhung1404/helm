@@ -158,7 +158,7 @@ internal sealed partial class McpViewModel : ObservableObject
         if (string.IsNullOrEmpty(text)) return;
         try
         {
-            System.Windows.Clipboard.SetText(text);
+            Helm.Core.Desktop.WindowsClipboard.SetText(text);
         }
         catch (System.Runtime.InteropServices.COMException)
         {

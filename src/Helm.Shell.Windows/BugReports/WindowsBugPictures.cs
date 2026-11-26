@@ -1,29 +1,23 @@
 using System.IO;
-using System.Windows;
-using System.Windows.Media.Imaging;
+using Avalonia.Platform.Storage;
+using Helm.Core.Desktop;
+using Helm.Ui.Windows;
 using Helm.BugReports.Ui;
 using Helm.Shell.BugReports;
 
 namespace Helm.Shell.Windows;
 
-/// <summary>Where a bug report's pictures come from on this PC (WPF's clipboard and file dialog).</summary>
+/// <summary>Where a bug report's pictures come from on this PC (the Windows clipboard and the window's file picker).</summary>
 internal static class WindowsBugPictures
 {
     /// <summary>Pictures on the clipboard: a copied image (as PNG) or copied picture files.</summary>
     public static IReadOnlyList<BugImageDraft> FromClipboard()
     {
-        try
-        {
-            if (Clipboard.ContainsFileDropList())
-                return FromFiles(Clipboard.GetFileDropList().Cast<string>());
-            if (Clipboard.ContainsImage() && Clipboard.GetImage() is { } source)
-                return [new BugImageDraft(Png(source), "image/png", $"Pasted {DateTime.Now:HH-mm-ss}.png")];
-        }
-        catch (System.Runtime.InteropServices.COMException)
-        {
-            // The clipboard is busy: nothing pasted.
-        }
-        return [];
+        if (WindowsClipboard.GetFiles() is { Count: > 0 } files) return FromFiles(files);
+        if (WindowsClipboard.GetImage() is not { } bytes) return [];
+        // A BMP from the clipboard becomes a PNG (smaller, and what the report keeps).
+        var png = BugPictureFiles.MimeOf(bytes) == "image/png" ? bytes : Png(bytes);
+        return png is null ? [] : [new BugImageDraft(png, "image/png", $"Pasted {DateTime.Now:HH-mm-ss}.png")];
     }
 
     /// <summary>The picture files among <paramref name="paths"/>.</summary>
@@ -47,15 +41,11 @@ internal static class WindowsBugPictures
     }
 
     /// <summary>Asks for picture files (at most <paramref name="max"/>); the dialog belongs to the window in front.</summary>
-    public static IReadOnlyList<BugImageDraft> Pick(int max)
+    public static async Task<IReadOnlyList<BugImageDraft>> PickAsync(int max)
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Add images",
-            Filter = "Images|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp|All files|*.*",
-            Multiselect = true,
-        };
-        return dialog.ShowDialog() == true ? FromFiles(dialog.FileNames).Take(Math.Max(0, max)).ToList() : [];
+        var images = new FilePickerFileType("Images") { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.webp"] };
+        var paths = await DesktopWindows.PickFilesAsync("Add images", [images, FilePickerFileTypes.All], many: true).ConfigureAwait(true);
+        return FromFiles(paths).Take(Math.Max(0, max)).ToList();
     }
 
     /// <summary>Opens a picture full size in the default viewer (a temp copy).</summary>
@@ -77,12 +67,19 @@ internal static class WindowsBugPictures
         _ => ".png",
     };
 
-    private static byte[] Png(BitmapSource source)
+    private static byte[]? Png(byte[] image)
     {
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(source));
-        using var memory = new MemoryStream();
-        encoder.Save(memory);
-        return memory.ToArray();
+        try
+        {
+            using var input = new MemoryStream(image);
+            using var bitmap = new Avalonia.Media.Imaging.Bitmap(input);
+            using var output = new MemoryStream();
+            bitmap.Save(output);
+            return output.ToArray();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or NotSupportedException)
+        {
+            return null;
+        }
     }
 }

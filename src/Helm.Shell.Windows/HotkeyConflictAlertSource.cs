@@ -34,7 +34,7 @@ internal sealed class HotkeyConflictAlertSource : IHomeAlertSource
     {
         var index = int.Parse(alertId["hotkey:".Length..], CultureInfo.InvariantCulture);
         var conflicts = _hotkeys.Conflicts;
-        if (index < conflicts.Count && _modules.Find(conflicts[index].Definitions[0].ModuleId) is { } module) _host.OpenPage(module.SettingsPageType);
+        if (index < conflicts.Count && _modules.Find(conflicts[index].Definitions[0].ModuleId) is { } module) _host.OpenPage(module.Id);
         return Task.CompletedTask;
     }
 }

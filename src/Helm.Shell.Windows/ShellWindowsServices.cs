@@ -50,9 +50,8 @@ public static class ShellWindowsServices
         services.TryAddSingleton<Mcp.McpPermissionsViewModel>();
         services.TryAddSingleton<Mcp.McpViewModel>();
 
-        // The two pages (WPF, each hosting its shared Avalonia view).
-        services.AddSingleton<HomePage>();
-        services.AddSingleton<GeneralPage>();
+        // Home, General and Bug reports, made by key when their tab first opens.
+        services.AddSingleton<WindowsShellPages>();
         return services;
     }
 }

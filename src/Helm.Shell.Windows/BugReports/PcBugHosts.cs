@@ -6,11 +6,7 @@ namespace Helm.Shell.Windows;
 /// <summary>Pictures on this PC: a file dialog, the clipboard, and the default viewer for a picture full size.</summary>
 internal class PcBugPictureSource : IBugPictureSource
 {
-    public Task<IReadOnlyList<BugImageDraft>> PickAsync(int max)
-    {
-        IReadOnlyList<BugImageDraft> picked = WindowsBugPictures.Pick(max);
-        return Task.FromResult(picked);
-    }
+    public Task<IReadOnlyList<BugImageDraft>> PickAsync(int max) => WindowsBugPictures.PickAsync(max);
 
     public Task<IReadOnlyList<BugImageDraft>> PasteAsync() => Task.FromResult(WindowsBugPictures.FromClipboard());
 

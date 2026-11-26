@@ -35,7 +35,6 @@ public sealed class McpConsentWindow
 
     public McpConsentWindow(McpConsentPrompt prompt, IWindowService windows, IMonitorService monitors)
     {
-        HelmAvalonia.EnsureStarted();
         _windows = windows;
         _monitors = monitors;
         var view = new McpConsentView(new McpConsentText(prompt)) { Margin = new Thickness(ShadowSpace) };

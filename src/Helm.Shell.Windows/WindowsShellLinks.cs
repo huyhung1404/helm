@@ -4,8 +4,9 @@ using Helm.Shell.Home;
 
 namespace Helm.Shell.Windows;
 
-/// <summary>Where a tap on Home goes on Windows: the tool's own action, else its content page, else its settings.</summary>
-internal sealed class WindowsShellLinks(IModuleHost modules, IEnumerable<IModuleLauncher> launchers, IShellWindowsHost host, GeneralSelection general) : IHomeLinks
+/// <summary>Where a tap on Home goes on Windows: the tool's own action, else its page.</summary>
+internal sealed class WindowsShellLinks(IModuleHost modules, IEnumerable<IModuleLauncher> launchers, IShellWindowsHost host, GeneralSelection general,
+    Helm.Core.Services.IProcessLauncher launcher) : IHomeLinks
 {
     public void OpenTool(string moduleId)
     {
@@ -15,8 +16,8 @@ internal sealed class WindowsShellLinks(IModuleHost modules, IEnumerable<IModule
             _ = launcher.LaunchAsync();
             return;
         }
-        if (modules.Find(moduleId) is not { } module) return;
-        host.OpenPage((module as IModuleContent)?.ContentPageType ?? module.SettingsPageType);
+        if (modules.Find(moduleId) is null) return;
+        host.OpenPage(moduleId);
     }
 
     public void OpenGeneral(string part)
@@ -25,7 +26,8 @@ internal sealed class WindowsShellLinks(IModuleHost modules, IEnumerable<IModule
         host.OpenGeneral();
     }
 
-    public void OpenWhatsNew() => host.OpenWhatsNew();
+    /// <summary>This version's release notes on GitHub, in the browser.</summary>
+    public void OpenWhatsNew() => launcher.OpenUrl(Helm.Shell.Services.AppInfo.ReleaseNotesUrl);
 }
 
 /// <summary>Which part of General to show when the page opens (an alert's button picks it).</summary>
