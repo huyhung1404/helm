@@ -6,5 +6,7 @@ namespace Helm.Modules.AlwaysOnTop;
 public static class AlwaysOnTopServices
 {
     public static IServiceCollection AddAlwaysOnTopModule(this IServiceCollection services) =>
-        services.AddHelmModule<AlwaysOnTopModule, AlwaysOnTopPage, AlwaysOnTopViewModel>();
+        services
+            .AddSingleton<IAlwaysOnTop>(sp => sp.GetRequiredService<AlwaysOnTopModule>())
+            .AddHelmModule<AlwaysOnTopModule, AlwaysOnTopPage, AlwaysOnTopViewModel>();
 }

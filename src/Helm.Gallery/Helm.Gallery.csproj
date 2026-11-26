@@ -32,6 +32,7 @@
     <ProjectReference Include="..\Helm.Modules.Missions.UI\Helm.Modules.Missions.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.SlackBot.UI\Helm.Modules.SlackBot.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.WindowZones.UI\Helm.Modules.WindowZones.UI.csproj" />
+    <ProjectReference Include="..\Helm.Modules.AlwaysOnTop.UI\Helm.Modules.AlwaysOnTop.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.NovelReader.UI\Helm.Modules.NovelReader.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Ssh.UI\Helm.Modules.Ssh.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vocab.UI\Helm.Modules.Vocab.UI.csproj" />

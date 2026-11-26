@@ -121,6 +121,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Ssh.UI", "src\
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Vocab.UI", "src\Helm.Modules.Vocab.UI\Helm.Modules.Vocab.UI.csproj", "{CAE34B0B-7B93-493E-939D-B7B43DCD32F7}"
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Wallet.UI", "src\Helm.Modules.Wallet.UI\Helm.Modules.Wallet.UI.csproj", "{7FBACC1B-59DF-43D1-A6D5-607A1AC7F5D8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.AlwaysOnTop.Core", "src\Helm.Modules.AlwaysOnTop.Core\Helm.Modules.AlwaysOnTop.Core.csproj", "{2BCB417C-E323-4735-8D85-6046856E861B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.AlwaysOnTop.UI", "src\Helm.Modules.AlwaysOnTop.UI\Helm.Modules.AlwaysOnTop.UI.csproj", "{88A99CAC-5170-4D17-846A-420C3FA53D82}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -839,6 +843,30 @@ Global
 		{7FBACC1B-59DF-43D1-A6D5-607A1AC7F5D8}.Release|x64.Build.0 = Release|Any CPU
 		{7FBACC1B-59DF-43D1-A6D5-607A1AC7F5D8}.Release|x86.ActiveCfg = Release|Any CPU
 		{7FBACC1B-59DF-43D1-A6D5-607A1AC7F5D8}.Release|x86.Build.0 = Release|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Debug|x64.Build.0 = Debug|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Debug|x86.Build.0 = Debug|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Release|x64.ActiveCfg = Release|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Release|x64.Build.0 = Release|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Release|x86.ActiveCfg = Release|Any CPU
+		{2BCB417C-E323-4735-8D85-6046856E861B}.Release|x86.Build.0 = Release|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Debug|x64.Build.0 = Debug|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Debug|x86.Build.0 = Debug|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Release|Any CPU.Build.0 = Release|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Release|x64.ActiveCfg = Release|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Release|x64.Build.0 = Release|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Release|x86.ActiveCfg = Release|Any CPU
+		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -7,6 +7,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+    <ProjectReference Include="..\Helm.Modules.AlwaysOnTop.Core\Helm.Modules.AlwaysOnTop.Core.csproj" />
+    <!-- The page is the shared Avalonia view, shown through Helm.Ui.Windows. -->
+    <ProjectReference Include="..\Helm.Modules.AlwaysOnTop.UI\Helm.Modules.AlwaysOnTop.UI.csproj" />
+    <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>

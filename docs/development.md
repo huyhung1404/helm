@@ -54,7 +54,9 @@ src/
   Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, Home/General/Diagnostics pages
   Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
-  Helm.Modules.AlwaysOnTop/  Windows only: engine, settings page
+  Helm.Modules.AlwaysOnTop.Core/ net8.0: settings, the tool as the page sees it (IAlwaysOnTop), shared view model
+  Helm.Modules.AlwaysOnTop.UI/ Avalonia: the Always On Top page (on/off, shortcut, border, windows on top, excluded apps)
+  Helm.Modules.AlwaysOnTop/  Windows only: the module, the engine and border overlays, the WPF page that hosts the shared view
   Helm.Keyboard.Engine/      net8.0: Telex (namespace Helm.Typing), the ids Helm and the input method share
   Helm.Keyboard.Tip/         HelmKeyboard.dll: the Vietnamese input method (TSF, NativeAOT, 64- and 32-bit);
                              built by scripts/build-keyboard.ps1, needs the C++ build tools

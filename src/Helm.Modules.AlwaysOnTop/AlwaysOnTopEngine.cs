@@ -7,8 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.AlwaysOnTop;
 
-public sealed record PinnedWindowInfo(nint Handle, string Title, string ProcessName);
-
 /// <summary>
 /// All pin state lives on one <see cref="MessageLoopThread"/>: WinEvents arrive there, border overlays are created
 /// there, and public calls are posted there — so no locking is needed.

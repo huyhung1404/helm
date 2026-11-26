@@ -8,9 +8,9 @@ using Wpf.Ui.Controls;
 
 namespace Helm.Modules.AlwaysOnTop;
 
-public sealed class AlwaysOnTopModule : HelmModuleBase
+public sealed class AlwaysOnTopModule : HelmModuleBase, IAlwaysOnTop
 {
-    public const string ModuleId = "always-on-top";
+    public const string ModuleId = AlwaysOnTopIds.ModuleId;
     private const string HotkeyId = "toggle";
 
     private readonly IHotkeyManager _hotkeys;

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Always On Top page, ONE Avalonia view (Windows through Helm.Ui.Windows; the tool is Windows-only): the on/off
+       switch, the shortcut, the border around kept windows, the windows on top now and the excluded apps. Recording a
+       shortcut comes through IAlwaysOnTopPageHost; unpinning through IAlwaysOnTop. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.AlwaysOnTop.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.AlwaysOnTop.Core\Helm.Modules.AlwaysOnTop.Core.csproj" />
+  </ItemGroup>
+
+</Project>

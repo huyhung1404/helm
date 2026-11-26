@@ -42,6 +42,7 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Ssh.UI\Helm.Modules.Ssh.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Vocab.UI\Helm.Modules.Vocab.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Wallet.UI\Helm.Modules.Wallet.UI.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.AlwaysOnTop.UI\Helm.Modules.AlwaysOnTop.UI.csproj" />
   </ItemGroup>
 
   <!-- The Gallery's in-memory stand-ins, so a page runs with its real view model here too. -->
@@ -60,6 +61,7 @@
     <Compile Include="..\..\src\Helm.Gallery\SshDemo.cs" Link="SshDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\VocabDemo.cs" Link="VocabDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\WalletDemo.cs" Link="WalletDemo.cs" />
+    <Compile Include="..\..\src\Helm.Gallery\AlwaysOnTopDemo.cs" Link="AlwaysOnTopDemo.cs" />
   </ItemGroup>
 
 </Project>
