@@ -25,7 +25,7 @@ public sealed partial class MissionsViewModel : ObservableObject
     private readonly ISettingsStoreFactory _settingsFactory;
     private readonly ISettingsStore<MissionsSettings> _settings;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly IProcessLauncher _launcher;
     private readonly MissionReminderService _reminders;
@@ -205,8 +205,22 @@ public sealed partial class MissionsViewModel : ObservableObject
         Refresh();
     }
 
+    /// <summary>Confirmations (skip, abandon, delete) from the page that shows them (the shared view's glass sheet).</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
+
     /// <summary>Raised when a step, a phase or the whole mission is done here, so the page can play its animation.</summary>
     public event EventHandler<CelebrationKind?>? Celebrated;
+
+    /// <summary>The line at the top of the page: "Thursday 26 November · 2 in progress".</summary>
+    public string TodayLine
+    {
+        get
+        {
+            var date = TodayDate.ToString("dddd d MMMM", CultureInfo.CurrentCulture);
+            var running = _store.Missions().Count(m => m.Value.Status == MissionStatus.Active);
+            return running == 0 ? date : $"{date} · {running} in progress";
+        }
+    }
 
     public ObservableCollection<MissionChoice> Missions { get; } = [];
 
@@ -289,6 +303,7 @@ public sealed partial class MissionsViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(ShowMission));
+        foreach (var choice in Missions) choice.IsSelected = ReferenceEquals(choice, value);
         if (!_loading && value is not null) _settings.Update(s => s.SelectedMissionId = value.Id);
         CompleteNote = "";
         NewStepTitle = "";
@@ -1031,6 +1046,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         if (stats.MissionsWithDeadline > 0) missions += $" · {stats.MissionsOnTime} of {stats.MissionsWithDeadline} by the deadline";
         missions += $" · {stats.MissionsRunning} in progress";
         StatsMissions = missions;
+        OnPropertyChanged(nameof(TodayLine));
     }
 
     partial void OnStatsMissionsChanged(string value) => OnPropertyChanged(nameof(HasStats));
@@ -1201,6 +1217,11 @@ public sealed partial class MissionsViewModel : ObservableObject
                 MissionStatus.Completed => $"{m.Value.Title} · done",
                 _ => $"{m.Value.Title} · {MissionsFormat.Status(m.Value.Status).ToLowerInvariant()}",
             };
+            choice.Title = m.Value.Title;
+            choice.Summary = m.Value.Status == MissionStatus.Active
+                ? $"{done} of {steps.Count} steps"
+                : $"{MissionsFormat.Status(m.Value.Status)} · {done} of {steps.Count}";
+            choice.IsActive = m.Value.Status == MissionStatus.Active;
             choices.Add(choice);
         }
         foreach (var gone in _choices.Keys.Where(id => all.All(m => m.Id != id)).ToList()) _choices.Remove(gone);
@@ -1213,6 +1234,7 @@ public sealed partial class MissionsViewModel : ObservableObject
             keep ??= _settings.Current.SelectedMissionId is { } saved ? choices.FirstOrDefault(c => c.Id == saved) : null;
             keep ??= choices.FirstOrDefault();
             if (!ReferenceEquals(SelectedMission, keep)) SelectedMission = keep;
+            foreach (var choice in Missions) choice.IsSelected = ReferenceEquals(choice, SelectedMission);
         }
         finally
         {

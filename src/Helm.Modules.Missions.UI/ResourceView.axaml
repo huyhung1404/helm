@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             xmlns:ui="using:Helm.Modules.Missions.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Missions.Ui.ResourceView"
+             x:DataType="vm:ResourceRow">
+
+    <!-- A resource of a step: its label, title and link; opened, its text and table (each row: the first cell large, the
+         other cells under it, the column names above, so any number of columns fits a phone) -->
+    <Border CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource HelmGlassStroke}" Margin="0,0,0,6">
+        <StackPanel>
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <Button Classes="rowhit" Padding="10,8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Title}"
+                        Command="{Binding $parent[ui:MissionsView].((vm:MissionsViewModel)DataContext).ActivateResourceCommand}" CommandParameter="{Binding}">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <Panel Margin="0,2,10,0" VerticalAlignment="Top" Width="14" Height="14">
+                            <Panel Classes="turn" core:Motion.Turn="{Binding IsExpanded}" IsVisible="{Binding HasDetails}">
+                                <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" />
+                            </Panel>
+                            <ic:SymbolIcon Symbol="Link" FontSize="14" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding IsPlainLink}" />
+                        </Panel>
+                        <StackPanel Grid.Column="1" Spacing="3">
+                            <Border Classes="tag" HorizontalAlignment="Left" IsVisible="{Binding HasLabel}">
+                                <TextBlock Text="{Binding Label}" Foreground="{DynamicResource HelmEyebrow}" />
+                            </Border>
+                            <TextBlock Text="{Binding Title}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Summary}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasSummary}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+                <Button Grid.Column="1" Classes="flat" Width="36" Height="36" Padding="0" VerticalAlignment="Top" Margin="0,4,0,0" IsVisible="{Binding IsLink}"
+                        ToolTip.Tip="{Binding Url}" AutomationProperties.Name="Open the link"
+                        Command="{Binding $parent[ui:MissionsView].((vm:MissionsViewModel)DataContext).OpenResourceCommand}" CommandParameter="{Binding}">
+                    <ic:SymbolIcon Symbol="Open" FontSize="16" />
+                </Button>
+                <Button Grid.Column="2" Classes="flat" Width="36" Height="36" Padding="0" VerticalAlignment="Top" Margin="0,4,4,0"
+                        ToolTip.Tip="Copy (a table pastes as columns)" AutomationProperties.Name="Copy"
+                        Command="{Binding $parent[ui:MissionsView].((vm:MissionsViewModel)DataContext).CopyResourceCommand}" CommandParameter="{Binding}">
+                    <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                </Button>
+            </Grid>
+            <StackPanel Margin="34,0,12,12" Spacing="4" IsVisible="{Binding ShowDetails}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="0,0,0,4" IsVisible="{Binding HasText}" />
+                <TextBlock Text="{Binding Header}" Classes="muted" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding HasHeader}" />
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:ResourceTableRow">
+                            <StackPanel Margin="0,4">
+                                <TextBlock Text="{Binding First}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Rest}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasRest}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -43,6 +43,17 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Habits", "Reason for skipped days", "Habits", m => HabitsDemo.Create(m, HabitsStage.Reason), Framed: false),
         new("Habits", "First run", "Habits", m => HabitsDemo.Create(m, HabitsStage.FirstRun), Framed: false),
         new("Habits", "Settings", "Habits", m => HabitsDemo.Create(m, HabitsStage.Settings), Framed: false),
+        new("Missions", "Mission", "Missions", m => MissionsDemo.Create(m, MissionsStage.Mission), Framed: false),
+        new("Missions", "Insights", "Missions", m => MissionsDemo.Create(m, MissionsStage.Insights), Framed: false),
+        new("Missions", "Roadmap step", "Missions", m => MissionsDemo.Create(m, MissionsStage.Roadmap), Framed: false),
+        new("Missions", "Paused", "Missions", m => MissionsDemo.Create(m, MissionsStage.Paused), Framed: false),
+        new("Missions", "New mission", "Missions", m => MissionsDemo.Create(m, MissionsStage.NewMission), Framed: false),
+        new("Missions", "Paste the answer", "Missions", m => MissionsDemo.Create(m, MissionsStage.Import), Framed: false),
+        new("Missions", "New plan", "Missions", m => MissionsDemo.Create(m, MissionsStage.Replan), Framed: false),
+        new("Missions", "Phase done", "Missions", m => MissionsDemo.Create(m, MissionsStage.PhaseDone), Framed: false),
+        new("Missions", "Mission done", "Missions", m => MissionsDemo.Create(m, MissionsStage.MissionDone), Framed: false),
+        new("Missions", "First run", "Missions", m => MissionsDemo.Create(m, MissionsStage.FirstRun), Framed: false),
+        new("Missions", "Settings", "Missions", m => MissionsDemo.Create(m, MissionsStage.Settings), Framed: false),
         new("Base", "Controls", "Controls", _ => new ControlsPage()),
     ];
 

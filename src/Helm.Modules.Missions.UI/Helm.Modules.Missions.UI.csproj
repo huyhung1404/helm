@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Missions page, ONE view for every platform (Windows through Helm.Ui.Windows, Android, later macOS/iOS): the
+       mission cards, the mission with its current step and roadmap, insights (statistics and badges), and the sheets
+       (a new mission or a new plan, the celebration, the settings). What differs per platform (the CSV export, the
+       notification permission, the home-screen widget, the phone's menu) comes through IMissionsPageHost. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.Missions.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Missions.Core\Helm.Modules.Missions.Core.csproj" />
+  </ItemGroup>
+
+</Project>

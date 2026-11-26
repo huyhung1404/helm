@@ -1,0 +1,79 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             x:Class="Helm.Modules.Missions.Ui.MissionsFirstRun"
+             x:DataType="vm:MissionsViewModel">
+
+    <!-- No mission yet: the way in, step by step (1 is the only thing to do now), then the ready-made missions for
+         anyone without an AI at hand -->
+    <StackPanel>
+        <Border Classes="glass hero enter" Margin="0,32,0,0" Padding="28,26">
+            <StackPanel Spacing="18">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="START HERE" />
+                    <TextBlock Text="A goal reached one step at a time" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Classes="muted" TextWrapping="Wrap"
+                               Text="Like passing HSK3 or running 10 km. An AI writes the steps; Helm keeps you on them." />
+                </StackPanel>
+                <UniformGrid x:Name="Steps" Columns="3">
+                    <Border Classes="glass" Margin="0,0,10,10" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="1" />
+                            <TextBlock Text="Describe your goal" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="Helm writes a prompt from it for any AI." />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="2" />
+                            <TextBlock Text="Ask ChatGPT, Gemini or Claude" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="Paste the prompt and copy the JSON it answers." />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="3" />
+                            <TextBlock Text="Import it and start" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" TextWrapping="Wrap" Text="Check the steps, leave out what you do not need." />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding OpenPromptCommand}"
+                        AutomationProperties.Name="Write the prompt">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <TextBlock Text="Write the prompt" Foreground="{DynamicResource HelmPillForeground}" />
+                        <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Or not from an AI: the JSON already at hand, or a ready-made mission -->
+        <Grid ColumnDefinitions="*,Auto" Margin="2,26,0,10">
+            <TextBlock Text="Or start from a ready-made mission" Classes="head" VerticalAlignment="Center" TextWrapping="Wrap" />
+            <Button Grid.Column="1" Classes="ghost" Margin="12,0,0,0" Command="{Binding OpenImportCommand}" AutomationProperties.Name="Import JSON">
+                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="ArrowImport" FontSize="14" /><TextBlock Text="Import JSON" /></StackPanel>
+            </Button>
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Templates}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><UniformGrid x:Name="TemplateGrid" Columns="3" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:MissionTemplate">
+                    <Border Classes="glass lift" Padding="0" Margin="0,0,10,10">
+                        <Button Classes="rowhit" Padding="16,14" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalAlignment="Stretch"
+                                VerticalContentAlignment="Top" AutomationProperties.Name="{Binding Name}"
+                                Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).UseTemplateCommand}" CommandParameter="{Binding}">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Button>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

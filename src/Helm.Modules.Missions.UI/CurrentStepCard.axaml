@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             xmlns:ui="using:Helm.Modules.Missions.Ui"
+             x:Class="Helm.Modules.Missions.Ui.CurrentStepCard"
+             x:DataType="vm:MissionsViewModel">
+
+    <!-- The step to do now: what it is, when it is done, its checklist and resources, a note, and Complete -->
+    <Border x:Name="CardBorder" Classes="glass" Padding="18,16" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+        <StackPanel Spacing="10">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="eyebrow" Text="{Binding CurrentNumberText}" TextWrapping="Wrap" />
+                <TextBlock Classes="muted" Text="{Binding CurrentPhaseText}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding CurrentTitle}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0" />
+                <TextBlock Classes="muted" Text="{Binding CurrentStartedText}" TextWrapping="Wrap"
+                           IsVisible="{Binding CurrentStartedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+            <TextBlock Text="{Binding CurrentDescription}" TextWrapping="Wrap" IsVisible="{Binding HasCurrentDescription}" />
+            <Border Background="{DynamicResource HelmSubtleFill}" CornerRadius="10" Padding="12,10" IsVisible="{Binding HasCurrentDoneWhen}">
+                <Grid ColumnDefinitions="Auto,*">
+                    <ic:SymbolIcon Symbol="Target" FontSize="16" Margin="0,1,8,0" VerticalAlignment="Top" Foreground="{DynamicResource HelmEyebrow}" />
+                    <TextBlock Grid.Column="1" TextWrapping="Wrap">
+                        <Run Text="Done when: " FontWeight="SemiBold" /><Run Text="{Binding CurrentDoneWhen}" />
+                    </TextBlock>
+                </Grid>
+            </Border>
+            <ItemsControl ItemsSource="{Binding CurrentChecklist}" IsVisible="{Binding HasCurrentChecklist}" IsEnabled="{Binding IsActive}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:ChecklistRow">
+                        <CheckBox IsChecked="{Binding IsDone}" MinHeight="36" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Text}">
+                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Classes.done="{Binding IsDone}" />
+                        </CheckBox>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <StackPanel IsVisible="{Binding HasCurrentResources}" Spacing="6">
+                <TextBlock Text="Resources" Classes="head" />
+                <ItemsControl ItemsSource="{Binding CurrentResources}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:ResourceRow"><ui:ResourceView /></DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+            <Border Background="{DynamicResource HelmWarningBackground}" CornerRadius="10" Padding="12,10" IsVisible="{Binding IsPaused}">
+                <TextBlock Text="Paused. Resume the mission to carry on with this step." TextWrapping="Wrap" />
+            </Border>
+
+            <StackPanel Spacing="10" IsEnabled="{Binding IsActive}">
+                <TextBox Classes="glass" PlaceholderText="Note (optional): what you did, a result, a link" Text="{Binding CompleteNote}" AcceptsReturn="True"
+                         TextWrapping="Wrap" MinHeight="40" AutomationProperties.Name="Note for this step" />
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CompleteStepCommand}"
+                        AutomationProperties.Name="Complete step">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <ic:SymbolIcon Symbol="Checkmark" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Text="Complete step" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+                <WrapPanel Margin="-4,0,0,0">
+                    <Button Classes="act" Command="{Binding StartStepCommand}" IsVisible="{Binding CanStartStep}"
+                            ToolTip.Tip="Log when you begin, to see how long the step takes" AutomationProperties.Name="Start">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Play" FontSize="14" /><TextBlock Classes="label" Text="Start" /></StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding SendToTasksCommand}" IsVisible="{Binding CanSendToTasks}"
+                            ToolTip.Tip="Add this step to your to-do list, due when it should be done; finishing either one finishes the other"
+                            AutomationProperties.Name="{Binding SendToTasksLabel}">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="TaskList" FontSize="14" /><TextBlock Classes="label" Text="{Binding SendToTasksLabel}" /></StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding SkipStepCommand}" ToolTip.Tip="Skip: mark it skipped and go on to the next step" AutomationProperties.Name="Skip">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="ArrowForward" FontSize="14" /><TextBlock Classes="label" Text="Skip" /></StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding UndoStepCommand}" IsVisible="{Binding CanUndo}" ToolTip.Tip="Open the last step again"
+                            AutomationProperties.Name="Undo last step">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="ArrowUndo" FontSize="14" /><TextBlock Classes="label" Text="Undo last step" /></StackPanel>
+                    </Button>
+                </WrapPanel>
+                <TextBlock Text="{Binding TaskText}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasTask}" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             x:Class="Helm.Modules.Missions.Ui.MissionsInsights"
+             x:DataType="vm:MissionsViewModel">
+
+    <!-- Across all missions: this week and the weeks before, the pace, the missions done; then the badges -->
+    <UserControl.Styles>
+        <Style Selector="Border.badge.locked">
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="12">
+        <TextBlock Classes="display" Text="Insights" />
+
+        <Border Classes="glass" Padding="18,16">
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding StatsThisWeek}" Classes="stat" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding StatsWeeks}" Classes="muted" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding StatsPace}" TextWrapping="Wrap" Margin="0,6,0,0"
+                           IsVisible="{Binding StatsPace, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <TextBlock Text="{Binding StatsMissions}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <Grid ColumnDefinitions="*,Auto" Margin="2,14,0,0">
+            <TextBlock Text="Badges" Classes="head" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{Binding BadgesSummary}" Classes="muted" VerticalAlignment="Center" />
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Badges}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><UniformGrid x:Name="BadgeGrid" Columns="3" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:BadgeRow">
+                    <Border Classes="glass badge" Classes.locked="{Binding Locked}" Margin="0,0,10,10" AutomationProperties.Name="{Binding Title}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Panel Margin="0,0,12,0" VerticalAlignment="Center">
+                                <ic:SymbolIcon Symbol="Ribbon" FontSize="24" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding Earned}" />
+                                <ic:SymbolIcon Symbol="LockClosed" FontSize="24" Foreground="{DynamicResource HelmSecondaryText}" IsVisible="{Binding Locked}" />
+                            </Panel>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Detail}" Classes="muted" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>
