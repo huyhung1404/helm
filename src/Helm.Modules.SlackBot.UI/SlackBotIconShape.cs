@@ -4,7 +4,7 @@ namespace Helm.Modules.SlackBot;
 /// The Slack Report icon: a robot's head (a rounded outline with ears and an antenna, two eyes and a mouth) in silver with a
 /// glowing cyan face and antenna (Lumi's colours), with no background. The silver darkens towards the bottom-left so the
 /// outline still shows on a light background. Ears to ears it spans the 100 × 100 box edge to edge, like the other
-/// tool icons. PC only, so the shape lives in the PC project.
+/// tool icons. Drawn by <see cref="Ui.SlackBotIcon"/>.
 /// </summary>
 public static class SlackBotIconShape
 {

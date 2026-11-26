@@ -1,4 +1,3 @@
-using System.Windows;
 using Helm.Core.Desktop;
 using Helm.Core.Services;
 using Helm.Core.Settings;
@@ -10,7 +9,6 @@ namespace Helm.Tests;
 
 /// <summary>
 /// The SlackBot inbox loads with messages (the page and the list that stays on screen are shared Avalonia views, tested in Helm.Ui.Tests), built off-screen: no window is shown.
-/// With HELM_SLACKBOT_SNAPSHOTS set to a folder each one is rendered to a PNG there, for checking the layout by eye.
 /// </summary>
 public sealed class SlackBotViewsTests : IDisposable
 {
@@ -78,7 +76,7 @@ public sealed class SlackBotViewsTests : IDisposable
         var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoShell(), settings);
         var windows = new WindowService(NullLogger<WindowService>.Instance);
         var overlay = new SlackBotOverlay(inbox, settings, windows, new MonitorService(), ui, NullLogger<SlackBotOverlay>.Instance);
-        var module = new SlackBotModule(engine, overlay) { IsEnabled = true };
+        var module = new SlackBotModule(engine, overlay, new Microsoft.Extensions.DependencyInjection.ServiceCollection().BuildServiceProvider()) { IsEnabled = true };
 
         // To do: the DM and the mention (one unsorted), not the channel chatter or what the user answered.
         Assert.Equal(["Tuấn", "Linh"], inbox.ToDo.Select(i => i.From));
@@ -88,8 +86,8 @@ public sealed class SlackBotViewsTests : IDisposable
         // The report shows what came before the last report time.
         Assert.Equal(1, inbox.ReportCount);
         Assert.True(inbox.HasOverlay);
+>>>>
 
-        Layout(new System.Windows.Controls.Image { Source = SlackBotLogo.Image, Width = 128, Height = 128 }, new Size(128, 128), "0-icon");
         inbox.StartReplyCommand.Execute(inbox.ToDo[0]);
         inbox.ReplyText = "Ok em, chiều nay anh xem nhé";
         Assert.Same(inbox.ToDo[0], inbox.ReplyTo);
@@ -180,35 +178,5 @@ public sealed class SlackBotViewsTests : IDisposable
         };
         timer.Start();
         System.Windows.Threading.Dispatcher.PushFrame(frame);
-    }
-
-    private static void Layout(FrameworkElement element, Size size, string name)
-    {
-        // A window that is never shown does not lay out; its content does.
-        var target = element is Window { Content: FrameworkElement content } ? content : element;
-        target.Measure(size);
-        target.Arrange(new Rect(size));
-        target.UpdateLayout();
-        var idle = new System.Windows.Threading.DispatcherFrame();
-        System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () => idle.Continue = false);
-        System.Windows.Threading.Dispatcher.PushFrame(idle);
-        target.UpdateLayout();
-        if (Environment.GetEnvironmentVariable("HELM_SLACKBOT_SNAPSHOTS") is not { Length: > 0 } folder) return;
-        var host = new System.Windows.Controls.Border
-        {
-            Background = (System.Windows.Media.Brush)Application.Current.FindResource("ApplicationBackgroundBrush"),
-            Width = size.Width,
-            Height = size.Height,
-        };
-        host.Measure(size);
-        host.Arrange(new Rect(size));
-        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)size.Width, (int)size.Height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
-        bitmap.Render(host);
-        bitmap.Render(target);
-        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
-        Directory.CreateDirectory(folder);
-        using var png = File.Create(Path.Combine(folder, $"{name}.png"));
-        encoder.Save(png);
     }
 }

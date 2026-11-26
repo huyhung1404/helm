@@ -7,7 +7,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Scratch.Core\ScratchIconShape.cs" Link="ToolIcons\ScratchIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.QuickCapture\QuickCaptureIconShape.cs" Link="ToolIcons\QuickCaptureIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.WindowZones\WindowZonesIconShape.cs" Link="ToolIcons\WindowZonesIconShape.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.SlackBot\SlackBotIconShape.cs" Link="ToolIcons\SlackBotIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Notes.Android\NotesIcon.cs" Link="ToolIcons\NotesIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.QuickCapture.Android\QuickCaptureIcon.cs" Link="ToolIcons\QuickCaptureIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Scratch.Android\ScratchIcon.cs" Link="ToolIcons\ScratchIcon.cs" />

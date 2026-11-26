@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Media;
-using Helm.Modules.SlackBot;
 using Helm.Modules.WindowZones;
 
 namespace Helm.ToolIcons;
@@ -26,7 +25,7 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         "vault" => Helm.Modules.Vault.Ui.VaultIcon.Image,
         "keyboard" => Helm.Modules.Keyboard.Ui.KeyboardIcon.Image,
         "window-zones" => WindowZones.Value,
-        "slackbot" => SlackBot.Value,
+        "slackbot" => Helm.Modules.SlackBot.Ui.SlackBotIcon.Image,
         _ => null,
     };
 
@@ -42,26 +41,6 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         return new DrawingImage(group);
     });
 
-    private static readonly Lazy<IImage> SlackBot = new(() =>
-    {
-        static Geometry Rounded((double X, double Y, double Width, double Height, double Radius) b) =>
-            new RectangleGeometry(new Rect(b.X, b.Y, b.Width, b.Height), b.Radius, b.Radius);
-        const double size = SlackBotIconShape.Size;
-        var head = Gradient(size, SlackBotIconShape.HeadStart, SlackBotIconShape.HeadEnd);
-        var glow = new SolidColorBrush(Color.FromUInt32(SlackBotIconShape.GlowColor));
-        var ears = new SolidColorBrush(Color.FromUInt32(SlackBotIconShape.EarColor));
-        var group = Box(size);
-        foreach (var ear in SlackBotIconShape.Ears) group.Children.Add(new GeometryDrawing { Brush = ears, Geometry = Rounded(ear) });
-        group.Children.Add(new GeometryDrawing { Pen = new Pen(head, SlackBotIconShape.Stroke), Geometry = Rounded(SlackBotIconShape.Head) });
-        var (sx, top, bottom) = SlackBotIconShape.Stalk;
-        group.Children.Add(new GeometryDrawing { Pen = new Pen(glow, SlackBotIconShape.Stroke, lineCap: PenLineCap.Round), Geometry = new LineGeometry(new Point(sx, top), new Point(sx, bottom)) });
-        var ball = SlackBotIconShape.Ball;
-        group.Children.Add(new GeometryDrawing { Brush = glow, Geometry = new EllipseGeometry(new Rect(ball.X - ball.R, ball.Y - ball.R, ball.R * 2, ball.R * 2)) });
-        foreach (var (ex, ey, er) in SlackBotIconShape.Eyes)
-            group.Children.Add(new GeometryDrawing { Brush = glow, Geometry = new EllipseGeometry(new Rect(ex - er, ey - er, er * 2, er * 2)) });
-        group.Children.Add(new GeometryDrawing { Brush = glow, Geometry = Rounded(SlackBotIconShape.Mouth) });
-        return new DrawingImage(group);
-    });
 
     private static LinearGradientBrush Gradient(double size, uint start, uint end) => new()
     {
