@@ -269,7 +269,6 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
     {
         if (pageType == typeof(HomePage)) return new("Home", () => new SymbolIcon(SymbolRegular.Home24));
         if (pageType == typeof(GeneralPage)) return new("General", () => new SymbolIcon(SymbolRegular.Settings24));
-        if (pageType == typeof(WelcomePage)) return new("Welcome", () => new SymbolIcon(SymbolRegular.HandWave24));
         if (pageType == typeof(BugReportsPage)) return new(Shell.BugReports.BugReportsServices.PageTitle, () => new SymbolIcon(SymbolRegular.Bug24));
         foreach (var module in catalog.Groups.SelectMany(g => g.Modules))
         {

@@ -7,8 +7,8 @@
              x:DataType="vm:NavMenuViewModel">
 
     <!-- The menu reads top to bottom: Home, the tools under small group names, then Bug reports and General, then the
-         switch between "open beside the page" and "icons only". Calm: no fills, no dividers; the open page's row is a
-         glass row with the strong stroke and accent text. Collapsed (class rail) only the icons stay, each group's name
+         switch between "open beside the page" and "icons only". Calm: no fills, no dividers, no mark on the open page
+         (the tab bar says which page is open); a row lights up only under the mouse. Collapsed (class rail) only the icons stay, each group's name
          becomes a short line of the same height, so opening the menu never moves the row under the mouse. -->
     <UserControl.Styles>
         <Style Selector="Button.navrow">
@@ -38,14 +38,7 @@
         <Style Selector="Button.navrow:pressed /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
         </Style>
-        <Style Selector="Button.navrow.active /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
-        </Style>
-        <Style Selector="Button.navrow.active TextBlock.navlabel">
-            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
+
         <Style Selector="Button.navrow.off core|ModuleIcon, Button.navrow.off TextBlock.navlabel">
             <Setter Property="Opacity" Value="0.5" />
         </Style>

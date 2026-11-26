@@ -51,7 +51,6 @@ internal static class ShellDemo
         Tool("wallet", "Wallet", ModuleGroup.MoneyAndMedia),
         Tool("ssh", "SSH", ModuleGroup.SecurityAndServers),
         Tool("vault", "Vault", ModuleGroup.SecurityAndServers),
-        new ShellToolItem("always-on-top", "Always On Top", ModuleGroup.WindowsAndDesktop, null) { Glyph = Symbol.Pin },
         Tool("keyboard", "Helm Keyboard", ModuleGroup.WindowsAndDesktop, on: false),
         Tool("window-zones", "Window Zones", ModuleGroup.WindowsAndDesktop),
         Tool("vocab", "Vocabulary", ModuleGroup.Learning),
@@ -93,6 +92,8 @@ internal static class ShellDemo
         // The green "just synced" lasts an hour here, so a screenshot catches it.
         var shell = new ShellViewModel(host, tools, Search(tools), new SyncIndicatorViewModel(sync, new AvaloniaUi(), TimeSpan.FromHours(1)));
         shell.Restore(new TabsState([ShellPages.Home, "notes", "wallet", "habits", "ssh"], ShellPages.Home));
+        // The app starts with the icon rail; most demos show the menu open (the Rail and Peek stages show the rail).
+        shell.Menu.IsPinned = true;
         return shell;
     }
 

@@ -47,11 +47,11 @@ A few command-line flags are handy while developing:
 src/
   Helm.Core/                 net8.0, no UI: module contract (IModule, ModuleRegistry<T>), settings, sync, update rules
   Helm.Shell/                net8.0: view models shared by both apps' Home and General (Updates, Sync), Bug reports (store, black box, view models)
-  Helm.Shell.UI/             Avalonia: Home, General, Bug reports (the page and the report form), Welcome, the MCP consent question, every platform
+  Helm.Shell.UI/             Avalonia: Home, General, Bug reports (the page and the report form), the shell (menu, tabs, title bar), the MCP consent question, every platform
   Helm.Shell.Windows/        Windows: the WPF pages that host Home, General and Bug reports, the report window, the MCP consent window, this PC's pictures and MCP part
   Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
                              GDI overlay window, DPAPI, the few WPF controls the shell still uses (Ui/); namespaces stay Helm.Core.*
-  Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, the WPF page that hosts Welcome
+  Helm.App/                  WPF-UI shell: DI host, MainWindow, tray
   Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
   Helm.Keyboard.Engine/      net8.0: Telex (namespace Helm.Typing), the ids Helm and the input method share

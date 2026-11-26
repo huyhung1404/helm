@@ -81,10 +81,10 @@ public sealed partial class NavMenuViewModel : ObservableObject
 
     public IEnumerable<NavItemViewModel> All => [Home, .. Groups.SelectMany(g => g.Items), BugReports, General];
 
-    /// <summary>Pinned: open beside the page. Unpinned: an icon rail that opens over the page on hover.</summary>
+    /// <summary>Pinned: open beside the page. Unpinned (the default): an icon rail that opens over the page on hover.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOpen), nameof(IsOverlay), nameof(ReservedWidth), nameof(PinToolTip), nameof(PinLabel), nameof(PinGlyph))]
-    private bool _isPinned = true;
+    private bool _isPinned;
 
     /// <summary>The rail is open over the page for a moment (the mouse rests on it or on the title bar's icon).</summary>
     [ObservableProperty]

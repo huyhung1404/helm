@@ -91,6 +91,9 @@ public sealed class ShellViewTests : IDisposable
         window.Close();
     }
 
+    [Fact]
+    public void The_menu_starts_as_an_icon_rail() => Assert.False(new NavMenuViewModel(new ShellCatalog([]), _ => { }).IsPinned);
+
     [AvaloniaFact]
     public async Task Collapsing_the_menu_leaves_an_icon_rail_that_opens_over_the_page()
     {
