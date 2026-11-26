@@ -4,6 +4,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Helm.Modules.NovelReader.Conversion;
 using Helm.Modules.NovelReader.Lens;
+using Helm.Modules.NovelReader.Ui;
 
 namespace Helm.Modules.NovelReader.Lens;
 

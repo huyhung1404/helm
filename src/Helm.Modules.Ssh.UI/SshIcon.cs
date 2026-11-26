@@ -1,9 +1,9 @@
 using Avalonia;
 using Avalonia.Media;
 
-namespace Helm.Modules.Ssh;
+namespace Helm.Modules.Ssh.Ui;
 
-/// <summary>The SSH icon as an Avalonia vector image, drawn from the same shapes as on Windows.</summary>
+/// <summary>The SSH icon as an Avalonia vector image, drawn from SshIconShape (the same picture on every platform).</summary>
 public static class SshIcon
 {
     public static IImage Image { get; } = Create();

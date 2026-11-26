@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Novel Reader on Android: the module, its Avalonia pages, the phone's voices and reading aloud in the background
+  <!-- Novel Reader on Android: the module, the page around the shared NovelReaderView (Helm.Modules.NovelReader.UI), the phone's voices and reading aloud in the background
        (a media playback service: the screen can be off). The logic, the view model and reading aloud come from
        Helm.Modules.NovelReader.Core (shared with Windows). Not in Helm.sln; CI builds it with the app. -->
   <PropertyGroup>
@@ -35,6 +35,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.NovelReader.Core\Helm.Modules.NovelReader.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.NovelReader.UI\Helm.Modules.NovelReader.UI.csproj" />
   </ItemGroup>
 
 </Project>

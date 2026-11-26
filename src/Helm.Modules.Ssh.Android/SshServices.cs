@@ -8,6 +8,6 @@ public static class SshServices
     public static IServiceCollection AddSshModule(this IServiceCollection services) =>
         services
             .AddSshCore()
-            .AddAndroidModule<SshModule, SshPage>()
+            .AddAndroidModule<SshModule, SshContentPage>()
             .AddTransient<SshContentPage>();
 }

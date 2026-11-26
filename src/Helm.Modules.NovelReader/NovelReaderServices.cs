@@ -26,7 +26,7 @@ public static class NovelReaderServices
             .AddSingleton<NovelScraperViewModel>()
             .AddSingleton<NovelSourceWatcher>()
             .AddNovelReaderCore()
-            .AddHelmModule<NovelReaderModule, NovelReaderPage, NovelReaderViewModel>()
+            .AddHelmModule<NovelReaderModule, NovelReaderContentPage, NovelReaderViewModel>()
             .AddSingleton<NovelReaderContentPage>();
 
     internal static Stream OpenWordClasses() =>

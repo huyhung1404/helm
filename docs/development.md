@@ -81,6 +81,14 @@ src/
   Helm.Modules.Vocab.UI/     Avalonia: the Vocabulary page (Learn, Words, Roots), its sheets and settings (every platform)
   Helm.Modules.Vocab/        Windows: the module, the WPF page that hosts the shared view, the corner pop-up card, the Claude Code agent
   Helm.Modules.Vocab.Android/ Android: the module, the page that hosts the shared view, the pop-up card and bubble over other apps (not in Helm.sln)
+  Helm.Modules.NovelReader.Core/ net8.0: novels (on Helm Sync), conversion, dictionaries, reading aloud, names, reports, MCP tools, shared view model
+  Helm.Modules.NovelReader.UI/ Avalonia: the Novel Reader page (library, reader, sheets, settings), every platform
+  Helm.Modules.NovelReader/  Windows: the module, scraping the web, Windows voices, the WPF page that hosts the shared view
+  Helm.Modules.NovelReader.Android/ Android: the module, the page that hosts the shared view, the phone's voices, Novel Lens (not in Helm.sln)
+  Helm.Modules.Ssh.Core/     net8.0: servers, keys, known hosts, sessions, the server's menu, AI agents' tools, shared view model
+  Helm.Modules.Ssh.UI/       Avalonia: the SSH page (servers, connect bar, key bar, menu and settings sheets), every platform
+  Helm.Modules.Ssh/          Windows: the module, the terminal (xterm.js in WebView2, in a NativeControlHost), the WPF page that hosts the shared view
+  Helm.Modules.Ssh.Android/  Android: the module, the page that hosts the shared view, the terminal (xterm.js in WebView) (not in Helm.sln)
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
   Helm.Core.Linux/           net8.0, Linux for the connector: secrets under a host key (0600, optionally sealed by
                              systemd-creds), MCP on a Unix socket, plain child processes; namespaces stay Helm.Core.*

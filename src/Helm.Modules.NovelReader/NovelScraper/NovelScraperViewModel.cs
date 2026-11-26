@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Services;
 using Helm.Modules.NovelReader.Scraping;
+using Helm.Modules.NovelReader.Ui;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.NovelReader;
@@ -12,7 +13,7 @@ namespace Helm.Modules.NovelReader;
 /// download"). "Retry failed" runs the same scrape again: the chapters that came are kept on disk, so only the failed
 /// ones are fetched.
 /// </summary>
-public sealed partial class NovelScraperViewModel : ObservableObject
+public sealed partial class NovelScraperViewModel : ObservableObject, INovelWebScraper
 {
     private readonly NovelScraperService _service;
     private readonly NovelReaderViewModel _novels;
@@ -46,6 +47,16 @@ public sealed partial class NovelScraperViewModel : ObservableObject
         OnPropertyChanged(nameof(IsIndeterminate));
     }
     partial void OnChapterTotalChanged(int value) => OnPropertyChanged(nameof(IsIndeterminate));
+
+    // What the shared page binds to (INovelWebScraper): the generated commands and the collection by their interface types.
+    IEnumerable<SearchHit> INovelWebScraper.Results => Results;
+    System.Windows.Input.ICommand INovelWebScraper.AutoCommand => AutoCommand;
+    System.Windows.Input.ICommand INovelWebScraper.PickCommand => PickCommand;
+    System.Windows.Input.ICommand INovelWebScraper.ReadNowCommand => ReadNowCommand;
+    System.Windows.Input.ICommand INovelWebScraper.CancelCommand => CancelCommand;
+    System.Windows.Input.ICommand INovelWebScraper.RetryFailedCommand => RetryFailedCommand;
+    System.Windows.Input.ICommand INovelWebScraper.ContinueCommand => ContinueCommand;
+    System.Windows.Input.ICommand INovelWebScraper.LogInCommand => LogInCommand;
 
     public NovelScraperViewModel(NovelScraperService service, NovelReaderViewModel novels, ILogger<NovelScraperViewModel> logger)
     {

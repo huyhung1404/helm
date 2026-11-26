@@ -23,6 +23,6 @@ public static class NovelReaderServices
             .AddNovelReaderCore()
             // Novel Lens (an accessibility service, Lens/LensService): the reading app's pages in study form.
             .AddSingleton<Lens.LensTranslator>()
-            .AddAndroidModule<NovelReaderModule, NovelReaderPage>()
+            .AddAndroidModule<NovelReaderModule, NovelReaderContentPage>()
             .AddTransient<NovelReaderContentPage>();
 }
