@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Media;
-using Helm.Modules.Keyboard;
 using Helm.Modules.SlackBot;
 using Helm.Modules.WindowZones;
 
@@ -25,7 +24,7 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         "vocab" => Helm.Modules.Vocab.Ui.VocabIcon.Image,
         "wallet" => Helm.Modules.Wallet.Ui.WalletIcon.Image,
         "vault" => Helm.Modules.Vault.Ui.VaultIcon.Image,
-        "keyboard" => Keyboard.Value,
+        "keyboard" => Helm.Modules.Keyboard.Ui.KeyboardIcon.Image,
         "window-zones" => WindowZones.Value,
         "slackbot" => SlackBot.Value,
         _ => null,
@@ -33,15 +32,6 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
 
     public IImage? For(string moduleId) => Of(moduleId);
 
-    private static readonly Lazy<IImage> Keyboard = new(() =>
-    {
-        const double size = KeyboardIconShape.Size;
-        var gradient = Gradient(size, KeyboardIconShape.GradientStart, KeyboardIconShape.GradientEnd);
-        var group = Box(size);
-        foreach (var (x, y, width, height) in KeyboardIconShape.Keys)
-            group.Children.Add(new GeometryDrawing { Brush = gradient, Geometry = new RectangleGeometry(new Rect(x, y, width, height), KeyboardIconShape.Radius, KeyboardIconShape.Radius) });
-        return new DrawingImage(group);
-    });
 
     private static readonly Lazy<IImage> WindowZones = new(() =>
     {
