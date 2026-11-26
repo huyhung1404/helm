@@ -41,7 +41,6 @@ public sealed class AvaloniaCornerWindow
     /// <param name="moved">Keeps the new bottom-left corner after a drag (null after going back to the corner).</param>
     public AvaloniaCornerWindow(IWindowService windows, IMonitorService monitors, string title, double? width, Point? anchor, Action<Point?> moved)
     {
-        HelmAvalonia.EnsureStarted();
         _windows = windows;
         _monitors = monitors;
         _anchor = anchor;
