@@ -21,7 +21,10 @@ public sealed partial class DebtsViewModel : ObservableObject
 
     private readonly DebtBook _book;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
+
+    /// <summary>The confirmations open in the page's own dialog (the shared Avalonia page passes its glass sheet).</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
     private readonly ILogger<DebtsViewModel> _logger;
     private readonly LinkHub? _links;
     private readonly Dictionary<string, DebtPersonViewModel> _people = new(StringComparer.Ordinal);

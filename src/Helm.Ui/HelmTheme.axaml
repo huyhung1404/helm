@@ -387,6 +387,29 @@
         <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
         <Setter Property="BorderThickness" Value="1" />
     </Style>
+    <!-- A text box with suggestions (a person's name): the same glass field; its list a rounded floating card -->
+    <Style Selector="AutoCompleteBox.glass /template/ TextBox#PART_TextBox">
+        <Setter Property="Background" Value="{DynamicResource HelmGlass}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="AutoCompleteBox.glass /template/ TextBox#PART_TextBox:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+    </Style>
+    <Style Selector="AutoCompleteBox.glass /template/ TextBox#PART_TextBox:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="AutoCompleteBox.glass /template/ Border#PART_SuggestionsContainer">
+        <Setter Property="Background" Value="{DynamicResource HelmSheetBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="4" />
+    </Style>
     <!-- The list opens under the field, left edges lined up (it centred under the field when wider than it) -->
     <Style Selector="ComboBox.glass /template/ Popup#PART_Popup">
         <Setter Property="Placement" Value="BottomEdgeAlignedLeft" />

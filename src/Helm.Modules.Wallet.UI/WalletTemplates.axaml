@@ -1,0 +1,243 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ic="using:FluentIcons.Avalonia"
+                    xmlns:vm="using:Helm.Modules.Wallet"
+                    xmlns:ui="using:Helm.Modules.Wallet.Ui">
+
+    <!-- The rows, cards and chips the Wallet views and their sheets share. -->
+
+    <!-- A category to pick (a form, the details): its badge, its name, and why it says more ("in Eating") -->
+    <DataTemplate x:Key="PickChip" x:DataType="vm:CategoryPick">
+        <Button Classes="pick" Classes.selected="{Binding IsSelected}" Command="{Binding PickCommand}" AutomationProperties.Name="{Binding Name}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+                <ui:CategoryBadge Icon="{Binding Icon}" Color="{Binding Color}" Size="26" />
+                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Note, StringFormat='· {0}'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding HasNote}" />
+            </StackPanel>
+        </Button>
+    </DataTemplate>
+
+    <!-- A one-tap category under a transaction to categorize (AI's pick first) -->
+    <DataTemplate x:Key="SuggestionChip" x:DataType="vm:CategoryChip">
+        <Button Classes="pick" Command="{Binding PickCommand}" AutomationProperties.Name="{Binding Name, StringFormat='File under {0}'}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+                <ui:CategoryBadge Icon="{Binding Icon}" Color="{Binding Color}" Size="26" />
+                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
+    </DataTemplate>
+
+    <!-- A fund's category, shown (not picked) -->
+    <DataTemplate x:Key="ChoiceChip" x:DataType="vm:CategoryChoice">
+        <Border Classes="choice">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+                <ui:CategoryBadge Icon="{Binding Icon}" Color="{Binding Color}" Size="26" />
+                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- What a transaction row shows: badge, what it was, category · time · bank, the amount -->
+    <DataTemplate x:Key="TransactionLine" x:DataType="vm:TransactionRow">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            <ui:CategoryBadge Icon="{Binding CategoryIcon}" Color="{Binding CategoryColor}" Size="38" Margin="0,0,12,0" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                <TextBlock Text="{Binding Title}" FontSize="14.5" TextTrimming="CharacterEllipsis" />
+                <!-- A grid, not a row as wide as it likes: the time and the bank are cut before the amount is -->
+                <Grid ColumnDefinitions="Auto,Auto,*">
+                    <TextBlock Text="{Binding CategoryName, StringFormat='{}{0} · '}" Classes="muted" TextWrapping="NoWrap" VerticalAlignment="Center"
+                               IsVisible="{Binding IsCategorized}" />
+                    <Panel Classes="waitingtag">
+                        <Border Classes="tag accent" IsVisible="{Binding !IsCategorized}">
+                            <TextBlock Text="To categorize" />
+                        </Border>
+                    </Panel>
+                    <Border Grid.Column="1" Classes="tag" IsVisible="{Binding IsAuto}" ToolTip.Tip="Filed by itself, like earlier ones with this description">
+                        <TextBlock Text="auto" />
+                    </Border>
+                    <TextBlock Grid.Column="2" Text="{Binding Details}" Classes="muted" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                </Grid>
+                <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding IsDebt}">
+                    <ic:SymbolIcon Symbol="People" FontSize="13" Margin="0,0,5,0" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding DebtText}" Classes="muted accent" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                </Grid>
+            </StackPanel>
+            <TextBlock Grid.Column="2" Text="{Binding AmountText}" Classes="amount" Classes.income="{Binding IsIncome}" Margin="10,0,0,0" />
+        </Grid>
+    </DataTemplate>
+
+    <!-- A transaction: the whole card lights up; a tap opens its details -->
+    <DataTemplate x:Key="TransactionCard" x:DataType="vm:TransactionRow">
+        <Border Classes="glass lift fade" Padding="0" Margin="0,0,0,8">
+            <Button Classes="rowhit" Padding="14,10" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Title}">
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource TransactionLine}" />
+            </Button>
+        </Border>
+    </DataTemplate>
+
+    <!-- A transaction waiting for a category: its line, then one tap files it (AI's pick first); the second row makes the
+         new category AI proposes, puts the money in the debt book, or opens every category -->
+    <DataTemplate x:Key="ToCategorizeCard" x:DataType="vm:TransactionRow">
+        <Border Classes="glass lift fade waiting" Padding="14,10,14,8" Margin="0,0,0,10">
+            <StackPanel Spacing="10">
+                <Button Classes="rowhit" Padding="0" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Title}">
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource TransactionLine}" />
+                </Button>
+                <ItemsControl ItemsSource="{Binding Suggestions}" ItemTemplate="{StaticResource SuggestionChip}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <WrapPanel Margin="0,-4,0,0">
+                    <Button Classes="act" Command="{Binding AcceptProposedCategoryCommand}" IsVisible="{Binding HasProposedCategory}"
+                            ToolTip.Tip="A new category AI proposes: made when you tap it" AutomationProperties.Name="{Binding ProposedCategoryText}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="14" Foreground="{DynamicResource HelmEyebrow}" />
+                            <TextBlock Text="{Binding ProposedCategoryText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding OpenDebtFormCommand}" IsVisible="{Binding CanBeDebt}" AutomationProperties.Name="Lent, borrowed or paid back">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="PersonMoney" FontSize="14" />
+                            <TextBlock Text="Lent, borrowed…" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="act" Command="{Binding OpenCommand}" AutomationProperties.Name="Another category">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="MoreHorizontal" FontSize="14" />
+                            <TextBlock Text="Another category" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <!-- One day of transactions: the day and what was spent on it, then its cards -->
+    <DataTemplate x:Key="DayGroup" x:DataType="vm:DayGroup">
+        <StackPanel Margin="0,8,0,4">
+            <Grid ColumnDefinitions="*,Auto" Margin="2,0,2,8">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" />
+                <TextBlock Grid.Column="1" Text="{Binding TotalText}" Classes="muted" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource TransactionCard}" />
+        </StackPanel>
+    </DataTemplate>
+
+    <!-- A fund: its honey pot (the water is what is left), name, what is left or over; a tap opens it -->
+    <DataTemplate x:Key="FundTile" x:DataType="vm:FundRow">
+        <Button Classes="glass fund" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding StatusText}"
+                ToolTip.Tip="{Binding StatusText}">
+            <StackPanel Spacing="5" HorizontalAlignment="Center">
+                <ui:FundJar Width="54" Height="64" HorizontalAlignment="Center" Level="{Binding LeftShare}" Color="{Binding Color}" Status="{Binding Status}"
+                            Text="{Binding PercentText}" TextSize="12" />
+                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
+                <Grid ColumnDefinitions="Auto,Auto" HorizontalAlignment="Center">
+                    <ic:SymbolIcon Symbol="Warning" FontSize="12" Margin="0,0,4,0" Foreground="{DynamicResource HelmDanger}" VerticalAlignment="Center"
+                                   IsVisible="{Binding !IsOnTrack}" />
+                    <TextBlock Grid.Column="1" Classes="muted" TextWrapping="NoWrap" Classes.danger="{Binding IsOver}">
+                        <Run Text="{Binding BigShort}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding BigLabel}" />
+                    </TextBlock>
+                </Grid>
+            </StackPanel>
+        </Button>
+    </DataTemplate>
+
+    <!-- A person in the debt book: their initial on a disc of their colour, name, due, balance; a tap opens them -->
+    <DataTemplate x:Key="PersonCard" x:DataType="vm:DebtPersonViewModel">
+        <Border Classes="glass lift fade" Padding="0" Margin="0,0,0,8">
+            <Button Classes="rowhit" Padding="14,10" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Name}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Border Width="40" Height="40" CornerRadius="20" Margin="0,0,12,0" Background="{Binding Name, Converter={x:Static ui:WalletConverters.PersonFill}}">
+                        <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{Binding Name, Converter={x:Static ui:WalletConverters.PersonInk}}" />
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="{Binding Name}" FontSize="14.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Details}" Classes="muted" Classes.late="{Binding IsOverdue}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding BalanceText}" Classes="amount" Classes.owed="{Binding OwedToMe}" Classes.iowe="{Binding IOwe}" Margin="10,0,0,0" />
+                </Grid>
+            </Button>
+        </Border>
+    </DataTemplate>
+
+    <!-- A slice of the donut, named: badge, name, a bar of its share, amount and share (identity never by colour alone) -->
+    <DataTemplate x:Key="LegendRow" x:DataType="vm:DonutSegment">
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,5">
+            <ui:CategoryBadge Icon="{Binding Icon}" Color="{Binding Color}" Size="32" Margin="0,0,10,0" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5">
+                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                <ProgressBar Classes="share" Value="{Binding Share}" Foreground="{Binding Color, Converter={x:Static ui:WalletConverters.Ink}}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding AmountText}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                <TextBlock Text="{Binding ShareText}" Classes="muted" HorizontalAlignment="Right" />
+            </StackPanel>
+        </Grid>
+    </DataTemplate>
+
+    <!-- Money in by category: badge, name and count, amount and share -->
+    <DataTemplate x:Key="EarningRow" x:DataType="vm:CategorySpendRow">
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,5">
+            <ui:CategoryBadge Icon="{Binding Icon}" Color="{Binding Color}" Size="32" Margin="0,0,10,0" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding CountText}" Classes="muted" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding AmountText}" FontWeight="SemiBold" HorizontalAlignment="Right" Classes="income" />
+                <TextBlock Text="{Binding ShareText}" Classes="muted" HorizontalAlignment="Right" />
+            </StackPanel>
+        </Grid>
+    </DataTemplate>
+
+    <!-- A savings goal: its photo lit up to what is saved, the money under it; a tap opens it -->
+    <DataTemplate x:Key="GoalTile" x:DataType="vm:GoalRow">
+        <Border Classes="glass lift fade" Padding="0" Margin="0,0,12,12" ClipToBounds="True">
+            <Button Classes="rowhit" Padding="0" VerticalAlignment="Stretch" VerticalContentAlignment="Top" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Name}"
+                    AutomationProperties.HelpText="{Binding LeftText}">
+                <StackPanel>
+                    <Panel Height="150">
+                        <ui:GoalPicture Photo="{Binding Photo}" Share="{Binding Share}" Color="{Binding Color}" Initial="{Binding Initial}" CornerRadius="11" />
+                        <TextBlock Text="{Binding PercentText}" Classes="onPhoto" FontSize="26" Margin="14,0,0,8" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+                        <Border Classes="tag" Background="{DynamicResource HelmSheetBackground}" IsVisible="{Binding IsReady}" Margin="0,10,10,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Top">
+                            <TextBlock Text="Ready to buy" Foreground="{DynamicResource HelmSuccess}" />
+                        </Border>
+                    </Panel>
+                    <StackPanel Margin="14,12,14,14" Spacing="3">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1" Text="{Binding PriceShort}" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+                        </Grid>
+                        <TextBlock>
+                            <Run Text="{Binding SavedText}" FontWeight="SemiBold" />
+                            <Run Text="saved" Foreground="{DynamicResource HelmSecondaryText}" />
+                        </TextBlock>
+                        <ProgressBar Classes="goal" Classes.ready="{Binding IsReady}" Value="{Binding Percent}" Margin="0,6,0,4" />
+                        <TextBlock Text="{Binding LeftText}" Classes="muted" />
+                        <TextBlock Text="{Binding PaceText}" Classes="muted" IsVisible="{Binding HasPace}" />
+                    </StackPanel>
+                </StackPanel>
+            </Button>
+        </Border>
+    </DataTemplate>
+
+    <!-- A goal bought or given up: a small picture, what happened -->
+    <DataTemplate x:Key="FinishedGoalCard" x:DataType="vm:GoalRow">
+        <Border Classes="glass lift fade" Padding="0" Margin="0,0,0,8">
+            <Button Classes="rowhit" Padding="12,10" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding EndedText}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <ui:GoalPicture Width="56" Height="42" CornerRadius="8" Margin="0,0,12,0" Photo="{Binding Photo}" Share="{Binding Share}" Color="{Binding Color}"
+                                    Initial="{Binding Initial}" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding EndedText}" Classes="muted" />
+                    </StackPanel>
+                    <Border Grid.Column="2" Classes="tag" Margin="10,0,0,0">
+                        <TextBlock Text="{Binding StateText}" />
+                    </Border>
+                </Grid>
+            </Button>
+        </Border>
+    </DataTemplate>
+</ResourceDictionary>

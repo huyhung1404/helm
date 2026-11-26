@@ -1,0 +1,375 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             xmlns:ui="using:Helm.Modules.Wallet.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Wallet.Ui.MoneyView"
+             x:DataType="vm:WalletViewModel">
+
+    <!-- The Money tab, read top to bottom in the order money is handled: which month and how it goes → add one by hand →
+         file what waits for a category → bills to pay and the funds → the month's transactions. On a wide screen the bills
+         and the funds sit in a column beside the transactions; on a phone they come before them. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Wallet.UI/WalletStyles.axaml" />
+    </UserControl.Styles>
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Modules.Wallet.UI/WalletTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <!-- 1. The month: its name, how it goes, and the way to other months -->
+        <Grid ColumnDefinitions="*,Auto" Margin="0,22,0,16">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Classes="display" Text="{Binding MonthTitle}" />
+                <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="{Binding MonthLine}" TextWrapping="Wrap"
+                           IsVisible="{Binding MonthLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0" IsVisible="{Binding !IsFirstRun}">
+                <Button Classes="ghost" Content="This month" Command="{Binding ThisMonthCommand}" IsVisible="{Binding !IsCurrentMonth}" />
+                <Button Classes="chip" Command="{Binding PreviousMonthCommand}" ToolTip.Tip="Previous month" AutomationProperties.Name="Previous month">
+                    <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+                </Button>
+                <Button Classes="chip" Command="{Binding NextMonthCommand}" IsEnabled="{Binding CanGoNext}" ToolTip.Tip="Next month" AutomationProperties.Name="Next month">
+                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- First run: the way in, step by step (1 is the only thing to do now) -->
+        <Border Classes="glass hero enter" IsVisible="{Binding IsFirstRun}" Margin="0,0,0,6" Padding="28,26">
+            <StackPanel Spacing="18">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="START HERE" />
+                    <TextBlock Text="Know where your money goes" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                </StackPanel>
+                <UniformGrid x:Name="FirstRunSteps" Columns="3">
+                    <Border Classes="glass" Margin="0,0,10,10" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="1" />
+                            <TextBlock Text="Add what you spend" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" Text="Type 45k cà phê in the box below. On your phone, Helm can also save your bank's notifications by itself." />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="2" />
+                            <TextBlock Text="Give each a category" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" Text="One tap. Helm learns, and files the next ones like it by itself." />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="3" />
+                            <TextBlock Text="See where it went" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" Text="Insights show the month; funds warn you before one runs out." />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding OpenAddCommand}"
+                        AutomationProperties.Name="Add my first transaction">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <TextBlock Text="Add my first transaction" Foreground="{DynamicResource HelmPillForeground}" />
+                        <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- The month in numbers: spent, money in, net, and what is left of the funds (or the budget) -->
+        <UniformGrid x:Name="StatGrid" Columns="4" Margin="0,0,-10,6" IsVisible="{Binding !IsFirstRun}">
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Spent" Classes="muted" />
+                    <TextBlock Classes="stat wideonly" Text="{Binding SpentText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="stat narrowonly" Text="{Binding SpentShort}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="muted" Text="{Binding SpentTodayText}" IsVisible="{Binding HasSpentToday}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Money in" Classes="muted" />
+                    <TextBlock Classes="stat income wideonly" Text="{Binding IncomeText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="stat income narrowonly" Text="{Binding IncomeShort}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="muted" Text="{Binding CountText}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="glass" Margin="0,0,10,10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Net" Classes="muted" />
+                    <TextBlock Classes="stat wideonly" Classes.danger="{Binding IsNetNegative}" Text="{Binding NetText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="stat narrowonly" Classes.danger="{Binding IsNetNegative}" Text="{Binding NetShort}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="muted" Text="Money in less spent" />
+                </StackPanel>
+            </Border>
+            <!-- The funds are the month's budget when there are any; else the one monthly budget, if set -->
+            <Border x:Name="FundsStat" Classes="glass" Margin="0,0,10,10" IsVisible="{Binding Funds.HasFunds, FallbackValue=False}">
+                <StackPanel Spacing="2">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Funds left" Classes="muted" />
+                        <TextBlock Grid.Column="1" Text="{Binding Funds.UsedPercentText, FallbackValue=''}" Classes="muted" />
+                    </Grid>
+                    <TextBlock Classes="stat" Classes.danger="{Binding Funds.TotalIsOver, FallbackValue=False}" Text="{Binding Funds.LeftText, FallbackValue=''}"
+                               TextTrimming="CharacterEllipsis" />
+                    <ui:BudgetMeter Margin="0,2,0,0" Percent="{Binding Funds.UsedPercent, FallbackValue=0}" Pace="{Binding BudgetPacePercent}"
+                                    IsOver="{Binding Funds.TotalIsOver, FallbackValue=False}" ToolTip.Tip="The mark is where spending would be on track today" />
+                </StackPanel>
+            </Border>
+            <Border x:Name="BudgetStat" Classes="glass" Margin="0,0,10,10" IsVisible="{Binding ShowBudgetCard}">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Budget" Classes="muted" />
+                    <TextBlock Classes="stat" Classes.danger="{Binding IsOverBudget}" Text="{Binding BudgetText}" FontSize="17" TextWrapping="Wrap" />
+                    <ui:BudgetMeter Margin="0,2,0,0" Percent="{Binding BudgetPercent}" Pace="{Binding BudgetPacePercent}" IsOver="{Binding IsOverBudget}"
+                                    ToolTip.Tip="The mark is where spending would be on track today" />
+                    <TextBlock Classes="muted" Text="{Binding BudgetDetail}" />
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <StackPanel x:Name="MainColumn">
+            <!-- 2. Add: cash, or a bank Helm does not read. "45k cà phê" and Enter; the options open the whole form -->
+            <StackPanel x:Name="AddPart" Margin="0,10,0,0">
+                <Border Classes="glass" Padding="16,8,8,8">
+                    <StackPanel>
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBox x:Name="QuickBox" Classes="bare" FontSize="15" PlaceholderText="Add spending: 45k cà phê — press Enter" Text="{Binding QuickText}"
+                                     VerticalAlignment="Center" AutomationProperties.Name="Add a transaction">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding QuickAddCommand}" />
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                            <Button Grid.Column="1" Classes="chip" Margin="8,0" VerticalAlignment="Center" Command="{Binding OpenQuickOptionsCommand}"
+                                    ToolTip.Tip="Money in, category, day, note" AutomationProperties.Name="More: money in, category, day, note">
+                                <ic:SymbolIcon Symbol="Options" FontSize="16" />
+                            </Button>
+                            <Button Grid.Column="2" Classes="pill" Width="40" Height="40" MinHeight="40" Padding="0" VerticalAlignment="Center"
+                                    Command="{Binding QuickAddCommand}" ToolTip.Tip="Add" AutomationProperties.Name="Add">
+                                <ic:SymbolIcon Symbol="Add" FontSize="18" Foreground="{DynamicResource HelmPillForeground}" />
+                            </Button>
+                        </Grid>
+                        <TextBlock Text="{Binding QuickHint}" Classes="hint" Classes.ok="{Binding QuickReads}" Margin="0,0,0,6" IsVisible="{Binding HasQuickHint}"
+                                   core:Motion.EnterOnShow="True" core:Motion.FromTop="True" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- 3. Do: what the bank saved and waits for a category. One tap files it -->
+            <StackPanel x:Name="ToCategorizePart" Margin="0,26,0,0" IsVisible="{Binding HasToCategorize}">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock Text="To categorize" Classes="head" FontSize="18" />
+                        <Border Classes="tag accent" VerticalAlignment="Center"><TextBlock Text="{Binding ToCategorize.Count}" /></Border>
+                    </StackPanel>
+                    <Button x:Name="AllToCategorize" Grid.Column="1" Classes="ghost" Command="{Binding OpenToCategorizeCommand}" AutomationProperties.Name="All to categorize">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock x:Name="AllToCategorizeText" Text="See all" />
+                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <TextBlock Classes="muted" Margin="2,0,0,12" Text="Tap a category to file it. Tap the transaction for anything else." />
+                <!-- "The same for similar ones" after filing one -->
+                <Border Classes="glass" Margin="0,0,0,10" IsVisible="{Binding HasSimilar}" BorderBrush="{DynamicResource HelmGlassStrokeStrong}"
+                        core:Motion.EnterOnShow="True">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                        <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Margin="0,0,10,0" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                        <TextBlock Grid.Column="1" Text="{Binding SimilarText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,10,0,0">
+                            <Button Classes="ghost" HorizontalAlignment="Stretch" Content="No" Command="{Binding DismissSimilarCommand}" />
+                            <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Yes, file them" Command="{Binding ApplySimilarCommand}" />
+                        </Grid>
+                    </Grid>
+                </Border>
+                <ItemsControl x:Name="ToCategorizeList" ItemTemplate="{StaticResource ToCategorizeCard}" />
+            </StackPanel>
+
+            <!-- 4. The bills and the funds (beside the transactions on a wide screen) -->
+            <StackPanel x:Name="SidePart" Spacing="14" IsVisible="{Binding !IsFirstRun}">
+                <!-- The bills that come every month: this month paid or not; "Paid" saves the spending (Undo) -->
+                <Panel IsVisible="{Binding Bills, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <Panel DataContext="{Binding Bills}">
+                        <Border Classes="glass" x:DataType="vm:BillsViewModel">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="Bills" Classes="head" />
+                                        <TextBlock Text="{Binding SummaryText}" Classes="muted" IsVisible="{Binding HasBills}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="chip" Command="{Binding BeginAddCommand}" VerticalAlignment="Top" ToolTip.Tip="Add a bill"
+                                            AutomationProperties.Name="Add a bill">
+                                        <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                                    </Button>
+                                </Grid>
+                                <TextBlock Classes="muted" IsVisible="{Binding HasNoBills}"
+                                           Text="Electricity, internet, rent: bills that come every month. Helm reminds you before each is due, and “Paid” saves the spending." />
+
+                                <!-- What the last Paid or Delete did, with Undo -->
+                                <Border Classes="glass" Padding="12,6,6,6" IsVisible="{Binding HasMessage}" core:Motion.EnterOnShow="True">
+                                    <Grid ColumnDefinitions="*,Auto,Auto">
+                                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="act" Margin="6,0,0,0" Content="Undo" Command="{Binding UndoCommand}" IsVisible="{Binding CanUndo}" />
+                                        <Button Grid.Column="2" Classes="act" Margin="6,0,0,0" Command="{Binding DismissMessageCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                                            <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
+                                        </Button>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Add or edit: the name, the amount (empty: it varies), the day of the month it is due -->
+                                <StackPanel Spacing="8" IsVisible="{Binding IsEditing}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                                    <TextBlock Text="{Binding FormTitle}" FontWeight="SemiBold" />
+                                    <TextBox Classes="glass" Text="{Binding FormName}" PlaceholderText="Name, e.g. Tiền điện" MaxLength="60" AutomationProperties.Name="Bill name" />
+                                    <Grid ColumnDefinitions="*,88" ColumnSpacing="8">
+                                        <TextBox Classes="glass amount" FontSize="14" FontWeight="Normal" Text="{Binding FormAmount}" PlaceholderText="Amount (empty: it varies)"
+                                                 AutomationProperties.Name="Amount every month" />
+                                        <TextBox Grid.Column="1" Classes="glass" Text="{Binding FormDayText}" PlaceholderText="Day" MaxLength="2" ToolTip.Tip="Day of the month it is due"
+                                                 AutomationProperties.Name="Day of the month it is due" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding FormAmountHint}" Classes="hint" Margin="2,0,0,0" />
+                                    <TextBlock Text="{Binding FormProblem}" Classes="muted late" IsVisible="{Binding HasFormProblem}" />
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel" Command="{Binding CancelEditCommand}" />
+                                        <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Save" Command="{Binding SaveEditCommand}" />
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- One row per bill: name, amount and this month's state, Paid, edit, delete -->
+                                <ItemsControl ItemsSource="{Binding Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:BillRow">
+                                            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmGlassStroke}" Padding="0,9,0,3">
+                                                <StackPanel Spacing="8">
+                                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                                                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Classes="muted" Classes.late="{Binding IsLate}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap">
+                                                                <Run Text="{Binding AmountText}" /><Run Text=" · " /><Run Text="{Binding StateText}" />
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" Classes="act" Margin="8,0,0,0" Command="{Binding PayCommand}" IsVisible="{Binding CanPay}"
+                                                                ToolTip.Tip="Saves the spending" AutomationProperties.Name="{Binding Name, StringFormat='{}{0}: paid'}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                <ic:SymbolIcon Symbol="Checkmark" FontSize="13" />
+                                                                <TextBlock Text="Paid" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <ic:SymbolIcon Grid.Column="1" Symbol="CheckmarkCircle" IconVariant="Filled" FontSize="20" Margin="8,0,6,0"
+                                                                       Foreground="{DynamicResource HelmSuccess}" IsVisible="{Binding IsPaid}" VerticalAlignment="Center"
+                                                                       ToolTip.Tip="Paid this month" />
+                                                        <Button Grid.Column="2" Classes="act" Margin="4,0,0,0" MinWidth="36" Padding="8,7" Command="{Binding EditCommand}"
+                                                                ToolTip.Tip="Edit" AutomationProperties.Name="{Binding Name, StringFormat='Edit {0}'}">
+                                                            <ic:SymbolIcon Symbol="Edit" FontSize="14" />
+                                                        </Button>
+                                                        <Button Grid.Column="3" Classes="act" Margin="4,0,0,0" MinWidth="36" Padding="8,7" Command="{Binding DeleteCommand}"
+                                                                ToolTip.Tip="Delete" AutomationProperties.Name="{Binding Name, StringFormat='Delete {0}'}">
+                                                            <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                                                        </Button>
+                                                    </Grid>
+                                                    <!-- A bill that varies: how much it came to this month -->
+                                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6" IsVisible="{Binding IsAskingAmount}" core:Motion.EnterOnShow="True">
+                                                        <TextBox Classes="glass amount" FontSize="14" FontWeight="Normal" Text="{Binding PayAmount}" PlaceholderText="How much? 450k"
+                                                                 AutomationProperties.Name="{Binding Name, StringFormat='How much was {0}'}" />
+                                                        <Button Grid.Column="1" Classes="ghost" Content="Cancel" Command="{Binding CancelPayCommand}" />
+                                                        <Button Grid.Column="2" Classes="pill" Content="Save" Command="{Binding PayCommand}" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </Panel>
+                </Panel>
+
+                <!-- The funds as honey pots: the water is what is left; a tap opens one -->
+                <Panel IsVisible="{Binding Funds, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <Panel DataContext="{Binding Funds}">
+                        <Border Classes="glass" x:DataType="vm:FundsViewModel">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="Funds" Classes="head" />
+                                        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasFunds}">
+                                            <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="13" Margin="0,0,5,0" Foreground="{DynamicResource HelmSuccess}"
+                                                           IsVisible="{Binding !HasAlerts}" VerticalAlignment="Center" />
+                                            <ic:SymbolIcon Symbol="Warning" FontSize="13" Margin="0,0,5,0" Foreground="{DynamicResource HelmDanger}"
+                                                           IsVisible="{Binding HasAlerts}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding AlertText}" Classes="muted" />
+                                        </Grid>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="chip" Command="{Binding OpenAddCommand}" VerticalAlignment="Top" ToolTip.Tip="Add a fund"
+                                            AutomationProperties.Name="Add a fund">
+                                        <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                                    </Button>
+                                </Grid>
+                                <StackPanel Spacing="10" IsVisible="{Binding HasNoFunds}">
+                                    <TextBlock Classes="muted"
+                                               Text="Set an amount for each part of your month (eating, getting around, home and bills…) and pick its categories. Spending in them comes off the fund, and Helm warns before a fund runs out." />
+                                    <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding OpenAddCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ic:SymbolIcon Symbol="Add" FontSize="14" />
+                                            <TextBlock Text="Add a fund" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource FundTile}" Margin="0,0,-10,-10" IsVisible="{Binding HasFunds}">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                                <!-- Spending in no fund: one tap makes a fund of its categories -->
+                                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding OpenOutsideCommand}"
+                                        IsVisible="{Binding HasOutside}" AutomationProperties.Name="Outside funds: put them in a fund">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Spacing="1">
+                                            <TextBlock TextWrapping="Wrap"><Run Text="{Binding OutsideText}" FontWeight="SemiBold" /><Run Text=" spent outside funds" /></TextBlock>
+                                            <TextBlock Text="{Binding OutsideNames}" Classes="muted" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="Put in a fund" Classes="accent" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" />
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+                    </Panel>
+                </Panel>
+            </StackPanel>
+
+            <!-- 5. Done: the month's transactions, newest first -->
+            <StackPanel x:Name="TransactionsPart" Margin="0,26,0,0" IsVisible="{Binding !IsFirstRun}">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="Transactions" Classes="head" FontSize="18" />
+                    </StackPanel>
+                    <Border Grid.Column="1" Classes="glass" Padding="3" CornerRadius="10" BoxShadow="" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="2">
+                            <RadioButton x:Name="FilterAll" Classes="seg" GroupName="WalletFilter" IsChecked="True" Content="All" IsCheckedChanged="Filter_Changed" />
+                            <RadioButton x:Name="FilterSpending" Classes="seg" GroupName="WalletFilter" Content="Spending" IsCheckedChanged="Filter_Changed" />
+                            <RadioButton x:Name="FilterIncome" Classes="seg" GroupName="WalletFilter" Content="Money in" IsCheckedChanged="Filter_Changed" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+                <TextBox Classes="glass" Text="{Binding SearchText}" PlaceholderText="Search descriptions, notes, banks, categories" AutomationProperties.Name="Search transactions"
+                         Margin="0,0,0,6">
+                    <TextBox.InnerLeftContent>
+                        <ic:SymbolIcon Symbol="Search" FontSize="16" Margin="12,0,4,0" Foreground="{DynamicResource HelmSecondaryText}" />
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+                <Border Classes="glass" Margin="0,10,0,0" IsVisible="{Binding !HasDays}">
+                    <TextBlock Text="{Binding EmptyText}" Classes="muted" />
+                </Border>
+                <ItemsControl ItemsSource="{Binding Days}" ItemTemplate="{StaticResource DayGroup}" />
+                <!-- Only the newest few are drawn: the whole month made the page slow to scroll -->
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Margin="0,4,0,0" Content="{Binding TransactionPager.MoreText}"
+                        Command="{Binding TransactionPager.ShowMoreCommand}" IsVisible="{Binding TransactionPager.HasMore}" AutomationProperties.Name="Show more transactions" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Beside the transactions on a wide screen (MoneyView moves the bills and funds here) -->
+        <Grid x:Name="WideColumns" ColumnDefinitions="*,22,340" IsVisible="False">
+            <StackPanel x:Name="WideMain" />
+            <StackPanel x:Name="WideSide" Grid.Column="2" Margin="0,26,0,0" />
+        </Grid>
+    </StackPanel>
+</UserControl>

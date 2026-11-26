@@ -1,0 +1,189 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             xmlns:ui="using:Helm.Modules.Wallet.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Wallet.Ui.FundSheet"
+             x:DataType="vm:FundsViewModel">
+
+    <!-- The fund sheets of the Wallet pop-up: a fund (what is left, its spending this month), adding or editing one, and
+         moving money into it from another fund for the month. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Modules.Wallet.UI/WalletTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Panel>
+        <!-- ============ A fund ============ -->
+        <StackPanel x:Name="FundSection" Spacing="16" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="{Binding Selected.KindText, FallbackValue=''}" Title="{Binding Selected.Name, FallbackValue=''}"
+                            CloseCommand="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+            <Grid ColumnDefinitions="Auto,*">
+                <ui:FundJar Width="80" Height="92" Margin="0,0,18,0" Level="{Binding Selected.LeftShare, FallbackValue=0}" Color="{Binding Selected.Color, FallbackValue=0}"
+                            Status="{Binding Selected.Status, FallbackValue=OnTrack}" Text="{Binding Selected.PercentText, FallbackValue=''}" TextSize="15" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                    <TextBlock>
+                        <Run Text="{Binding Selected.BigText, FallbackValue=''}" FontSize="26" FontWeight="SemiBold" />
+                        <Run Text="{Binding Selected.BigLabel, FallbackValue=''}" Foreground="{DynamicResource HelmSecondaryText}" />
+                    </TextBlock>
+                    <TextBlock Text="{Binding Selected.StatusText, FallbackValue=''}" Classes="muted" Classes.late="{Binding Selected.IsOver, FallbackValue=False}" />
+                    <ui:BudgetMeter Margin="0,6,0,0" Percent="{Binding Selected.SpentPercent, FallbackValue=0}"
+                                    Pace="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).BudgetPacePercent, FallbackValue=-1}"
+                                    IsOver="{Binding Selected.IsOver, FallbackValue=False}" ToolTip.Tip="The mark is where spending would be on track today" />
+                </StackPanel>
+            </Grid>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                <Border Classes="glass">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Fund" Classes="muted" />
+                        <TextBlock Text="{Binding Selected.AmountText, FallbackValue=''}" FontWeight="SemiBold" FontSize="16" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="glass">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Spent" Classes="muted" />
+                        <TextBlock Text="{Binding Selected.SpentText, FallbackValue=''}" FontWeight="SemiBold" FontSize="16" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+            <TextBlock Classes="muted" FontSize="13">
+                <Run Text="{Binding Selected.PerDayText, FallbackValue=''}" />
+                <Run Text="{Binding Selected.CarryText, FallbackValue=''}" />
+            </TextBlock>
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}" IsVisible="{Binding Selected.IsOver, FallbackValue=False}">
+                <StackPanel Spacing="10">
+                    <TextBlock TextWrapping="Wrap"><Run Text="{Binding Selected.StatusText, FallbackValue=''}" /><Run Text=". Cover it from a fund with money left, or leave it over." /></TextBlock>
+                    <Button Classes="pill" HorizontalAlignment="Stretch" Content="Cover it…" Command="{Binding OpenCoverCommand}" />
+                </StackPanel>
+            </Border>
+            <StackPanel>
+                <TextBlock Text="Its categories" Classes="field" />
+                <ItemsControl ItemsSource="{Binding Selected.Categories, FallbackValue={x:Null}}" ItemTemplate="{StaticResource ChoiceChip}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Spent from it this month" Classes="field" />
+                <TextBlock Text="Nothing yet." Classes="muted" IsVisible="{Binding !HasSelectedRows}" />
+                <ItemsControl ItemsSource="{Binding SelectedRows}" ItemTemplate="{StaticResource TransactionCard}" />
+            </StackPanel>
+            <WrapPanel>
+                <Button Classes="act" Command="{Binding OpenCoverCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowSwap" FontSize="14" />
+                        <TextBlock Text="Move money in from another fund" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="act" Command="{Binding DeleteSelectedCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                        <TextBlock Text="Delete fund" Foreground="{DynamicResource HelmDanger}" />
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding EditSelectedCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Edit" FontSize="14" />
+                        <TextBlock Text="Edit" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Done"
+                        Command="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).ClosePopupCommand, FallbackValue={x:Null}}" />
+            </Grid>
+        </StackPanel>
+
+        <!-- ============ Add or edit a fund ============ -->
+        <StackPanel x:Name="FormSection" Spacing="16" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="Funds" Title="{Binding FormTitle}" Subtitle="Spending in its categories comes off it."
+                            CloseCommand="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+            <StackPanel>
+                <TextBlock Text="Name" Classes="field" />
+                <TextBox x:Name="FundNameBox" Classes="glass" PlaceholderText="Ăn uống, Đi lại, Trip to Đà Lạt…" Text="{Binding FormName}" AutomationProperties.Name="Fund name" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Amount" Classes="field" />
+                <TextBox Classes="glass amount" PlaceholderText="2tr, 500k" Text="{Binding FormAmount}" AutomationProperties.Name="Fund amount">
+                    <TextBox.InnerRightContent>
+                        <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    </TextBox.InnerRightContent>
+                </TextBox>
+                <TextBlock Text="{Binding FormAmountHint}" Classes="hint" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="How often" Classes="field" />
+                <ui:SegChoice Items="{x:Static vm:FundsViewModel.FormKindNames}" SelectedIndex="{Binding FormKindIndex}" />
+                <TextBlock Text="{Binding FormKindHelp}" Classes="hint" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Categories" Classes="field" />
+                <ItemsControl ItemsSource="{Binding FormPicks}" ItemTemplate="{StaticResource PickChip}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <TextBlock Text="A category belongs to one fund. Picking one from another fund moves it here." Classes="hint" Margin="2,0,0,0" />
+            </StackPanel>
+            <StackPanel IsVisible="{Binding FormEveryMonth}">
+                <TextBlock Text="At the end of the month" Classes="field" />
+                <ui:SegChoice Items="{x:Static vm:FundsViewModel.FormCarryNames}" SelectedIndex="{Binding FormCarryIndex}" />
+                <TextBlock Text="{Binding FormCarryHelp}" Classes="hint" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Warn me" Classes="field" />
+                <ui:SegChoice Items="{x:Static vm:FundsViewModel.FormAlertNames}" SelectedIndex="{Binding FormAlertIndex}" />
+                <TextBlock Text="A notification, and the fund is marked. Going over always warns." Classes="hint" />
+            </StackPanel>
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}"
+                    IsVisible="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).HasPopupError, FallbackValue=False}">
+                <TextBlock Text="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).PopupError, FallbackValue=''}" TextWrapping="Wrap" />
+            </Border>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel"
+                        Command="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="{Binding FormSaveText}" Command="{Binding SaveFormCommand}" />
+            </Grid>
+        </StackPanel>
+
+        <!-- ============ Move money into a fund for this month ============ -->
+        <StackPanel x:Name="CoverSection" Spacing="16" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="{Binding Selected.Name, FallbackValue=''}" Title="Move money in" Subtitle="It comes out of another fund, for this month only."
+                            CloseCommand="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+            <StackPanel>
+                <TextBlock Text="From" Classes="field" />
+                <TextBlock Text="No other fund has money left this month." Classes="muted" IsVisible="{Binding HasNoCoverChoices}" />
+                <ItemsControl ItemsSource="{Binding CoverChoices}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FundChoice">
+                            <Button Classes="pick" Padding="12,4" Classes.selected="{Binding IsSelected}" Content="{Binding Name}" Command="{Binding PickCommand}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Amount" Classes="field" />
+                <TextBox x:Name="CoverAmountBox" Classes="glass amount" Text="{Binding CoverAmount}" AutomationProperties.Name="Amount to move">
+                    <TextBox.InnerRightContent>
+                        <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    </TextBox.InnerRightContent>
+                </TextBox>
+                <TextBlock Text="{Binding CoverHint}" Classes="hint" />
+            </StackPanel>
+            <Border Classes="glass" IsVisible="{Binding HasCoverPreview}">
+                <TextBlock Text="{Binding CoverPreview}" TextWrapping="Wrap" />
+            </Border>
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}"
+                    IsVisible="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).HasPopupError, FallbackValue=False}">
+                <TextBlock Text="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).PopupError, FallbackValue=''}" TextWrapping="Wrap" />
+            </Border>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel"
+                        Command="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Move" Command="{Binding SaveCoverCommand}" />
+            </Grid>
+        </StackPanel>
+    </Panel>
+</UserControl>

@@ -26,7 +26,7 @@ public sealed partial class WalletViewModel : ObservableObject
     private readonly WalletCapture _capture;
     private readonly ISettingsStore<WalletSettings> _settings;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly IWalletPlatform? _platform;
     private readonly ILogger<WalletViewModel> _logger;
@@ -769,6 +769,7 @@ public sealed partial class WalletViewModel : ObservableObject
             CanGoNext = _month < current;
 
             var transactions = _store.Transactions();
+            IsFirstRun = transactions.Count == 0;
             var summary = WalletStats.Month(transactions, categories, _month, now, _zone);
             SpentText = WalletFormat.Money(summary.Spent);
             IncomeText = WalletFormat.Money(summary.Income);

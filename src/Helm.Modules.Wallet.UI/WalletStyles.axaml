@@ -1,0 +1,177 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- What the Wallet views and their sheets share on top of HelmTheme: money in its colours, the category chips, the
+         fund and goal tiles, and the parts that show only on a phone or only on a wide screen. -->
+
+    <!-- Money: spending in the text colour, money in green, over / owed by me in the danger colour -->
+    <Style Selector="TextBlock.amount">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="14.5" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+    </Style>
+    <Style Selector="TextBlock.income, TextBlock.owed">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+    </Style>
+    <Style Selector="TextBlock.danger, TextBlock.iowe">
+        <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+    </Style>
+    <Style Selector="TextBlock.accent">
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+    </Style>
+    <!-- A big amount in a sheet (the transaction, the person's balance) -->
+    <Style Selector="TextBlock.big">
+        <Setter Property="FontSize" Value="30" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- A field's name above it, in a sheet's form -->
+    <Style Selector="TextBlock.field">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="2,0,0,6" />
+    </Style>
+    <Style Selector="StackPanel.field">
+        <Setter Property="Spacing" Value="0" />
+    </Style>
+    <!-- The line under an amount box: "= 1,200,000 ₫", or how to type one -->
+    <Style Selector="TextBlock.hint">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Margin" Value="2,6,0,0" />
+    </Style>
+    <Style Selector="TextBlock.hint.ok">
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+    </Style>
+    <!-- An amount typed in: big, the ₫ inside on the right -->
+    <Style Selector="TextBox.amount">
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- A category to pick: its badge, its name; the chosen one outlined in the accent -->
+    <Style Selector="Button.pick">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Padding" Value="5,4,12,4" />
+        <Setter Property="Margin" Value="0,0,6,6" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.pick:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+    </Style>
+    <Style Selector="Button.pick.selected">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.pick.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+    </Style>
+    <!-- A category shown, not picked (a fund's categories) -->
+    <Style Selector="Border.choice">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="5,4,12,4" />
+        <Setter Property="Margin" Value="0,0,6,6" />
+    </Style>
+
+    <!-- Tags: the accent one ("To categorize", "Ready"), the warning one (a fund running low) -->
+    <Style Selector="Border.tag.accent > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+    </Style>
+    <Style Selector="Border.tag.warn">
+        <Setter Property="Background" Value="{DynamicResource HelmWarningBackground}" />
+    </Style>
+    <Style Selector="Border.tag.late > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+    </Style>
+
+    <!-- In the list of what waits for a category, every row waits: no tag for it -->
+    <Style Selector="Border.waiting Panel.waitingtag">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <!-- A fund in the row of funds: its honey pot, name, what is left -->
+    <Style Selector="Button.fund">
+        <Setter Property="Width" Value="128" />
+        <Setter Property="Margin" Value="0,0,10,10" />
+        <Setter Property="Padding" Value="10,12,10,10" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Top" />
+    </Style>
+    <!-- A savings goal's bar; ready to buy: green -->
+    <Style Selector="ProgressBar.goal">
+        <Setter Property="MinHeight" Value="6" />
+        <Setter Property="Height" Value="6" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="100" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+    </Style>
+    <Style Selector="ProgressBar.goal.ready">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+    </Style>
+    <!-- A big figure on a photo: white with a shadow, readable on any picture -->
+    <Style Selector="TextBlock.onPhoto">
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Effect">
+            <DropShadowEffect BlurRadius="8" OffsetX="0" OffsetY="0" Opacity="0.8" Color="Black" />
+        </Setter>
+    </Style>
+    <!-- A legend's share bar, in the category's colour -->
+    <Style Selector="ProgressBar.share">
+        <Setter Property="MinHeight" Value="5" />
+        <Setter Property="Height" Value="5" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="1" />
+        <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+    </Style>
+
+    <!-- A notice that goes by itself, floating at the bottom of the page -->
+    <Style Selector="Border.toast">
+        <Setter Property="Background" Value="{DynamicResource HelmSheetBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="16,11" />
+        <Setter Property="BoxShadow" Value="{DynamicResource HelmHeroShadow}" />
+    </Style>
+
+    <!-- A chip that cannot be used now (the next month from this one): faded, no fill -->
+    <Style Selector=":is(Button).chip:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector=":is(Button).chip:disabled">
+        <Setter Property="Opacity" Value="0.35" />
+    </Style>
+
+    <!-- Only on a wide screen / only on a phone -->
+    <Style Selector=":is(Control).narrowonly">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector=":is(UserControl).narrow :is(Control).narrowonly">
+        <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector=":is(UserControl).narrow :is(Control).wideonly">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- Stat figures shrink a little on a phone, where four sit two by two -->
+    <Style Selector=":is(UserControl).narrow TextBlock.stat">
+        <Setter Property="FontSize" Value="21" />
+    </Style>
+</Styles>

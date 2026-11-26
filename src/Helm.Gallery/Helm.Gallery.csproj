@@ -35,6 +35,7 @@
     <ProjectReference Include="..\Helm.Modules.NovelReader.UI\Helm.Modules.NovelReader.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Ssh.UI\Helm.Modules.Ssh.UI.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vocab.UI\Helm.Modules.Vocab.UI.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Wallet.UI\Helm.Modules.Wallet.UI.csproj" />
     <ProjectReference Include="..\Helm.Shell.UI\Helm.Shell.UI.csproj" />
     <ProjectReference Include="..\Helm.ToolIcons\Helm.ToolIcons.csproj" />
   </ItemGroup>

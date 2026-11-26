@@ -158,7 +158,10 @@ public sealed partial class FundsViewModel : ObservableObject
 {
     private readonly FundBook _book;
     private readonly WalletViewModel _owner;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
+
+    /// <summary>The confirmations open in the page's own dialog (the shared Avalonia page passes its glass sheet).</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
     private readonly TimeZoneInfo _zone;
     private readonly Dictionary<string, FundRow> _rows = new(StringComparer.Ordinal);
     private IReadOnlyList<CategoryInfo> _categories = [];

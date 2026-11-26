@@ -1,0 +1,150 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             xmlns:ui="using:Helm.Modules.Wallet.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Wallet.Ui.DebtSheet"
+             x:DataType="vm:DebtsViewModel">
+
+    <!-- The debt-book sheets of the Wallet pop-up: a new debt, and a person (balance, due date, notes, history). -->
+    <Panel>
+        <!-- ============ A new debt ============ -->
+        <StackPanel x:Name="AddSection" Spacing="16" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="Debt book" Title="Add a debt" Subtitle="Money lent or borrowed in cash. A bank transfer: open it in Money instead."
+                            CloseCommand="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+            <StackPanel>
+                <TextBlock Text="Who it is with" Classes="field" />
+                <AutoCompleteBox x:Name="PersonBox" Classes="glass" PlaceholderText="A name" Text="{Binding NewPerson}" ItemsSource="{Binding PersonNames}" FilterMode="ContainsOrdinal"
+                                 MinimumPrefixLength="1" AutomationProperties.Name="Person" />
+                <ItemsControl ItemsSource="{Binding PersonSuggestions}" Margin="0,8,0,0" IsVisible="{Binding HasPersonSuggestions}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Button Classes="act" Content="{Binding}" CommandParameter="{Binding}"
+                                    Command="{Binding $parent[ItemsControl].((vm:DebtsViewModel)DataContext).PickPersonCommand, FallbackValue={x:Null}}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="A name already in the book adds to that person." Classes="hint" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Amount" Classes="field" />
+                <TextBox Classes="glass amount" PlaceholderText="150k, 1.5tr" Text="{Binding NewAmount}" AutomationProperties.Name="Amount">
+                    <TextBox.InnerRightContent>
+                        <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    </TextBox.InnerRightContent>
+                </TextBox>
+                <TextBlock Text="{Binding NewAmountHint}" Classes="hint" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="What it was" Classes="field" />
+                <ui:SegChoice Items="{x:Static vm:DebtsViewModel.KindNames}" SelectedIndex="{Binding NewKindIndex}" />
+                <TextBlock Text="{Binding NewKindHelp}" Classes="hint" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="What it was for (optional)" Classes="field" />
+                <TextBox Classes="glass" Text="{Binding NewNote}" PlaceholderText="Tiền ăn trưa, vé xem phim…" AutomationProperties.Name="What it was for" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Due (optional)" Classes="field" />
+                <core:DateTimeBox Classes="glass" Date="{Binding NewDueDate}" Time="{Binding NewDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="No due date" />
+                <WrapPanel Margin="0,8,0,0">
+                    <Button Classes="act" Content="In a week" Command="{Binding DueInCommand}" CommandParameter="7" />
+                    <Button Classes="act" Content="In two weeks" Command="{Binding DueInCommand}" CommandParameter="14" />
+                    <Button Classes="act" Content="In a month" Command="{Binding DueInCommand}" CommandParameter="30" />
+                </WrapPanel>
+            </StackPanel>
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}"
+                    IsVisible="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).HasPopupError, FallbackValue=False}">
+                <TextBlock Text="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).PopupError, FallbackValue=''}" TextWrapping="Wrap" />
+            </Border>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel"
+                        Command="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Add" Command="{Binding AddCommand}" />
+            </Grid>
+        </StackPanel>
+
+        <!-- ============ A person ============ -->
+        <Panel x:Name="PersonSection">
+            <Panel DataContext="{Binding SelectedPerson}">
+                <StackPanel x:DataType="vm:DebtPersonViewModel" Spacing="16" core:Motion.EnterOnShow="True">
+                    <ui:SheetHeader Eyebrow="{Binding DueText}" Title="{Binding Name}"
+                                    CloseCommand="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).DismissPopupCommand, FallbackValue={x:Null}}">
+                        <ui:SheetHeader.Leading>
+                            <Border Width="44" Height="44" CornerRadius="22" Background="{Binding Name, Converter={x:Static ui:WalletConverters.PersonFill}}">
+                                <TextBlock Text="{Binding Initial}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Foreground="{Binding Name, Converter={x:Static ui:WalletConverters.PersonInk}}" />
+                            </Border>
+                        </ui:SheetHeader.Leading>
+                    </ui:SheetHeader>
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding BalanceText}" Classes="big" Classes.owed="{Binding OwedToMe}" Classes.iowe="{Binding IOwe}" />
+                        <TextBlock Text="{Binding VerbText}" Classes="muted" FontSize="13" Classes.late="{Binding IsOverdue}" />
+                    </StackPanel>
+                    <Border Classes="glass" IsVisible="{Binding !IsSettled}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Due" Classes="head" />
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="+1 day" Command="{Binding ExtendCommand}" CommandParameter="1" />
+                                <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" Content="+1 week" Command="{Binding ExtendCommand}" CommandParameter="7" />
+                                <Button Grid.Column="2" Classes="ghost" HorizontalAlignment="Stretch" Content="+1 month" Command="{Binding ExtendCommand}" CommandParameter="30" />
+                            </Grid>
+                            <core:DateTimeBox Classes="glass" Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="No due date" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="No due date" Command="{Binding ClearDueCommand}" />
+                                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Set due date" Command="{Binding SetDueCommand}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel IsVisible="{Binding HasLinks}">
+                        <TextBlock Text="Notes" Classes="field" />
+                        <core:LinksPanel DataContext="{Binding Links}" ShowActions="True" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="History" Classes="field" />
+                        <ItemsControl ItemsSource="{Binding Entries}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DebtEntryRow">
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmGlassStroke}" Padding="2,9">
+                                        <Grid ColumnDefinitions="*,Auto,Auto">
+                                            <StackPanel VerticalAlignment="Center" Spacing="1">
+                                                <Grid ColumnDefinitions="Auto,Auto">
+                                                    <TextBlock Text="{Binding KindText}" FontWeight="SemiBold" />
+                                                    <ic:SymbolIcon Grid.Column="1" Symbol="BuildingBank" FontSize="13" Margin="6,0,0,0" IsVisible="{Binding FromTransaction}"
+                                                                   VerticalAlignment="Center" ToolTip.Tip="From a bank transaction" />
+                                                </Grid>
+                                                <TextBlock Text="{Binding When}" Classes="muted" />
+                                                <TextBlock Text="{Binding Note}" Classes="muted" IsVisible="{Binding HasNote}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                <TextBlock Text="{Binding AmountText}" FontWeight="SemiBold" HorizontalAlignment="Right" Classes.owed="{Binding IsIncrease}"
+                                                           Classes.iowe="{Binding !IsIncrease}" />
+                                                <TextBlock Text="{Binding BalanceText}" Classes="muted" HorizontalAlignment="Right" />
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Classes="act" Margin="8,0,0,0" MinWidth="36" Padding="8,7" Command="{Binding DeleteCommand}" VerticalAlignment="Center"
+                                                    ToolTip.Tip="Delete this entry" AutomationProperties.Name="Delete entry">
+                                                <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding AddEntryCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Add" FontSize="14" />
+                                <TextBlock Text="Add an entry" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Done"
+                                Command="{Binding $parent[ui:WalletPopupView].((vm:WalletViewModel)DataContext).ClosePopupCommand, FallbackValue={x:Null}}" />
+                    </Grid>
+                </StackPanel>
+            </Panel>
+        </Panel>
+    </Panel>
+</UserControl>

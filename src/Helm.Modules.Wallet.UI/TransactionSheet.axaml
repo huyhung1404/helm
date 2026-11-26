@@ -1,0 +1,272 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             xmlns:ui="using:Helm.Modules.Wallet.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Wallet.Ui.TransactionSheet"
+             x:Name="Root"
+             x:DataType="vm:WalletViewModel">
+
+    <!-- The transaction sheets of the Wallet pop-up: adding one, its details, editing it, putting its money in the debt
+         book, and every transaction waiting for a category. One shows at a time (WalletPopupView). -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Modules.Wallet.UI/WalletTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Panel>
+        <!-- ============ Add a transaction ============ -->
+        <StackPanel x:Name="AddSection" Spacing="16" IsVisible="{Binding ShowAddPopup}" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="Wallet" Title="Add a transaction" Subtitle="Cash, or a bank Helm does not read" CloseCommand="{Binding DismissPopupCommand}" />
+            <StackPanel>
+                <ui:SegChoice Items="{x:Static ui:TransactionSheet.AddKinds}" SelectedIndex="{Binding NewKindIndex}" />
+                <TextBlock Classes="hint" Text="Between my own accounts: neither spending nor money in." IsVisible="{Binding !NewHasCategories}" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Amount" Classes="field" />
+                <TextBox x:Name="NewAmountBox" Classes="glass amount" PlaceholderText="50k, 1.5tr" Text="{Binding NewAmount}" AutomationProperties.Name="Amount">
+                    <TextBox.InnerRightContent>
+                        <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    </TextBox.InnerRightContent>
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <TextBlock Text="{Binding NewAmountHint}" Classes="hint" Classes.ok="{Binding NewAmountReads}" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="What it was for" Classes="field" />
+                <TextBox Classes="glass" PlaceholderText="Phở bò, Grab về nhà…" Text="{Binding NewDescription}" AutomationProperties.Name="Description" />
+            </StackPanel>
+            <StackPanel IsVisible="{Binding NewHasCategories}">
+                <TextBlock Text="Category (optional)" Classes="field" />
+                <ItemsControl ItemsSource="{Binding NewPicks}" ItemTemplate="{StaticResource PickChip}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                </ItemsControl>
+                <Button Classes="act" HorizontalAlignment="Left" Command="{Binding ToggleNewCategoryCommand}" Classes.selected="{Binding IsNewCategoryOpen}"
+                        AutomationProperties.Name="New category">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Add" FontSize="14" />
+                        <TextBlock Text="New category" />
+                    </StackPanel>
+                </Button>
+                <TextBox Classes="glass" Margin="0,4,0,0" PlaceholderText="Its name, e.g. Cà phê" Text="{Binding AddCategoryName}" IsVisible="{Binding IsNewCategoryOpen}"
+                         AutomationProperties.Name="New category name" core:Motion.EnterOnShow="True" core:Motion.FromTop="True" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="When" Classes="field" />
+                <core:DateTimeBox Classes="glass" Date="{Binding NewDate}" Time="{Binding NewTime}" Lean="Past" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Note (optional)" Classes="field" />
+                <TextBox Classes="glass" Text="{Binding NewNote}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" AutomationProperties.Name="Note" />
+            </StackPanel>
+            <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}" IsVisible="{Binding HasPopupError}" core:Motion.EnterOnShow="True">
+                <TextBlock Text="{Binding PopupError}" TextWrapping="Wrap" />
+            </Border>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel" Command="{Binding CancelAddCommand}" />
+                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Add" Command="{Binding AddCommand}" />
+            </Grid>
+        </StackPanel>
+
+        <!-- ============ A transaction's details: its category one tap away, and everything else ============ -->
+        <Panel IsVisible="{Binding ShowDetailsPopup}">
+            <Panel DataContext="{Binding Selected}">
+                <StackPanel x:DataType="vm:TransactionRow" Spacing="16" core:Motion.EnterOnShow="True">
+                    <ui:SheetHeader Eyebrow="{Binding WhenText}" Title="{Binding Title}" CloseCommand="{Binding #Root.((vm:WalletViewModel)DataContext).DismissPopupCommand}">
+                        <ui:SheetHeader.Leading>
+                            <ui:CategoryBadge Icon="{Binding CategoryIcon}" Color="{Binding CategoryColor}" Size="44" />
+                        </ui:SheetHeader.Leading>
+                    </ui:SheetHeader>
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding AmountText}" Classes="big" Classes.income="{Binding IsIncome}" />
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,8,0,0" RowSpacing="6" ColumnSpacing="16">
+                            <TextBlock Text="Account" Classes="muted" />
+                            <TextBlock Grid.Column="1" Text="{Binding AccountText}" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="1" Text="Balance after" Classes="muted" IsVisible="{Binding HasBalance}" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding BalanceText, Converter={x:Static ui:WalletConverters.BalanceOnly}}" IsVisible="{Binding HasBalance}" />
+                            <TextBlock Grid.Row="2" Text="Note" Classes="muted" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Note, Converter={x:Static ui:WalletConverters.OrDash}}" TextWrapping="Wrap" />
+                        </Grid>
+                    </StackPanel>
+                    <!-- In the debt book: who it is with, one tap away -->
+                    <Border Classes="glass" IsVisible="{Binding IsDebt}">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <ic:SymbolIcon Symbol="People" FontSize="18" Margin="0,0,10,0" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding DebtText}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Classes="ghost" Margin="8,0,0,0" Content="Open" Command="{Binding OpenDebtCommand}" />
+                        </Grid>
+                    </Border>
+                    <!-- Its category: one tap changes it, or a new one for it -->
+                    <StackPanel IsVisible="{Binding !IsDebt}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Category" Classes="field" />
+                            <Border Grid.Column="1" Classes="tag" IsVisible="{Binding IsAuto}" Margin="0,0,0,6"><TextBlock Text="filed by itself" /></Border>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Picks}" ItemTemplate="{StaticResource PickChip}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,4,0,0">
+                            <TextBox Classes="glass" PlaceholderText="Or a new category — press Enter" Text="{Binding NewCategoryName}" AutomationProperties.Name="New category name">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding CreateCategoryCommand}" />
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                            <Button Grid.Column="1" Classes="ghost" Content="Add" Command="{Binding CreateCategoryCommand}" />
+                        </Grid>
+                    </StackPanel>
+                    <!-- What the bank said -->
+                    <Border Classes="glass" IsVisible="{Binding HasOriginal}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="The bank's notification" Classes="muted" />
+                                <SelectableTextBlock Text="{Binding OriginalText}" TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12.5" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Margin="8,0,0,0" Command="{Binding CopyOriginalCommand}" ToolTip.Tip="Copy"
+                                    AutomationProperties.Name="Copy the notification">
+                                <ic:SymbolIcon Symbol="Copy" FontSize="14" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                    <WrapPanel>
+                        <Button Classes="act" Command="{Binding OpenDebtFormCommand}" IsVisible="{Binding CanBeDebt}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="PersonMoney" FontSize="14" />
+                                <TextBlock Text="Lent, borrowed, paid back…" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="act" Command="{Binding UncategorizeCommand}" IsVisible="{Binding IsCategorized}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="ArrowUndo" FontSize="14" />
+                                <TextBlock Text="Back to To categorize" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="act" Command="{Binding DeleteCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                                <TextBlock Text="Delete" Foreground="{DynamicResource HelmDanger}" />
+                            </StackPanel>
+                        </Button>
+                    </WrapPanel>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding BeginEditCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Edit" FontSize="14" />
+                                <TextBlock Text="Edit" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Done" Command="{Binding #Root.((vm:WalletViewModel)DataContext).ClosePopupCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Panel>
+        </Panel>
+
+        <!-- ============ Edit a transaction ============ -->
+        <Panel IsVisible="{Binding ShowEditPopup}">
+            <Panel DataContext="{Binding Selected}">
+                <StackPanel x:DataType="vm:TransactionRow" Spacing="16" core:Motion.EnterOnShow="True">
+                    <ui:SheetHeader Eyebrow="{Binding Title}" Title="Edit transaction" CloseCommand="{Binding CancelEditCommand}" />
+                    <ui:SegChoice Items="{x:Static ui:TransactionSheet.EditKinds}" SelectedIndex="{Binding EditKindIndex}" />
+                    <StackPanel>
+                        <TextBlock Text="Amount" Classes="field" />
+                        <TextBox x:Name="EditAmountBox" Classes="glass amount" Text="{Binding EditAmount}" AutomationProperties.Name="Amount">
+                            <TextBox.InnerRightContent>
+                                <TextBlock Text="₫" FontSize="17" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            </TextBox.InnerRightContent>
+                        </TextBox>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="What it was for" Classes="field" />
+                        <TextBox Classes="glass" Text="{Binding EditDescription}" AutomationProperties.Name="Description" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="When" Classes="field" />
+                        <core:DateTimeBox Classes="glass" Date="{Binding EditDate}" Time="{Binding EditTime}" Lean="Past" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Note" Classes="field" />
+                        <TextBox Classes="glass" Text="{Binding EditNote}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" AutomationProperties.Name="Note" />
+                    </StackPanel>
+                    <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}" IsVisible="{Binding #Root.((vm:WalletViewModel)DataContext).HasPopupError}">
+                        <TextBlock Text="{Binding #Root.((vm:WalletViewModel)DataContext).PopupError}" TextWrapping="Wrap" />
+                    </Border>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel" Command="{Binding CancelEditCommand}" />
+                        <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Save" Command="{Binding SaveEditCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Panel>
+        </Panel>
+
+        <!-- ============ A transaction's money in the debt book ============ -->
+        <Panel IsVisible="{Binding ShowDebtPopup}">
+            <Panel DataContext="{Binding Selected}">
+                <StackPanel x:DataType="vm:TransactionRow" Spacing="16" core:Motion.EnterOnShow="True">
+                    <ui:SheetHeader Eyebrow="Debt book" Title="Lent, borrowed or paid back" CloseCommand="{Binding CancelDebtFormCommand}" />
+                    <Border Classes="glass">
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource TransactionLine}" />
+                    </Border>
+                    <StackPanel>
+                        <TextBlock Text="Who it is with" Classes="field" />
+                        <AutoCompleteBox x:Name="DebtPersonBox" Classes="glass" PlaceholderText="A name" Text="{Binding DebtPerson}" ItemsSource="{Binding DebtNames}" FilterMode="ContainsOrdinal"
+                                         MinimumPrefixLength="1" AutomationProperties.Name="Person" />
+                        <ItemsControl ItemsSource="{Binding DebtNames}" Margin="0,8,0,0">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Button Classes="act" Content="{Binding}" CommandParameter="{Binding}"
+                                            Command="{Binding $parent[ItemsControl].((vm:TransactionRow)DataContext).PickDebtPersonCommand, FallbackValue={x:Null}}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="What it was" Classes="field" />
+                        <ui:SegChoice Items="{x:Static vm:TransactionRow.DebtKindNames}" SelectedIndex="{Binding DebtKindIndex}" />
+                        <TextBlock Text="{Binding DebtKindHelp}" Classes="hint" />
+                    </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Note (optional)" Classes="field" />
+                        <TextBox Classes="glass" Text="{Binding DebtNote}" AutomationProperties.Name="Debt note" />
+                        <TextBlock Classes="hint" Text="It then counts neither as spending nor as money in." />
+                    </StackPanel>
+                    <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}" IsVisible="{Binding #Root.((vm:WalletViewModel)DataContext).HasPopupError}">
+                        <TextBlock Text="{Binding #Root.((vm:WalletViewModel)DataContext).PopupError}" TextWrapping="Wrap" />
+                    </Border>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Cancel" Command="{Binding CancelDebtFormCommand}" />
+                        <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Save" Command="{Binding SaveDebtCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Panel>
+        </Panel>
+
+        <!-- ============ Every transaction waiting for a category ============ -->
+        <StackPanel Spacing="14" IsVisible="{Binding ShowToCategorizePopup}" core:Motion.EnterOnShow="True">
+            <ui:SheetHeader Eyebrow="{Binding ToCategorizeTitle}" Title="To categorize" Subtitle="Tap a category to file it. Tap the transaction for anything else."
+                            CloseCommand="{Binding DismissPopupCommand}" />
+            <Border Classes="glass" IsVisible="{Binding HasSimilar}" BorderBrush="{DynamicResource HelmGlassStrokeStrong}" core:Motion.EnterOnShow="True">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="{Binding SimilarText}" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="No" Command="{Binding DismissSimilarCommand}" />
+                        <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" Content="Yes, file them" Command="{Binding ApplySimilarCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <StackPanel Margin="0,24" Spacing="6" HorizontalAlignment="Center" IsVisible="{Binding !HasToCategorize}">
+                <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="32" Foreground="{DynamicResource HelmSuccess}" HorizontalAlignment="Center" />
+                <TextBlock Text="All categorized" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Text="New ones from the bank show up here and on the Money page." Classes="muted" TextAlignment="Center" />
+            </StackPanel>
+            <ItemsControl ItemsSource="{Binding ToCategorize}" ItemTemplate="{StaticResource ToCategorizeCard}" />
+            <TextBlock Text="{Binding MoreToCategorizeText}" Classes="muted" IsVisible="{Binding HasMoreToCategorize}" />
+            <Button Classes="pill" HorizontalAlignment="Stretch" Content="Done" Command="{Binding ClosePopupCommand}" />
+        </StackPanel>
+    </Panel>
+</UserControl>

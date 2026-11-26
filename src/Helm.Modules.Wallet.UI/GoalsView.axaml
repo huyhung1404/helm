@@ -1,0 +1,121 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Wallet.Ui.GoalsView"
+             x:DataType="vm:GoalsViewModel">
+
+    <!-- The Goals tab: money set aside for things to buy. It leaves the balance at once but is not spending, and it all
+         comes back if the goal is given up. The balance left to spend, then one card per goal (its photo lights up as it
+         fills; a tap opens it), the bought and given-up ones folded away. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Wallet.UI/WalletStyles.axaml" />
+    </UserControl.Styles>
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Modules.Wallet.UI/WalletTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Grid ColumnDefinitions="*,Auto" Margin="0,22,0,16">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Classes="display" Text="Goals" />
+                <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="Save up for something you want to buy." />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="pill" VerticalAlignment="Center" Margin="12,0,0,0" Command="{Binding OpenAddCommand}" IsVisible="{Binding !HasNoGoals}"
+                    ToolTip.Tip="Something to save up for" AutomationProperties.Name="New goal">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Add" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                    <TextBlock Classes="label" Text="New goal" Foreground="{DynamicResource HelmPillForeground}" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- What the last set-aside, purchase or give-up did, with Undo -->
+        <Border Classes="glass" Padding="16,6,8,6" Margin="0,0,0,12" IsVisible="{Binding HasUndo}" core:Motion.EnterOnShow="True">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Text="{Binding UndoText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="act" Margin="8,0,0,0" Content="Undo" Command="{Binding UndoCommand}" />
+                <Button Grid.Column="2" Classes="flat" Width="36" Height="36" Padding="0" Command="{Binding DismissUndoCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- The balance after what the goals hold -->
+        <Border Classes="glass" Margin="0,0,0,18" IsVisible="{Binding !HasNoGoals}">
+            <Grid x:Name="BalanceGrid" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Balance you can spend" Classes="muted" />
+                    <TextBlock Classes="stat" Classes.danger="{Binding IsAvailableNegative}" Text="{Binding AvailableText}" />
+                </StackPanel>
+                <Grid x:Name="SetAsideLine" Grid.Column="1" ColumnDefinitions="Auto,*" VerticalAlignment="Center" MaxWidth="360" Margin="16,0,0,0"
+                      IsVisible="{Binding HasSetAside}">
+                    <ic:SymbolIcon Symbol="Savings" FontSize="18" Margin="0,0,8,0" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding SetAsideText}" Classes="muted" FontSize="13" VerticalAlignment="Center" />
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- First run: the way in, step by step (1 is the only thing to do now) -->
+        <Border Classes="glass hero enter" IsVisible="{Binding HasNoGoals}" Margin="0,10,0,0" Padding="28,26">
+            <StackPanel Spacing="18">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="eyebrow" Text="START HERE" />
+                    <TextBlock Text="Save up for something you want" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                </StackPanel>
+                <UniformGrid x:Name="FirstRunSteps" Columns="3">
+                    <Border Classes="glass" Margin="0,0,10,10" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="1" />
+                            <TextBlock Text="Name it and its price" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" Text="A mini PC, a trip to Đà Lạt. Add a photo if you like." />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="2" />
+                            <TextBlock Text="Set small amounts aside" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted" Text="They leave your balance but are not spending. Give up and they all come back." />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="glass" Margin="0,0,10,10" Opacity="0.55">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="eyebrow" Text="3" />
+                            <TextBlock Text="Buy it" FontWeight="SemiBold" />
+                            <TextBlock Classes="muted" Text="The photo lights up as you go. At 100%, “I bought it” writes the purchase." />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding OpenAddCommand}" AutomationProperties.Name="Start my first goal">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                        <TextBlock Text="Start my first goal" Foreground="{DynamicResource HelmPillForeground}" />
+                        <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <ItemsControl x:Name="GoalList" ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource GoalTile}" Margin="0,0,-12,0">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        </ItemsControl>
+
+        <!-- Bought and given up, folded away -->
+        <StackPanel IsVisible="{Binding HasFinished}" Margin="0,8,0,0">
+            <Button Classes="flat" HorizontalAlignment="Left" Padding="4,8" Click="ToggleFinished_Click" AutomationProperties.Name="Bought and given up">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Panel x:Name="FinishedChevron" Width="12" Height="12" Classes="turn">
+                        <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" />
+                    </Panel>
+                    <TextBlock Text="Bought and given up" Classes="muted" FontSize="13" />
+                </StackPanel>
+            </Button>
+            <ItemsControl x:Name="FinishedList" ItemsSource="{Binding Finished}" ItemTemplate="{StaticResource FinishedGoalCard}" IsVisible="False"
+                          core:Motion.EnterOnShow="True" core:Motion.FromTop="True" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Wallet page, ONE view for every platform (Windows through Helm.Ui.Windows, Android, later macOS/iOS): the
+       month (quick add, to categorize, bills, funds, transactions), the debt book, the savings goals, the insights, every
+       pop-up as one sheet that follows the view model, and the settings sheet. What differs per platform (saving the CSV,
+       the phone's menu, the widget's redraw) comes through IWalletPageHost; the logic and the view models are
+       Helm.Modules.Wallet.Core. The Android home-screen widgets and notifications stay in Helm.Modules.Wallet.Android. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.Wallet.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Wallet.Core\Helm.Modules.Wallet.Core.csproj" />
+  </ItemGroup>
+
+</Project>

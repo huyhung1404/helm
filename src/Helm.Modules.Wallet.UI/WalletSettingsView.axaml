@@ -1,0 +1,354 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             xmlns:ui="using:Helm.Modules.Wallet.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Wallet.Ui.WalletSettingsView"
+             x:DataType="vm:WalletViewModel">
+
+    <!-- Wallet's settings as a sheet over the page (the gear): the on/off switch first, then one card per subject. What
+         only the phone does (reading the banks' notifications, the widget) shows only where it can. -->
+    <UserControl.Styles>
+        <StyleInclude Source="avares://Helm.Modules.Wallet.UI/WalletStyles.axaml" />
+    </UserControl.Styles>
+
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="WALLET" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- On or off: off keeps every transaction (read only) and stops saving new ones -->
+        <Border Classes="glass">
+            <DockPanel>
+                <ToggleSwitch x:Name="EnableSwitch" DockPanel.Dock="Right" OnContent="" OffContent="" AutomationProperties.Name="Wallet on or off" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Wallet is on" Classes="head" />
+                    <TextBlock Text="Off keeps your transactions, debts and goals but makes them read only, and stops saving new ones." Classes="secondary" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Bank notifications: read on the phone; the PC shows what the phone saved -->
+        <Border Classes="glass" IsVisible="{Binding !CanListen}">
+            <Grid ColumnDefinitions="Auto,*">
+                <ic:SymbolIcon Symbol="Phone" FontSize="20" Margin="0,0,12,0" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Text="Bank notifications are read on your phone" Classes="head" />
+                    <TextBlock Classes="secondary"
+                               Text="Helm on your Android phone reads Techcombank's and ACB's balance notifications (their apps or SMS) and saves each transaction; they sync here. Set it up in Wallet's settings on the phone." />
+                </StackPanel>
+            </Grid>
+        </Border>
+        <Border Classes="glass" IsVisible="{Binding CanListen}">
+            <StackPanel Spacing="12">
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ListenEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Read bank notifications" />
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="Read bank notifications" Classes="head" />
+                        <TextBlock Classes="secondary"
+                                   Text="Each balance change your bank's app or SMS tells you about is saved as a transaction, once. Only the banks below are read; nothing leaves your devices except through Helm's encrypted sync." />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Spacing="12" IsEnabled="{Binding ListenEnabled}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Notification access" />
+                        <TextBlock Text="{Binding AccessText}" Classes="secondary" Classes.accent="{Binding HasNotificationAccess}" />
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Open notification access" Command="{Binding OpenNotificationAccessCommand}" />
+                    </StackPanel>
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="If Android says “Restricted setting”" />
+                        <TextBlock Classes="secondary"
+                                   Text="Android 13 and later block notification access for apps installed from a file. First try turning Helm on in Notification access and close the block message (Android only offers the next step after that). Then open App info, tap ⋮ (top right) → Allow restricted settings, confirm, and turn Helm on in Notification access again." />
+                        <TextBlock Classes="secondary"
+                                   Text="On Xiaomi, OPPO, Samsung and others, also set Battery to No restrictions (or turn on Autostart) in App info, or the phone may stop Helm from listening." />
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Open App info" Command="{Binding OpenAppDetailsCommand}" />
+                    </StackPanel>
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding TechcombankEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Techcombank" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Techcombank" />
+                            <TextBlock Text="The Techcombank Mobile app and SMS from Techcombank." Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AcbEnabled}" OnContent="" OffContent="" AutomationProperties.Name="ACB" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="ACB" />
+                            <TextBlock Text="The ACB ONE app and SMS from ACB." Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- After a payment (the phone): the "What was it?" notification and what is filed by itself -->
+        <Border Classes="glass" IsVisible="{Binding CanListen}">
+            <StackPanel Spacing="12">
+                <TextBlock Text="After a payment" Classes="head" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AskForCategory}" OnContent="" OffContent="" AutomationProperties.Name="Ask what it was" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Ask what it was" />
+                        <TextBlock Text="A quiet notification with the likeliest categories as buttons: one tap files it." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AutoCategorize}" OnContent="" OffContent="" AutomationProperties.Name="Categorize by itself" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Categorize by itself" />
+                        <TextBlock Text="A transaction with the same description as earlier ones you all put in one category goes there too, marked auto." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AskForMissing}" OnContent="" OffContent="" AutomationProperties.Name="Ask about missing payments" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Ask about missing payments" />
+                        <TextBlock Classes="secondary"
+                                   Text="Some banks say nothing about a payment made in their app (Techcombank). When the next balance shows money that moved without a notification, a notification offers to write it down." />
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding WarnFunds}" OnContent="" OffContent="" AutomationProperties.Name="Warn about funds" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Warn about funds" />
+                        <TextBlock Text="A notification when a fund passes its warning share, is used up or goes over: once each, every month." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- The budget -->
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Monthly budget" Classes="head" />
+                    <TextBlock Classes="secondary"
+                               Text="What you mean to spend in a month at most: Wallet and its widget show what is left, and per day. Empty for none. While you have funds, they are the budget." />
+                </StackPanel>
+                <TextBox Classes="glass amount" FontSize="15" FontWeight="Normal" Text="{Binding MonthlyBudgetText, UpdateSourceTrigger=LostFocus}" PlaceholderText="e.g. 10tr"
+                         AutomationProperties.Name="Monthly budget">
+                    <TextBox.InnerRightContent>
+                        <TextBlock Text="₫" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                    </TextBox.InnerRightContent>
+                </TextBox>
+            </StackPanel>
+        </Border>
+
+        <!-- Categories: every one on its own row (look, name, shown, delete), then add one -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Categories" Classes="head" />
+                    <TextBlock Classes="secondary"
+                               Text="Rename them, give them an icon and a colour (tap the icon), hide the ones you do not use, or add your own. Between my accounts counts neither as spending nor as money in." />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding CategoryRows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:CategoryEditRow">
+                            <StackPanel Spacing="8" Margin="0,0,0,8">
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                                    <Button Classes="flat" Padding="1" Command="{Binding ToggleLookCommand}" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                            ToolTip.Tip="Change the icon and colour" AutomationProperties.Name="Change the icon and colour">
+                                        <ui:CategoryBadge Icon="{Binding Icon}" Color="{Binding Color}" Size="38" />
+                                    </Button>
+                                    <TextBox Grid.Column="1" Classes="glass" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" KeyDown="Rename_KeyDown"
+                                             AutomationProperties.Name="Category name">
+                                        <TextBox.InnerRightContent>
+                                            <TextBlock Text="{Binding KindText, Converter={x:Static ui:WalletConverters.KindName}}" Classes="secondary" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                        </TextBox.InnerRightContent>
+                                    </TextBox>
+                                    <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsShown}" OnContent="" OffContent="" VerticalAlignment="Center"
+                                                  ToolTip.Tip="Shown in the pickers" AutomationProperties.Name="{Binding Name, StringFormat='Show {0}'}" />
+                                    <Button Grid.Column="3" Classes="chip" VerticalAlignment="Center" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}"
+                                            ToolTip.Tip="Delete this category" AutomationProperties.Name="{Binding Name, StringFormat='Delete {0}'}">
+                                        <ic:SymbolIcon Symbol="Delete" FontSize="16" Foreground="{DynamicResource HelmDanger}" />
+                                    </Button>
+                                </Grid>
+                                <Border Classes="glass" Margin="48,0,0,0" IsVisible="{Binding IsEditingLook}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Colour" Classes="secondary" />
+                                        <ItemsControl ItemsSource="{Binding ColorChoices}">
+                                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:ColorChoice">
+                                                    <Button Classes="flat" Padding="3" Margin="0,0,4,4" Command="{Binding PickCommand}" CornerRadius="16" AutomationProperties.Name="Colour">
+                                                        <Border Width="28" Height="28" CornerRadius="14" Background="{Binding Color, Converter={x:Static ui:WalletConverters.Ink}}" />
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="Icon" Classes="secondary" />
+                                        <ItemsControl ItemsSource="{Binding IconChoices}">
+                                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:IconChoice">
+                                                    <Button Classes="flat" Width="40" Height="40" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                            Command="{Binding PickCommand}" ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}">
+                                                        <ic:SymbolIcon Symbol="{Binding Name, Converter={x:Static ui:WalletConverters.Symbol}}" FontSize="20" />
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <TextBox Classes="glass" PlaceholderText="A new category" Text="{Binding NewCategoryName}" AutomationProperties.Name="New category name">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding AddCategoryCommand}" />
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <ComboBox Grid.Column="1" Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:WalletViewModel.KindNames}"
+                              SelectedIndex="{Binding NewCategoryKindIndex}" AutomationProperties.Name="New category kind" />
+                </Grid>
+                <Button Classes="pill" HorizontalAlignment="Stretch" Content="Add category" Command="{Binding AddCategoryCommand}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Display -->
+        <Border Classes="glass">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Display" Classes="head" Margin="0,0,0,6" />
+                <TextBlock Text="Transactions shown at first" />
+                <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{x:Static core:ListPager.SizeNames}" SelectedIndex="{Binding TransactionPageIndex}"
+                          AutomationProperties.Name="Transactions shown at first" />
+                <TextBlock Text="The month's newest first; Show more adds as many again. Fewer keeps Wallet smooth to scroll." Classes="secondary" />
+            </StackPanel>
+        </Border>
+
+        <!-- The home-screen widget (the phone) -->
+        <Border Classes="glass" IsVisible="{Binding HasWidget}">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Home-screen widget" Classes="head" />
+                    <TextBlock Classes="secondary"
+                               Text="Your balance in a ring, with what you spent and earned today, this week, this month or in total. A red dot counts the transactions waiting for a category. You can also add it from the launcher's widget list." />
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Add to the home screen" Command="{Binding PinWidgetCommand}" IsVisible="{Binding CanPinWidget}" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" RowDefinitions="Auto,Auto" RowSpacing="6">
+                    <TextBlock Text="Ring" />
+                    <TextBlock Grid.Column="1" Text="Text" />
+                    <ComboBox Grid.Row="1" Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:WalletViewModel.WidgetChartNames}" SelectedIndex="{Binding WidgetChartIndex}"
+                              AutomationProperties.Name="Widget ring" />
+                    <ComboBox Grid.Row="1" Grid.Column="1" Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:WalletViewModel.WidgetTextNames}"
+                              SelectedIndex="{Binding WidgetTextIndex}" AutomationProperties.Name="Widget text colour" />
+                </Grid>
+                <TextBlock Text="Background" />
+                <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:WalletViewModel.WidgetBackgroundNames}" SelectedIndex="{Binding WidgetBackgroundIndex}"
+                          AutomationProperties.Name="Widget background" />
+                <TextBlock Text="{Binding WidgetOpacity, StringFormat='Opacity {0}%'}" />
+                <Slider Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding WidgetOpacity}" AutomationProperties.Name="Widget opacity" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding WidgetHideBalance}" OnContent="" OffContent="" AutomationProperties.Name="Hide the balance" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Hide the balance" />
+                        <TextBlock Text="Dots instead of the balance, for anyone who sees your home screen." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- What only this platform has -->
+        <ContentControl x:Name="PlatformCards" />
+
+        <!-- Checking what Helm reads -->
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Try a notification" Classes="head" />
+                    <TextBlock Text="Paste a bank notification to see what Helm reads in it: the amount, the balance, the account and the description." Classes="secondary" />
+                </StackPanel>
+                <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:WalletViewModel.TestBankNames}" SelectedIndex="{Binding TestBankIndex}"
+                          AutomationProperties.Name="Bank" />
+                <TextBox Classes="glass" Text="{Binding TestText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64"
+                         PlaceholderText="TK 1903xxxx0123 So tien GD:-150,000 So du:1,234,567 THANH TOAN QR…" AutomationProperties.Name="Notification text" />
+                <Border Classes="glass" IsVisible="{Binding HasTestResult}" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="16" Margin="0,0,8,0" Foreground="{DynamicResource HelmSuccess}" IsVisible="{Binding TestOk}" VerticalAlignment="Top" />
+                        <ic:SymbolIcon Symbol="Warning" FontSize="16" Margin="0,0,8,0" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding !TestOk}" VerticalAlignment="Top" />
+                        <TextBlock Grid.Column="1" Text="{Binding TestResult}" TextWrapping="Wrap" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Border>
+        <Border Classes="glass" IsVisible="{Binding CanListen}">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Notifications Helm could not read" Classes="head" />
+                    <TextBlock Classes="secondary"
+                               Text="Your bank's notifications that talk about money but that Helm did not understand, kept on this phone only. Read with AI sends that one notification to AI, which finds the transaction in it; or copy one and add it by hand." />
+                </StackPanel>
+                <TextBlock Text="None." Classes="secondary" IsVisible="{Binding !HasUnread}" />
+                <ItemsControl ItemsSource="{Binding Unread}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:UnreadRow">
+                            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmGlassStroke}" Padding="0,10,0,4">
+                                <StackPanel Spacing="8">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock>
+                                            <Run Text="{Binding Bank}" FontWeight="SemiBold" />
+                                            <Run Text="{Binding When}" Foreground="{DynamicResource HelmSecondaryText}" FontSize="12" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Copy" Command="{Binding CopyCommand}" />
+                                        <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" Content="{Binding ActionText}" Command="{Binding ActionCommand}"
+                                                IsVisible="{Binding HasAction}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding ClearUnreadCommand}" IsVisible="{Binding HasUnread}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                        <TextBlock Text="Clear the list" Foreground="{DynamicResource HelmDanger}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Data -->
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Export" Classes="head" />
+                    <TextBlock Text="Every transaction with its date, amount, category, description, bank and note, as CSV for a spreadsheet." Classes="secondary" />
+                </StackPanel>
+                <Button x:Name="ExportButton" Classes="ghost" HorizontalAlignment="Stretch">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="TableSimple" FontSize="14" />
+                        <TextBlock x:Name="ExportText" Text="Export…" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+        <Border Classes="glass">
+            <Grid ColumnDefinitions="Auto,*">
+                <ic:SymbolIcon Symbol="Flash" FontSize="18" Margin="0,0,12,0" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Text="Add spending from anywhere" Classes="head" />
+                    <TextBlock x:Name="QuickCaptureText" Classes="secondary" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Classes="glass" IsVisible="{Binding HasMessage}" BorderBrush="{DynamicResource HelmDanger}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" Content="Done" />
+    </StackPanel>
+</UserControl>
