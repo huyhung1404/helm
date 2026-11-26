@@ -163,7 +163,7 @@ public sealed class VocabPopup : IDisposable
     private void OpenWord(string id)
     {
         _services.GetRequiredService<VocabViewModel>().Open(id);
-        _services.GetRequiredService<IShellNavigation>().ShowPage(typeof(VocabContentPage));
+        _services.GetRequiredService<IShellNavigation>().ShowTool(VocabIds.ModuleId);
     }
 
     private void CloseWindow()

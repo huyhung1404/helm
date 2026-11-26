@@ -1,14 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <UseWPF>true</UseWPF>
     <RootNamespace>Helm.Modules.Vocab</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vocab.Core\Helm.Modules.Vocab.Core.csproj" />
-    <!-- The page is the shared Avalonia view, shown through Helm.Ui.Windows. -->
+    <!-- The page is the shared Avalonia view. -->
     <ProjectReference Include="..\Helm.Modules.Vocab.UI\Helm.Modules.Vocab.UI.csproj" />
     <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>
