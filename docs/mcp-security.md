@@ -5,7 +5,8 @@ Administrator**, and the SSH tools reach servers where the user is often **root*
 then runs with those rights, so this page lists what can go wrong and what Helm does about it.
 
 Code: `src/Helm.Core.Windows/Mcp/McpPipeHost.cs` (the pipe), `src/Helm.Core/Mcp/McpServer.cs` (the protocol),
-`src/Helm.Core/Mcp/McpConsent.cs` (the policy and the activity log), `src/Helm.App/Mcp/` (the dialog).
+`src/Helm.Core/Mcp/McpConsent.cs` (the policy and the activity log), `src/Helm.App/Mcp/` (asking), the dialog in
+`src/Helm.Shell.UI/Mcp/` and `src/Helm.Shell.Windows/Mcp/McpConsentWindow.cs`.
 
 ## How a call reaches a tool
 
@@ -122,7 +123,8 @@ A question asked too often stops meaning anything. So:
 - The Allow buttons stay disabled for a moment after the dialog opens, so a key or click meant for another window
   never allows anything.
 - No answer within **2 minutes** is a Deny. A client that disconnects cancels its question.
-- While Helm is hidden in the tray, a notification says the agent asks; the dialog opens only when it is clicked.
+- The dialog opens on top of everything, centred on the screen with the mouse, also while Helm is hidden in the tray
+  (then a notification says the agent asks too; clicking it brings the dialog to the front).
 - Nothing is ever allowed without a click on an Allow button, and nothing is remembered across restarts.
 
 ### Secrets in arguments or logs

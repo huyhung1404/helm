@@ -20,6 +20,7 @@ public sealed class VocabPopup : IDisposable
     private readonly VocabQuiz _quiz;
     private readonly ISettingsStore<VocabSettings> _settings;
     private readonly IWindowService _windows;
+    private readonly IMonitorService _monitors;
     private readonly IUserActivity _activity;
     private readonly IUiDispatcher _ui;
     // The page and the shell are found when a card opens a word: the shell is built from the modules, this among them.
@@ -31,13 +32,14 @@ public sealed class VocabPopup : IDisposable
     private bool _running;
     private (int Min, int Max) _range;
 
-    public VocabPopup(VocabStore store, VocabQuiz quiz, ISettingsStoreFactory settings, IWindowService windows, IUserActivity activity, IUiDispatcher ui,
-        IServiceProvider services, VocabVoice voice, ILogger<VocabPopup> logger)
+    public VocabPopup(VocabStore store, VocabQuiz quiz, ISettingsStoreFactory settings, IWindowService windows, IMonitorService monitors, IUserActivity activity,
+        IUiDispatcher ui, IServiceProvider services, VocabVoice voice, ILogger<VocabPopup> logger)
     {
         _store = store;
         _quiz = quiz;
         _settings = settings.Get<VocabSettings>(VocabIds.ModuleId);
         _windows = windows;
+        _monitors = monitors;
         _activity = activity;
         _ui = ui;
         _services = services;
@@ -138,8 +140,8 @@ public sealed class VocabPopup : IDisposable
             };
             if (!card.ShowNext()) return;
             var s = _settings.Current;
-            _window = new VocabPopupWindow(card, _windows, OpenWord,
-                s.PopupLeft is { } left && s.PopupBottom is { } bottom ? new System.Windows.Point(left, bottom) : null,
+            _window = new VocabPopupWindow(card, _windows, _monitors, OpenWord,
+                s.PopupLeft is { } left && s.PopupBottom is { } bottom ? new Avalonia.Point(left, bottom) : null,
                 at => _settings.Update(v =>
                 {
                     v.PopupLeft = at?.X;

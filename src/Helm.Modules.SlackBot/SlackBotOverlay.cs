@@ -17,16 +17,19 @@ public sealed class SlackBotOverlay
     private readonly SlackBotInboxViewModel _inbox;
     private readonly ISettingsStore<SlackBotSettings> _settings;
     private readonly IWindowService _windows;
+    private readonly IMonitorService _monitors;
     private readonly IUiDispatcher _ui;
     private readonly ILogger<SlackBotOverlay> _logger;
     private SlackBotOverlayWindow? _window;
     private bool _running;
 
-    public SlackBotOverlay(SlackBotInboxViewModel inbox, ISettingsStoreFactory settings, IWindowService windows, IUiDispatcher ui, ILogger<SlackBotOverlay> logger)
+    public SlackBotOverlay(SlackBotInboxViewModel inbox, ISettingsStoreFactory settings, IWindowService windows, IMonitorService monitors, IUiDispatcher ui,
+        ILogger<SlackBotOverlay> logger)
     {
         _inbox = inbox;
         _settings = settings.Get<SlackBotSettings>(SlackBotModule.ModuleId);
         _windows = windows;
+        _monitors = monitors;
         _ui = ui;
         _logger = logger;
         inbox.PropertyChanged += OnInboxChanged;
@@ -117,8 +120,8 @@ public sealed class SlackBotOverlay
     private SlackBotOverlayWindow Create()
     {
         var s = _settings.Current;
-        var window = new SlackBotOverlayWindow(_inbox, _windows,
-            s.OverlayLeft is { } left && s.OverlayBottom is { } bottom ? new System.Windows.Point(left, bottom) : null,
+        var window = new SlackBotOverlayWindow(_inbox, _windows, _monitors,
+            s.OverlayLeft is { } left && s.OverlayBottom is { } bottom ? new Avalonia.Point(left, bottom) : null,
             s.OverlayFolded,
             at => _settings.Update(v =>
             {

@@ -36,6 +36,17 @@ internal enum SlackBotStage
     SettingsConnect,
 }
 
+/// <summary>Which state of the PC's list that stays on screen a Gallery entry shows.</summary>
+internal enum SlackListStage
+{
+    /// <summary>Open, with the to-do cards (see-through at rest).</summary>
+    Open,
+    /// <summary>Writing a reply in it.</summary>
+    Reply,
+    /// <summary>Folded to its badge with the count.</summary>
+    Folded,
+}
+
 /// <summary>
 /// The real Slack Report view over an inbox in a temporary folder, at a game studio. Nothing reaches Slack: the engine
 /// never starts, shows itself as connected (<see cref="SlackBotEngine.ShowConnectedForPreview"/>) with no API, and the
@@ -109,6 +120,45 @@ internal static class SlackBotDemo
                 break;
         }
         return (view, inbox, options);
+    }
+
+    /// <summary>
+    /// The PC's list that stays on screen (the real view its window shows) over the same inbox, in the bottom-right corner
+    /// of a screen: open, writing a reply, or folded to its badge.
+    /// </summary>
+    public static Control List(FakeModule module, SlackListStage stage) => BuildList(module, stage).Screen;
+
+    /// <summary>The list with its inbox (the UI tests drive them).</summary>
+    public static (Control Screen, SlackBotListView List, SlackBotInboxViewModel Inbox) BuildList(FakeModule module, SlackListStage stage,
+        ISlackBotListHost? host = null)
+    {
+        var (_, inbox, _) = Build(module, SlackBotStage.ToDo);
+        var list = new SlackBotListView(inbox, host ?? new ListHost(), Helm.ToolIcons.ToolIcons.Of(SlackBotIds.ModuleId), stage == SlackListStage.Folded)
+        {
+            Margin = new Avalonia.Thickness(12),
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom,
+            RestOpacity = stage == SlackListStage.Open ? 0.85 : 1,
+        };
+        if (stage == SlackListStage.Reply)
+        {
+            inbox.StartReplyCommand.Execute(inbox.ToDo[0]);
+            inbox.ReplyText = "Ok em, để anh xem log rồi báo lại trước 3h nhé.";
+        }
+        return (new Panel { Children = { new Helm.Core.Ui.Backdrop(), list } }, list, inbox);
+    }
+
+    private sealed class ListHost : ISlackBotListHost
+    {
+        public void Folded(bool folded) { }
+
+        public void TakeKeyboard() { }
+
+        public void ReturnKeyboard() { }
+
+        public bool Drag(Avalonia.Input.PointerPressedEventArgs e) => false;
+
+        public void BackToCorner() { }
     }
 
     /// <summary>The settings sheet's own scroller, at its end.</summary>

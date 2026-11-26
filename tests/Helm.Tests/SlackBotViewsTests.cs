@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Helm.Tests;
 
 /// <summary>
-/// The SlackBot overlay loads with messages (the page itself is the shared Avalonia view, tested in Helm.Ui.Tests), built off-screen: no window is shown (the overlay is topmost).
+/// The SlackBot inbox loads with messages (the page and the list that stays on screen are shared Avalonia views, tested in Helm.Ui.Tests), built off-screen: no window is shown.
 /// With HELM_SLACKBOT_SNAPSHOTS set to a folder each one is rendered to a PNG there, for checking the layout by eye.
 /// </summary>
 public sealed class SlackBotViewsTests : IDisposable
@@ -77,7 +77,7 @@ public sealed class SlackBotViewsTests : IDisposable
         var ui = new StaUi();
         var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoShell(), settings);
         var windows = new WindowService(NullLogger<WindowService>.Instance);
-        var overlay = new SlackBotOverlay(inbox, settings, windows, ui, NullLogger<SlackBotOverlay>.Instance);
+        var overlay = new SlackBotOverlay(inbox, settings, windows, new MonitorService(), ui, NullLogger<SlackBotOverlay>.Instance);
         var module = new SlackBotModule(engine, overlay) { IsEnabled = true };
 
         // To do: the DM and the mention (one unsorted), not the channel chatter or what the user answered.
@@ -90,16 +90,11 @@ public sealed class SlackBotViewsTests : IDisposable
         Assert.True(inbox.HasOverlay);
 
         Layout(new System.Windows.Controls.Image { Source = SlackBotLogo.Image, Width = 128, Height = 128 }, new Size(128, 128), "0-icon");
-        var open = new SlackBotOverlayWindow(inbox, windows, null, false, _ => { }, _ => { });
-        Layout(open, new Size(400, 520), "1-overlay");
         inbox.StartReplyCommand.Execute(inbox.ToDo[0]);
         inbox.ReplyText = "Ok em, chiều nay anh xem nhé";
         Assert.Same(inbox.ToDo[0], inbox.ReplyTo);
-        Layout(open, new Size(400, 700), "1b-overlay-reply");
         inbox.CancelReplyCommand.Execute(null);
         Assert.Null(inbox.ReplyTo);
-        var folded = new SlackBotOverlayWindow(inbox, windows, null, true, _ => { }, _ => { });
-        Layout(folded, new Size(200, 80), "2-overlay-folded");
 
         inbox.OpenCommand.Execute(inbox.ToDo[0]);
         // Open goes to the newest message of the card.

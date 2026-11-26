@@ -12,6 +12,9 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **MCP moved into General.** AI agents (Fairy, Claude Code, VS Code, Claude Desktop, any MCP client) and Helm's tools now
   live in **General › MCP** on the PC: the two switches, the tools they reach, how to connect each client, who is connected,
   and the permissions with the activity log. Nothing about the tools changed: same names, same rules, same questions first.
+- **An AI agent's question has the new look**: a glass card on top of everything, centred on the screen with your mouse,
+  even while Helm is hidden in the tray. It says who asks, what will happen, why Helm asks and exactly what will run;
+  Deny is still the default (Enter and Esc deny) and Allow wakes up a moment after it opens.
 - **Slack Bot is now Slack Report.** It reads your Slack, sorts it with Claude and keeps what needs you on screen, but it
   never answers by itself. Where you turn Write on, AI agents (Fairy) may post, behind the AI signature and asked first each
   time; the signature now says Fairy.
@@ -28,7 +31,9 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **Vocabulary has the new look on the PC and the phone**, one page for both: Learn with its answer bar, Words with a
   word's page and tree, Roots, and the sheets for adding words or a text, an analysis, editing and the settings. The
   settings are a sheet behind the gear (with the on/off switch), and Home → Utilities opens Vocabulary itself. The corner
-  card on the PC and the card and bubble over other apps on the phone work as before.
+  card on the PC has the new look too (a glass card like the phone's) and works as before: it never takes the keyboard
+  except while you type a pinyin, fades at rest, and "Open in Helm" shows the word's whole tree. The card and bubble over
+  other apps on the phone work as before.
 - **Wallet has the new look on the PC and the phone**, one page for both: the month with quick add and the transactions,
   the Debts, Goals and Insights tabs, and every form (a transaction, a debt, a fund, a savings goal) as one sheet. The
   settings are a sheet behind the gear; Home → Utilities opens Wallet itself. The home-screen widgets, the bank
@@ -48,7 +53,8 @@ The code removed here is kept at tag `archive/helm-ai-2026-11-26`.
 - **Slack Report has the new look on the PC**: the to-do list as glass cards, what you handled today folded under it, the
   Worth knowing tab, the reply as a sheet and, until Slack is connected, a first-run card with the steps. The settings
   (connection, channels, how it sorts, when it reports, the on/off switch) are a sheet behind the gear; Home → Utilities opens
-  Slack Report itself. The list that stays on screen is unchanged.
+  Slack Report itself. The list that stays on screen has the new look too (glass cards, the reply box inside it, the
+  folded badge) and works as before: on top, never taking the keyboard except while you write a reply.
 - **Window Zones has the new look on the PC**: your screens drawn to scale with their zones, a card per zone with its
   windows (show one, take it out), first-run steps while there are no zones, and the zone editor as a sheet over the page.
   The settings (drag key, shortcuts, the on/off switch) are a sheet behind the gear; Home → Utilities opens Window Zones
