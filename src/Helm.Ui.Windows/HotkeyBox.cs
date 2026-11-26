@@ -31,6 +31,17 @@ public sealed class HotkeyBox : Button
         Refresh();
     }
 
+    /// <summary>A recorder for a shared page's host (IXxxPageHost.CreateHotkeyPicker): starts at <paramref name="gesture"/>, tells each new one.</summary>
+    public static HotkeyBox Create(HotkeyGesture gesture, Action<HotkeyGesture> changed)
+    {
+        var box = new HotkeyBox { Gesture = gesture, MinHeight = 40 };
+        box.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == GestureProperty) changed(box.Gesture);
+        };
+        return box;
+    }
+
     public HotkeyGesture Gesture
     {
         get => GetValue(GestureProperty);

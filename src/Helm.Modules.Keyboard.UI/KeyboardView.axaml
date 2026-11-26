@@ -2,9 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.Keyboard"
-             xmlns:uiw="using:Helm.Ui.Windows"
              xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Ui"
-             x:Class="Helm.Modules.Keyboard.KeyboardView"
+             x:Class="Helm.Modules.Keyboard.Ui.KeyboardView"
              x:DataType="vm:KeyboardViewModel">
 
     <!-- Helm Keyboard's settings: the tool has no page of content, so this is its page. One card per subject, a switch on the
@@ -20,7 +19,7 @@
                                Text="Type Vietnamese with Telex, go round English, Vietnamese and Chinese with one shortcut, and let every app and web site keep the keyboard you last used in it." />
                 </StackPanel>
 
-                <core:MasonryPanel MinColumnWidth="430" Spacing="14">
+                <core:MasonryPanel x:Name="Cards" MinColumnWidth="430" Spacing="14">
 
                 <!-- On or off -->
                 <Border Classes="glass">
@@ -30,6 +29,14 @@
                             <TextBlock Text="Off stops the switch shortcut and remembering the keyboard of each app. The input method stays installed." Classes="secondary" TextWrapping="Wrap" />
                         </StackPanel>
                         <ToggleSwitch x:Name="EnableSwitch" Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" AutomationProperties.Name="Helm Keyboard on or off" />
+                    </Grid>
+                </Border>
+
+                <!-- A shortcut that could not be registered, an install that failed -->
+                <Border x:Name="ProblemCard" Classes="glass" Background="{DynamicResource HelmWarningBackground}" IsVisible="False">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <ic:SymbolIcon Symbol="Warning" FontSize="18" Margin="0,1,10,0" VerticalAlignment="Top" />
+                        <TextBlock x:Name="ProblemText" Grid.Column="1" TextWrapping="Wrap" />
                     </Grid>
                 </Border>
 
@@ -70,7 +77,7 @@
                         </StackPanel>
                         <StackPanel Spacing="6" IsEnabled="{Binding IsOwnHotkey}">
                             <TextBlock Text="Your own shortcut" />
-                            <uiw:HotkeyBox x:Name="OwnHotkey" Classes="ghost" HorizontalAlignment="Stretch" MinHeight="40" />
+                            <ContentControl x:Name="OwnHotkey" />
                             <TextBlock Text="Used when the shortcut above is set to a shortcut of your own." Classes="secondary" TextWrapping="Wrap" />
                         </StackPanel>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsEnabled="{Binding HasChinese}">

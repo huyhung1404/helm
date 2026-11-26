@@ -7,19 +7,6 @@ using Microsoft.Win32;
 
 namespace Helm.Modules.Keyboard;
 
-public enum KeyboardInstallState
-{
-    /// <summary>This build of Helm has no input method next to it (a developer build).</summary>
-    NotBundled,
-    NotInstalled,
-    /// <summary>Installed, but an older version than the one next to Helm.</summary>
-    Outdated,
-    Installed,
-}
-
-/// <param name="OldVersionsInUse">Folders of older versions still loaded by running apps (deleted once they close).</param>
-public sealed record KeyboardInstallStatus(KeyboardInstallState State, int OldVersionsInUse);
-
 /// <summary>
 /// Puts the Helm Keyboard input method on this PC and takes it off again. The DLLs (64- and 32-bit) ship next to Helm in
 /// <c>keyboard\</c>; each version is copied to its own folder under Program Files, because every app that typed with the

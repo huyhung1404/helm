@@ -11,7 +11,7 @@ using Wpf.Ui.Controls;
 
 namespace Helm.Modules.Keyboard;
 
-public sealed class KeyboardModule : HelmModuleBase
+public sealed class KeyboardModule : HelmModuleBase, IKeyboard
 {
     public const string ModuleId = "keyboard";
     private const string HotkeyId = "switch";
@@ -70,6 +70,10 @@ public sealed class KeyboardModule : HelmModuleBase
     public KeyboardApps Apps { get; }
 
     public KeyboardInstaller Installer { get; }
+
+    public bool HasChinese => _inputMethods.HasLanguage(KeyboardModes.ChineseSimplified);
+
+    public KeyboardInstallStatus InstallStatus() => Installer.GetStatus();
 
     /// <summary>Raised (on any thread) after Helm Keyboard was installed, updated or removed.</summary>
     public event EventHandler? InstallChanged;

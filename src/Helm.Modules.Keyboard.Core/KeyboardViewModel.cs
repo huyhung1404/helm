@@ -45,7 +45,6 @@ public sealed partial class KeyboardAppRow : ObservableObject
 public sealed partial class KeyboardViewModel : ObservableObject
 {
     private readonly ISettingsStore<KeyboardSettings> _store;
-    private readonly IInputMethods _inputMethods;
     private readonly IUiDispatcher _ui;
     private bool _loading;
 
@@ -67,11 +66,10 @@ public sealed partial class KeyboardViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand))]
     private bool _isBusy;
 
-    public KeyboardViewModel(KeyboardModule module, IInputMethods inputMethods, IUiDispatcher ui)
+    public KeyboardViewModel(IKeyboard module, IUiDispatcher ui)
     {
         Module = module;
         _store = module.Settings;
-        _inputMethods = inputMethods;
         _ui = ui;
         Load(_store.Current);
         module.InstallChanged += (_, _) => _ui.Post(RefreshInstall);
@@ -80,7 +78,7 @@ public sealed partial class KeyboardViewModel : ObservableObject
         RefreshApps();
     }
 
-    public KeyboardModule Module { get; }
+    public IKeyboard Module { get; }
 
     public HotkeyGesture DefaultHotkey => KeyboardSettings.DefaultHotkey;
 
@@ -101,7 +99,7 @@ public sealed partial class KeyboardViewModel : ObservableObject
     public bool IsOwnHotkey => Shortcut == SwitchShortcut.Hotkey;
 
     /// <summary>A Chinese keyboard (Sogou, Microsoft Pinyin) is in Windows' keyboard list.</summary>
-    public bool HasChinese => _inputMethods.HasLanguage(KeyboardModes.ChineseSimplified);
+    public bool HasChinese => Module.HasChinese;
 
     public ObservableCollection<KeyboardAppRow> Apps { get; } = [];
 
@@ -168,7 +166,7 @@ public sealed partial class KeyboardViewModel : ObservableObject
 
     private void RefreshInstall()
     {
-        var status = Module.Installer.GetStatus();
+        var status = Module.InstallStatus();
         IsInstalled = status.State is KeyboardInstallState.Installed or KeyboardInstallState.Outdated;
         CanInstall = status.State is KeyboardInstallState.NotInstalled or KeyboardInstallState.Outdated;
         InstallButton = status.State == KeyboardInstallState.Outdated ? "Update" : "Install";

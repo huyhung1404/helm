@@ -125,6 +125,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.AlwaysOnTop.Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.AlwaysOnTop.UI", "src\Helm.Modules.AlwaysOnTop.UI\Helm.Modules.AlwaysOnTop.UI.csproj", "{88A99CAC-5170-4D17-846A-420C3FA53D82}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Keyboard.Core", "src\Helm.Modules.Keyboard.Core\Helm.Modules.Keyboard.Core.csproj", "{200E7A21-B12C-4212-B1A1-76C42F3C05B1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Keyboard.UI", "src\Helm.Modules.Keyboard.UI\Helm.Modules.Keyboard.UI.csproj", "{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -867,6 +871,30 @@ Global
 		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Release|x64.Build.0 = Release|Any CPU
 		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Release|x86.ActiveCfg = Release|Any CPU
 		{88A99CAC-5170-4D17-846A-420C3FA53D82}.Release|x86.Build.0 = Release|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Debug|x64.Build.0 = Debug|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Debug|x86.Build.0 = Debug|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Release|x64.ActiveCfg = Release|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Release|x64.Build.0 = Release|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Release|x86.ActiveCfg = Release|Any CPU
+		{200E7A21-B12C-4212-B1A1-76C42F3C05B1}.Release|x86.Build.0 = Release|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Debug|x64.Build.0 = Debug|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Debug|x86.Build.0 = Debug|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Release|x64.ActiveCfg = Release|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Release|x64.Build.0 = Release|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Release|x86.ActiveCfg = Release|Any CPU
+		{9C22A0F2-B5DD-4519-BDB5-5A74155546A3}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

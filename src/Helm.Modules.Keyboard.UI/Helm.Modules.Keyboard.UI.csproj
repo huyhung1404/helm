@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Helm Keyboard page, ONE Avalonia view (Windows through Helm.Ui.Windows; the tool is Windows-only): on/off, the
+       input method, switching, typing Vietnamese, excluded apps and the keyboard each app keeps. Recording a shortcut
+       comes through IKeyboardPageHost; installing and the rest through IKeyboard. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.Keyboard.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Keyboard.Core\Helm.Modules.Keyboard.Core.csproj" />
+  </ItemGroup>
+
+</Project>
