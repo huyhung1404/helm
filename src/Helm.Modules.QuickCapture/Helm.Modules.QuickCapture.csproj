@@ -6,13 +6,13 @@
   <PropertyGroup>
     <UseWPF>true</UseWPF>
     <RootNamespace>Helm.Modules.QuickCapture</RootNamespace>
-    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
-    <!-- The capture box and the settings page are Avalonia views in Helm's look, shown through Helm.Ui.Windows. -->
-    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.QuickCapture.Core\Helm.Modules.QuickCapture.Core.csproj" />
+    <!-- The capture box and the page are the shared Avalonia views, shown through Helm.Ui.Windows. -->
+    <ProjectReference Include="..\Helm.Modules.QuickCapture.UI\Helm.Modules.QuickCapture.UI.csproj" />
     <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>
 

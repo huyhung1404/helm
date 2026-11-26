@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Quick Capture's two Avalonia views (Windows through Helm.Ui.Windows): the page (on/off, the shortcut, where text
+       goes, what to type) and the capture box that floats over any app. Recording a shortcut comes through
+       IQuickCapturePageHost; the rest through IQuickCapture. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.QuickCapture.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.QuickCapture.Core\Helm.Modules.QuickCapture.Core.csproj" />
+  </ItemGroup>
+
+</Project>

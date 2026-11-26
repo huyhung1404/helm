@@ -2,9 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.QuickCapture"
-             xmlns:uiw="using:Helm.Ui.Windows"
              xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Ui"
-             x:Class="Helm.Modules.QuickCapture.QuickCaptureView"
+             x:Class="Helm.Modules.QuickCapture.Ui.QuickCaptureView"
              x:DataType="vm:QuickCaptureViewModel">
 
     <!-- Quick Capture's settings: the tool has no page of content (its box floats over any app), so this is its page. -->
@@ -19,7 +18,7 @@
                                Text="Press a shortcut in any app to save a note, a task or a debt in a second, without opening Helm." />
                 </StackPanel>
 
-                <core:MasonryPanel MinColumnWidth="430" Spacing="14">
+                <core:MasonryPanel x:Name="Cards" MinColumnWidth="430" Spacing="14">
 
                 <!-- On or off -->
                 <Border Classes="glass">
@@ -32,13 +31,21 @@
                     </Grid>
                 </Border>
 
+                <!-- A shortcut that could not be registered, a box that could not open -->
+                <Border x:Name="ProblemCard" Classes="glass" Background="{DynamicResource HelmWarningBackground}" IsVisible="False">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <ic:SymbolIcon Symbol="Warning" FontSize="18" Margin="0,1,10,0" VerticalAlignment="Top" />
+                        <TextBlock x:Name="ProblemText" Grid.Column="1" TextWrapping="Wrap" />
+                    </Grid>
+                </Border>
+
                 <!-- Activation -->
                 <Border Classes="glass">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Activation" Classes="head" />
                         <StackPanel Spacing="6">
                             <TextBlock Text="Activation shortcut" />
-                            <uiw:HotkeyBox x:Name="ActivationHotkey" Classes="ghost" HorizontalAlignment="Stretch" MinHeight="40" />
+                            <ContentControl x:Name="ActivationHotkey" />
                             <TextBlock Text="Opens the capture box over any app." Classes="secondary" TextWrapping="Wrap" />
                         </StackPanel>
                         <Button x:Name="TryButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding TryCommand}"

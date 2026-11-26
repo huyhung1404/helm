@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Quick Capture's logic with no WPF, Avalonia or Win32: the settings, the capture box's and the page's view models and
+       the tool as the page sees it (IQuickCapture). The Windows app adds the shortcut and the floating window around the
+       box; the shared views are Helm.Modules.QuickCapture.UI. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.QuickCapture</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Modules.QuickCapture" />
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

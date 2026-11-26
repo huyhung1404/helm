@@ -3,7 +3,7 @@
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.QuickCapture"
              xmlns:core="using:Helm.Core.Ui"
-             x:Class="Helm.Modules.QuickCapture.CaptureBoxView"
+             x:Class="Helm.Modules.QuickCapture.Ui.CaptureBoxView"
              x:DataType="vm:CaptureBoxViewModel">
 
     <!-- The capture box that floats over any app: the target buttons, the text, what will be saved. The window around it is

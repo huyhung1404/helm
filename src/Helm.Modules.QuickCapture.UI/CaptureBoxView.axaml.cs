@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
 
-namespace Helm.Modules.QuickCapture;
+namespace Helm.Modules.QuickCapture.Ui;
 
 /// <summary>View glue for the capture box: Enter saves, Tab switches the target, Ctrl+1…9 picks one.</summary>
 public partial class CaptureBoxView : UserControl

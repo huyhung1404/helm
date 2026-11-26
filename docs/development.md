@@ -60,6 +60,9 @@ src/
   Helm.Keyboard.Engine/      net8.0: Telex (namespace Helm.Typing), the ids Helm and the input method share
   Helm.Keyboard.Tip/         HelmKeyboard.dll: the Vietnamese input method (TSF, NativeAOT, 64- and 32-bit);
                              built by scripts/build-keyboard.ps1, needs the C++ build tools
+  Helm.Modules.QuickCapture.Core/ net8.0: settings, IQuickCapture, the view models of the page and the capture box
+  Helm.Modules.QuickCapture.UI/ Avalonia: the Quick Capture page and the capture box
+  Helm.Modules.QuickCapture/ Windows only: the shortcut, the floating window around the box, the WPF page that hosts the shared view
   Helm.Modules.Keyboard.Core/ net8.0: settings, modes, the keyboard per app (on Helm Sync), IKeyboard, shared view model
   Helm.Modules.Keyboard.UI/  Avalonia: the Helm Keyboard page
   Helm.Modules.Keyboard/     Windows only: installs the input method, EN / VI / 中 shortcut, the WPF page that hosts the shared view

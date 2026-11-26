@@ -5,6 +5,6 @@
       ScrollViewer.CanContentScroll="False"
       Title="Quick Capture">
 
-    <!-- Quick Capture's settings are an Avalonia page (QuickCaptureView), the same look as the other tools; this WPF page only hosts it. -->
+    <!-- Quick Capture is the shared Avalonia page, Helm.Modules.QuickCapture.UI/QuickCaptureView. This WPF page only hosts it. -->
     <uiw:AvaloniaHost x:Name="Host" />
 </Page>
