@@ -7,6 +7,7 @@ using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Shell.BugReports;
+using Helm.Shell.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -27,14 +28,14 @@ internal sealed class PcBugReporter(
     IMonitorService monitors,
     TrayService tray,
     HelmPaths paths,
-    ILogger<PcBugReporter> logger)
+    ILogger<PcBugReporter> logger) : IPcBugReporting
 {
     /// <summary>Ctrl+Alt+F12 (Win+Alt+B is Windows' HDR switch, Ctrl+Alt+B is VS Code's).</summary>
     public static readonly HotkeyGesture Hotkey = new(HotkeyModifiers.Ctrl | HotkeyModifiers.Alt, 0x7B);
 
     private readonly HashSet<string> _notifiedQuestions = [];
     private readonly HashSet<string> _notifiedFixes = [];
-    private BugReportWindow? _window;
+    private BugReportPanel? _window;
     private BlackBoxSnapshot? _crash;
     private int _checkQueued;
 
@@ -75,19 +76,33 @@ internal sealed class PcBugReporter(
         var page = tabs.ActivePageTitle;
         var tool = fromCrash ? null : tools.FirstOrDefault(t => page is not null && page.StartsWith(t, StringComparison.OrdinalIgnoreCase));
         var form = new BugReportFormViewModel(store, box, snapshot, tool, tools, fromCrash);
-        _window = new BugReportWindow(form, windows, monitors);
-        _window.OpenRequested += (_, id) => ShowPage(id);
-        _window.Closed += (_, _) => _window = null;
-        _window.Show();
+        try
+        {
+            _window = new BugReportPanel(form, windows, monitors, id => ShowPage(id));
+            _window.Closed += (_, _) => _window = null;
+            _window.Show();
+        }
+        catch (Exception ex)
+        {
+            // The shared form could not open: the black box must not stay frozen.
+            logger.LogError(ex, "The report window could not open");
+            form.Close();
+            _window = null;
+            tray.Show("Could not open the report window", ex.GetBaseException().Message, null);
+        }
     }
 
+    /// <inheritdoc />
+    public string ReportHint => "Ctrl+Alt+F12, anywhere";
+
+    void IPcBugReporting.Report() => Report();
+
     /// <summary>The Bug reports page in the main window, with <paramref name="id"/> opened.</summary>
-    public BugReportsPage ShowPage(string? id = null)
+    public void ShowPage(string? id = null)
     {
         services.GetRequiredService<ShellController>().ShowMainWindow();
         services.GetRequiredService<IShellNavigation>().ShowPage(typeof(BugReportsPage));
         if (id is not null) services.GetRequiredService<BugReportsViewModel>().Open(id);
-        return services.GetRequiredService<BugReportsPage>();
     }
 
     private void QueueCheck()

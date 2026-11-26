@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Helm.App.Android.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Android.Views;
 
@@ -9,7 +10,11 @@ namespace Helm.App.Android.Views;
 internal static class PageViews
 {
     /// <summary>A page that lays itself out (fixed bars, its own scrolling) gets the whole area and no app bar.</summary>
-    public static bool IsFull(ShellTab tab) => tab.Page is ModulePage page && typeof(Helm.Core.Ui.IFullPage).IsAssignableFrom(page.PageType);
+    public static bool IsFull(ShellTab tab) =>
+        tab.Page is Helm.Shell.BugReports.BugReportsViewModel or Helm.Shell.BugReports.BugReportFormViewModel
+        || tab.Page is ModulePage page && typeof(Helm.Core.Ui.IFullPage).IsAssignableFrom(page.PageType);
+
+    private static BugReports.AndroidBugReporter Reporter => App.Services.GetRequiredService<BugReports.AndroidBugReporter>();
 
     /// <summary>The page, inside its own scroller unless it is a full page (so each tab keeps its scroll position).</summary>
     public static Control Build(ShellTab tab)
@@ -18,8 +23,9 @@ internal static class PageViews
         {
             Helm.Home.HomeViewModel home => new Helm.Home.HomeView(home),
             Helm.General.GeneralViewModel general => new Helm.General.GeneralView(general),
-            Helm.Shell.BugReports.BugReportsViewModel => new BugReports.BugReportsView(),
-            Helm.Shell.BugReports.BugReportFormViewModel => new BugReports.BugReportView(),
+            // Bug reports: the shared views (Helm.Shell.UI); the phone's part is AndroidBugReporter.
+            Helm.Shell.BugReports.BugReportsViewModel bugs => new Helm.BugReports.Ui.BugReportsView(bugs, Reporter),
+            Helm.Shell.BugReports.BugReportFormViewModel form => new Helm.BugReports.Ui.BugReportFormView(form, Reporter),
             ModulePage module => new ModulePageTemplate().Build(module)!,
             _ => new TextBlock { Text = tab.Title },
         };

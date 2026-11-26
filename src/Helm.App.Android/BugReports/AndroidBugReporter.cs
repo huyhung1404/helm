@@ -6,6 +6,7 @@ using Android.Media;
 using Android.OS;
 using Android.Provider;
 using FluentIcons.Common;
+using Helm.BugReports.Ui;
 using Helm.App.Android.ViewModels;
 using Helm.Core;
 using Helm.Core.Diagnostics;
@@ -34,7 +35,9 @@ namespace Helm.App.Android.BugReports;
 /// <summary>
 /// Bug reports on the phone: the report page from anywhere (the app bar's bug button, shaking the phone while Helm is
 /// open, the Quick Settings tile), the black box's hooks, the report a crash left, notifications when an agent asks or a
-/// fix arrives, and pictures from the gallery, the camera or the clipboard (Helm never takes screenshots).
+/// fix arrives, and pictures from the gallery, the camera or the clipboard (Helm never takes screenshots). It is also what
+/// the shared Bug reports page and report form ask of the phone (<see cref="IBugReportsPageHost"/>,
+/// <see cref="IBugReportFormHost"/>).
 /// </summary>
 public sealed class AndroidBugReporter(
     IServiceProvider services,
@@ -45,7 +48,7 @@ public sealed class AndroidBugReporter(
     ISettingsStoreFactory settings,
     HelmPaths paths,
     IUiDispatcher ui,
-    ILogger<AndroidBugReporter> logger)
+    ILogger<AndroidBugReporter> logger) : IBugReportsPageHost, IBugReportFormHost
 {
     /// <summary>String extra of an intent that opens Helm: <see cref="ReportRequest"/>, <see cref="CrashRequest"/>, or a bug's id.</summary>
     public const string ExtraBug = "com.huyhung1404.helm.extra.BUG";
@@ -164,6 +167,23 @@ public sealed class AndroidBugReporter(
         if (id is not null) services.GetRequiredService<BugReportsViewModel>().Open(id);
     }
 
+    // ---- what the shared page and form ask of the phone ----
+
+    void IBugReportsPageHost.Report() => Report();
+
+    string IBugReportsPageHost.ReportHint => "shake the phone, or use the Quick Settings tile";
+
+    ISettingsStore<BugReportSettings>? IBugReportsPageHost.ShakeSettings => _settings;
+
+    /// <summary>The page has no app bar on a phone: its menu button opens the drawer.</summary>
+    Action<Avalonia.Controls.Control>? IBugReportsPageHost.OpenMenu => Helm.Core.Ui.ShellChrome.OpenNavigation;
+
+    void IBugReportFormHost.Close() => CloseReport();
+
+    void IBugReportFormHost.OpenBug(string id) => ShowPage(id);
+
+    public bool CanTakePhoto => true;
+
     // ---- pictures ----
 
     /// <summary>Android's photo picker (no storage permission).</summary>
@@ -223,12 +243,12 @@ public sealed class AndroidBugReporter(
     }
 
     /// <summary>A picture copied to the clipboard (as a content URI), if there is one.</summary>
-    public async Task<BugImageDraft?> PasteAsync()
+    public async Task<IReadOnlyList<BugImageDraft>> PasteAsync()
     {
         var context = AndroidApp.Context;
-        if (context.GetSystemService(Context.ClipboardService) is not ClipboardManager clipboard || clipboard.PrimaryClip is not { ItemCount: > 0 } clip) return null;
-        if (clip.GetItemAt(0)?.Uri is not { } uri) return null;
-        return await Task.Run(() => FromUri(uri)).ConfigureAwait(true);
+        if (context.GetSystemService(Context.ClipboardService) is not ClipboardManager clipboard || clipboard.PrimaryClip is not { ItemCount: > 0 } clip) return [];
+        if (clip.GetItemAt(0)?.Uri is not { } uri) return [];
+        return await Task.Run(() => FromUri(uri) is { } image ? (IReadOnlyList<BugImageDraft>)[image] : []).ConfigureAwait(true);
     }
 
     private BugImageDraft? FromUri(AndroidUri uri)
