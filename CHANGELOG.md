@@ -3,6 +3,24 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Removed
+- **Helm's AI in the tools.** Helm no longer asks an AI of its own inside Vocabulary, Novel Reader, Wallet, Tracker or
+  Notes. Fairy does this work now, through Helm's tools: it breaks your new words down, suggests the translations of
+  the sentences you marked wrong, and files your new transactions. What changes on screen:
+  - Vocabulary: no "Analyze now", "Suggest 3 more words", Claude model or "break new words down by itself"; a word
+    added on the phone is no longer analysed there. Analysis still shows what waits, and when an AI agent is at work.
+  - Novel Reader: the name scan finds names from how words are used (as before without AI); the AI name scan and
+    explaining a held sentence are gone with no replacement (the held sentence still shows its pinyin, says it, and
+    sends its word to Vocabulary). "Ask Claude Code" on the reports is gone; Fairy's suggestions show as before.
+  - Wallet: the history's sure category still comes first, on the PC and in the phone's "What was it?"; no more AI
+    pick or "+ new category" chip. "Read with AI" on the notifications Helm could not read is gone (copy one and add
+    it by hand).
+  - Tracker and Notes: "Split into steps" and "Make tasks" are gone; the lines of a note that became tasks still show
+    when their task is done.
+  - The text actions on a selection (translate, rewrite…), already off since 26/11, are gone.
+
 ## [0.95.0] - 2026-11-27
 
 ### Added

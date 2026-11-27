@@ -3,7 +3,6 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using Helm.Core.Ai;
 using Helm.Core.Settings;
 using Helm.Gallery;
 using Helm.Modules.Tracker;
@@ -15,11 +14,6 @@ namespace Helm.Ui.Tests;
 /// <summary>The shared Tracker page (Helm.Modules.Tracker.UI) with its real view model over in-memory stores.</summary>
 public sealed class TrackerViewTests : IDisposable
 {
-    private const string FiveSteps = """
-        {"tasks": [{"title": "Học 10 câu mẫu part 1"}, {"title": "Mô tả 3 bức ảnh part 2"}, {"title": "So sánh 2 ảnh part 3"},
-                   {"title": "Nói 2 phút part 4"}, {"title": "Ghi âm, nghe lại, sửa lỗi"}]}
-        """;
-
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "helm-ui-tests", Guid.NewGuid().ToString("N"));
     private readonly SettingsStoreFactory _settings;
     private readonly TrackerStore _store = new(new MemorySynced<TrackerWorkspace>(), new MemorySynced<TrackerItem>(), new MemorySyncedLog<TrackerEvent>());
@@ -32,10 +26,10 @@ public sealed class TrackerViewTests : IDisposable
         try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
     }
 
-    private (Window Window, TrackerView View, TrackerViewModel Vm) Show(TrackerProposalViewModel? proposals = null, double width = 1200)
+    private (Window Window, TrackerView View, TrackerViewModel Vm) Show(double width = 1200)
     {
         var vm = new TrackerViewModel(_store, _settings, new AvaloniaUi(), new YesDialogs(), new NoClipboard(),
-            new TrackerReminderService(_store, _settings), NullLogger<TrackerViewModel>.Instance, proposals: proposals);
+            new TrackerReminderService(_store, _settings), NullLogger<TrackerViewModel>.Instance);
         var view = new TrackerView(new FakeModule("tracker", "Tracker"), vm, new NoHost());
         var window = new Window { Content = view, Width = width, Height = 900 };
         window.Show();
@@ -45,27 +39,6 @@ public sealed class TrackerViewTests : IDisposable
 
     private static List<TextBlock> Shown(Control root, string text) =>
         root.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Text == text && t.IsEffectivelyVisible).ToList();
-
-    [AvaloniaFact]
-    public async Task The_steps_panel_shows_only_under_the_task_whose_steps_are_open()
-    {
-        var list = _store.AddWorkspace("TODO");
-        var first = _store.AddItem(list, new TrackerItemDraft("Đổi mật khẩu WeChat"));
-        _store.AddItem(list, new TrackerItemDraft("Đòi 3 khoản tiền"));
-        var proposals = new TrackerProposalViewModel(_store, new OneAnswer(FiveSteps), TimeProvider.System);
-        var (window, view, vm) = Show(proposals);
-
-        Assert.Equal(2, vm.OpenItems.Count);
-        // No task has its steps open: no panel at all (it once showed under every task, every part at once).
-        Assert.Empty(Shown(view, "Proposed steps"));
-
-        await proposals.ForTaskAsync(first);
-        Dispatcher.UIThread.RunJobs();
-
-        var heading = Assert.Single(Shown(view, "Proposed steps"));
-        Assert.Same(proposals, heading.DataContext);
-        window.Close();
-    }
 
     [AvaloniaFact]
     public void Each_tab_replaces_the_whole_page_under_the_tabs()
@@ -233,12 +206,5 @@ public sealed class TrackerViewTests : IDisposable
 
         public void Opened() { }
 
-    }
-
-    private sealed class OneAnswer(string answer) : IAiText
-    {
-        public string? Unavailable(string feature) => null;
-
-        public Task<AiTextAnswer> AskAsync(AiTextRequest request, CancellationToken ct) => Task.FromResult(new AiTextAnswer(answer, null));
     }
 }

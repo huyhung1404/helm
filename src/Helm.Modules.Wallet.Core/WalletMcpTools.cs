@@ -121,10 +121,13 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
 
     private const int UnfiledLimit = 20;
 
+    /// <summary>Earlier filed transactions shown per waiting one: enough to see the user's habits, few enough to stay small.</summary>
+    internal const int SimilarExamples = 5;
+
     /// <summary>
-    /// What an agent needs to file the transactions waiting for a category, as <see cref="WalletCategoryAi"/> asks it:
-    /// the categories that fit (spending or money in), up to <see cref="WalletCategoryAi.Examples"/> filed ones like it,
-    /// and the history's category when it is sure (no AI needed then).
+    /// What an agent needs to file the transactions waiting for a category: the categories that fit (spending or money
+    /// in), up to <see cref="SimilarExamples"/> filed ones like it, and the history's category when it is sure (no AI
+    /// needed then).
     /// </summary>
     private object Unfiled(JsonElement args)
     {
@@ -143,7 +146,7 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
                 bank = t.Value.Bank.Length > 0 ? t.Value.Bank : null,
                 description = t.Value.Description,
                 categories = store.Categories().Where(c => c.Fits(t.Value.Amount)).Select(c => c.Name).ToList(),
-                alike = store.SimilarFiled(t.Value, WalletCategoryAi.Examples).Select(a => new
+                alike = store.SimilarFiled(t.Value, SimilarExamples).Select(a => new
                 {
                     amount = a.Amount,
                     description = a.Description,

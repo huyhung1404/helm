@@ -12,7 +12,7 @@ public sealed class VocabSourceRow(string id, string title, string status, int w
 
     public string Title { get; } = title;
 
-    /// <summary>"Waiting for Claude Code", "12 words to look at", "5 words added".</summary>
+    /// <summary>"Waiting for an AI agent", "12 words to look at", "5 words added".</summary>
     public string Status { get; } = status;
 
     public int Words { get; } = words;
@@ -194,7 +194,7 @@ public sealed partial class VocabTextsViewModel : ObservableObject
     {
         if (_openId is not { } id) return;
         var added = _store.AddChosen(id);
-        Message = added == 1 ? "Added 1 word. Claude Code breaks it down next." : $"Added {added} words. Claude Code breaks them down next.";
+        Message = added == 1 ? "Added 1 word. An AI agent breaks it down next." : $"Added {added} words. An AI agent breaks them down next.";
     }
 
     [RelayCommand]
@@ -292,7 +292,7 @@ public sealed partial class VocabTextsViewModel : ObservableObject
 
     private static string StatusOf(VocabSource source, int added) => source.Status switch
     {
-        VocabSourceStatus.Waiting => "Waiting for Claude Code",
+        VocabSourceStatus.Waiting => "Waiting for an AI agent",
         VocabSourceStatus.Proposed => source.Proposals.Count == 1 ? "1 word to look at" : $"{source.Proposals.Count} words to look at",
         _ => added switch { 0 => "Done", 1 => "1 word added", _ => $"{added} words added" },
     };

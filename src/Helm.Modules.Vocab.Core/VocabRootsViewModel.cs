@@ -31,8 +31,7 @@ public sealed record VocabRootRow(string PartId, string Form, string Kind, strin
 
 /// <summary>
 /// The Roots tab: every part of the user's words with the words that share it, the biggest families first; a card to
-/// practise roots alone (the root, then its meaning and family); and, on the PC, "Suggest words" to add more of a
-/// family. A family opened takes the whole tab, with Previous and Next through the list. The list shows one page at a
+/// practise roots alone (the root, then its meaning and family). A family opened takes the whole tab, with Previous and Next through the list. The list shows one page at a
 /// time. UI thread only.
 /// </summary>
 public sealed partial class VocabRootsViewModel : ObservableObject
@@ -59,14 +58,13 @@ public sealed partial class VocabRootsViewModel : ObservableObject
     [ObservableProperty] private bool _isPracticeRevealed;
 
     /// <param name="strengthOf">A word's quiz level, for the dots of an opened family's words; null shows none.</param>
-    public VocabRootsViewModel(VocabStore store, VocabAgentViewModel agent, int pageSize, Action<string> open, Random? random = null,
+    public VocabRootsViewModel(VocabStore store, int pageSize, Action<string> open, Random? random = null,
         Func<string, int>? strengthOf = null)
     {
         _strengthOf = strengthOf;
         _store = store;
         _open = open;
         _random = random ?? Random.Shared;
-        Agent = agent;
         Pages = new ListPages(Refresh, pageSize);
     }
 
@@ -74,8 +72,6 @@ public sealed partial class VocabRootsViewModel : ObservableObject
 
     /// <summary>One page of the list at a time (Previous / Next under it).</summary>
     public ListPages Pages { get; }
-
-    public VocabAgentViewModel Agent { get; }
 
     public bool IsEnglish => Language == VocabLanguage.English;
 
@@ -171,11 +167,6 @@ public sealed partial class VocabRootsViewModel : ObservableObject
 
     [RelayCommand]
     private void CloseSelected() => Selected = null;
-
-    /// <summary>Asks the agent for a few more words of the selected family.</summary>
-    [RelayCommand]
-    private Task SuggestAsync() =>
-        Selected is { } root ? Agent.SuggestAsync(root.PartId, root.Form, root.Meaning, Language) : Task.CompletedTask;
 
     public void Refresh()
     {

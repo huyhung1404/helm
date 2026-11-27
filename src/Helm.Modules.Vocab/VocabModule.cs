@@ -10,11 +10,10 @@ namespace Helm.Modules.Vocab;
 
 /// <summary>
 /// Vocabulary on Windows. The words live in Helm Sync and the pages work on <see cref="VocabStore"/>; the background
-/// work is the pop-up card that shows a word now and then (<see cref="VocabPopup"/>) and Claude Code breaking down new
-/// words by itself (<see cref="VocabAgentViewModel"/>, when its setting is on). The page is the shared
+/// work is the pop-up card that shows a word now and then (<see cref="VocabPopup"/>). The page is the shared
 /// <see cref="VocabView"/>; the settings are a sheet inside it.
 /// </summary>
-public sealed class VocabModule(VocabPopup popup, VocabAgentViewModel agent, IServiceProvider services) : HelmModuleBase
+public sealed class VocabModule(VocabPopup popup, IServiceProvider services) : HelmModuleBase
 {
     public override string Id => VocabIds.ModuleId;
     public override string DisplayName => VocabIds.DisplayName;
@@ -34,14 +33,12 @@ public sealed class VocabModule(VocabPopup popup, VocabAgentViewModel agent, ISe
     {
         StatusMessage = null;
         popup.Start();
-        agent.Watch(true);
         return Task.CompletedTask;
     }
 
     public override Task DisableAsync()
     {
         popup.Stop();
-        agent.Watch(false);
         return Task.CompletedTask;
     }
 }

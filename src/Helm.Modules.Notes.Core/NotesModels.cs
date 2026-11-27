@@ -45,7 +45,7 @@ public sealed record NoteItem
     /// </summary>
     public string Rev { get; init; } = "";
 
-    /// <summary>The lines that became tasks ("Make tasks"): the line's mark shows when its task is done.</summary>
+    /// <summary>The lines that became tasks (Notes' "Make tasks" before 0.96): the line's mark shows when its task is done.</summary>
     public IReadOnlyList<NoteTaskLink> TaskLinks { get; init; } = [];
 
     /// <summary>The title, or else the first line of the text, or else "Untitled".</summary>

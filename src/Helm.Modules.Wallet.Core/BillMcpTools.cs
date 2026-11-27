@@ -5,7 +5,7 @@ using Helm.Core.Mcp;
 namespace Helm.Modules.Wallet;
 
 /// <summary>
-/// Recurring bills for AI agents (Ask Helm first): list them, add one, and save a payment (a Wallet transaction, and
+/// Recurring bills for AI agents: list them, add one, and save a payment (a Wallet transaction, and
 /// that month marked paid). The Tracker's daily reminder tells the user before each comes due.
 /// </summary>
 public sealed class BillMcpTools(BillBook bills, WalletStore store) : IMcpToolProvider

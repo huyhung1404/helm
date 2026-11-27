@@ -290,7 +290,6 @@ public partial class VocabView : UserControl
         _module.PropertyChanged += OnModuleChanged;
         _viewModel.PropertyChanged += OnViewModelChanged;
         _viewModel.Roots.PropertyChanged += OnRootsChanged;
-        _viewModel.Agent.PropertyChanged += OnAgentChanged;
         _sheets?.Attach();
         // The keys work wherever the focus is on the page (or nowhere yet): they are heard at the window.
         _topLevel = TopLevel.GetTopLevel(this);
@@ -309,7 +308,6 @@ public partial class VocabView : UserControl
         {
             _viewModel.PropertyChanged -= OnViewModelChanged;
             _viewModel.Roots.PropertyChanged -= OnRootsChanged;
-            _viewModel.Agent.PropertyChanged -= OnAgentChanged;
         }
         _sheets?.Detach();
         _topLevel?.RemoveHandler(KeyDownEvent, OnKey);
@@ -338,6 +336,9 @@ public partial class VocabView : UserControl
         {
             case nameof(VocabViewModel.Tab):
                 ShowContent(animate: true);
+                break;
+            case nameof(VocabViewModel.IsAgentBusy):
+                ShowContent(animate: false);
                 break;
             case nameof(VocabViewModel.Detail):
                 // The opened word is rebuilt after every change (a sync, an answer): only another word starts at the top.
@@ -370,11 +371,6 @@ public partial class VocabView : UserControl
     {
         if (e.PropertyName is nameof(VocabRootsViewModel.Selected) or nameof(VocabRootsViewModel.Practice) && _viewModel?.IsRootsTab == true)
             ScrollToTop();
-    }
-
-    private void OnAgentChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName is nameof(VocabAgentViewModel.IsBusy) or nameof(VocabAgentViewModel.ExternalBusy)) ShowContent(animate: false);
     }
 
     private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)

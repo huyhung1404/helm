@@ -4,7 +4,7 @@ using Helm.Core.Mcp;
 namespace Helm.Modules.Wallet;
 
 /// <summary>
-/// Money shared with other people, for AI agents (Ask Helm first): a bill split among friends in one call (the user's
+/// Money shared with other people, for AI agents: a bill split among friends in one call (the user's
 /// share as spending, a debt per person who still owes), and the message that reminds someone of a debt.
 /// </summary>
 public sealed class WalletShareTools(DebtBook book, WalletStore store) : IMcpToolProvider

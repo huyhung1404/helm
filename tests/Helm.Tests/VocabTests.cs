@@ -305,27 +305,6 @@ public sealed class VocabTests
     }
 
     [Fact]
-    public async Task New_words_are_broken_down_by_themselves_a_moment_after_they_arrive()
-    {
-        using var dir = new TempDir();
-        using var settings = new Helm.Core.Settings.SettingsStoreFactory(new Helm.Core.Settings.HelmPaths(dir.Path));
-        var agent = new FakeAgent();
-        var options = VocabKit.Settings(settings);
-        using var vm = new VocabAgentViewModel(agent, _store, new VocabQuiz(_store), options, new InlineUi());
-        vm.Watch(true);
-        _store.AddWord("relative");
-        Assert.Equal(0, agent.Runs); // waits for words added in a row
-        await vm.AnalyzeCommand.ExecuteAsync(null);
-        Assert.Equal(1, agent.Runs);
-        Assert.Equal("Đã phân tích 1 từ.", vm.Status);
-
-        agent.Fail = true;
-        await vm.AnalyzeCommand.ExecuteAsync(null);
-        Assert.Equal("Claude Code is not installed on this PC.", vm.Status);
-        Assert.False(vm.IsBusy);
-    }
-
-    [Fact]
     public void The_texts_dialog_shows_the_proposed_words_and_adds_only_the_ticked_ones()
     {
         var vm = new VocabTextsViewModel(_store, new InlineUi());
@@ -398,17 +377,18 @@ public sealed class VocabTests
     {
         using var dir = new TempDir();
         using var settings = new Helm.Core.Settings.SettingsStoreFactory(new Helm.Core.Settings.HelmPaths(dir.Path));
-        using var vm = new VocabAgentViewModel(new FakeAgent(), _store, new VocabQuiz(_store), VocabKit.Settings(settings), new InlineUi());
+        var vm = VocabKit.ViewModel(_store, new VocabQuiz(_store), settings);
         var server = Server();
 
-        _store.AddWord("relative"); // added in Helm: Helm's agent may take it
+        _store.AddWord("relative"); // added in Helm: no agent took it yet
         Assert.Single(_store.PendingUnclaimed());
-        Assert.False(vm.ExternalBusy);
+        Assert.False(vm.IsAgentBusy);
 
         var added = await CallAsync(server, "vocab_add_words", new JsonObject { ["words"] = new JsonArray("补救", "translate") });
         Assert.Equal(2, added["added"]!.AsArray().Count);
         Assert.Equal(["relative"], _store.PendingUnclaimed().Select(w => w.Value.Text));
-        Assert.True(vm.ExternalBusy);
+        Assert.True(vm.IsAgentBusy);
+        Assert.Equal("AI agent working…", vm.AgentChipText);
 
         // The agent that reads the waiting words takes them too.
         await CallAsync(server, "vocab_pending", []);
@@ -417,7 +397,9 @@ public sealed class VocabTests
         // An agent that never finishes frees them.
         _time.Advance(VocabStore.ClaimFor + TimeSpan.FromSeconds(1));
         Assert.Equal(3, _store.PendingUnclaimed().Count);
-        Assert.False(vm.ExternalBusy);
+        _store.AddWord("reluctant");
+        Assert.False(vm.IsAgentBusy);
+        Assert.Equal("4 waiting for analysis", vm.AgentChipText);
     }
 
     [Fact]
@@ -454,24 +436,6 @@ public sealed class VocabTests
         Assert.Null(_store.FindWord("然后"));
         Assert.NotNull(_store.FindWord("必须"));
         Assert.Null(target.Capture("必须").Undo);
-    }
-
-    private sealed class FakeAgent : IVocabAgent
-    {
-        public int Runs { get; private set; }
-
-        public bool Fail { get; set; }
-
-        public string? Unavailable() => null;
-
-        public Task<string> AnalyzeAsync(string? model, IProgress<string>? progress, CancellationToken ct)
-        {
-            Runs++;
-            return Fail ? throw new VocabAgentException("Claude Code is not installed on this PC.") : Task.FromResult("Đã phân tích 1 từ.");
-        }
-
-        public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, string? model, IProgress<string>? progress, CancellationToken ct) =>
-            Task.FromResult("");
     }
 
     [Fact]

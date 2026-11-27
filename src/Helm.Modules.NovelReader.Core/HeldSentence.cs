@@ -5,9 +5,12 @@ using Helm.Modules.NovelReader.Speech;
 
 namespace Helm.Modules.NovelReader;
 
+/// <summary>A word of a held sentence: its Chinese, its reading and Helm's Vietnamese for it.</summary>
+public sealed record SentenceWord(string Word, string Reading, string Meaning);
+
 /// <summary>
 /// The sentence a long press landed in: its segments (to highlight it, as reading aloud does), its Chinese (what is
-/// explained and said), its pinyin, and the word under the finger (offered for Vocabulary even before an explanation).
+/// said), its pinyin, and the word under the finger (offered for Vocabulary).
 /// </summary>
 /// <param name="Paragraph">The paragraph's place on the page.</param>
 /// <param name="FirstSegment">The sentence's first segment in the paragraph's line.</param>

@@ -113,57 +113,35 @@ public sealed class NovelReaderReportTests
     }
 
     [Fact]
-    public async Task Asking_the_ai_saves_the_report_and_shows_its_suggestion_beside_the_readers_translation()
+    public void A_suggestion_an_agent_writes_shows_beside_the_readers_translation_and_can_be_used()
     {
         var converter = NewConverter();
-        var line = converter.ConvertLine("他父亲的剑。");
         var store = new TranslationReportStore(new MemorySynced<TranslationReport>(), _clock);
-        var agent = new FakeTranslator(store);
-        var reports = new TranslationReportsViewModel(store, new InlineUi(), new MemoryClipboard(), new Phone(), () => Context(converter), agent);
-        reports.Start(line, line.Source.IndexOf('的'), 1);
+        var reports = new TranslationReportsViewModel(store, new InlineUi(), new MemoryClipboard(), new Phone(), () => Context(converter));
+        var id = store.Add(new TranslationReport { BookId = "book", BookTitle = "Novel", Chinese = "他父亲的剑。", Helm = "Hắn phụ thân của kiếm." }, "PC");
+
+        // An AI agent writes it through novel_suggest_translations: the open form shows it, the reader's text stays.
         var form = reports.Editor;
-        Assert.True(form.CanAsk);
-
-        await form.AskAiCommand.ExecuteAsync(null);
-
-        // Saved first (Helm's own text left in the box is no translation), then asked about.
-        var (id, saved, _) = Assert.Single(store.Reports());
-        Assert.Equal(id, form.EditingId);
-        Assert.Equal("", saved.Correct);
-        Assert.Equal(["book"], agent.Books);
-        Assert.Equal([id], agent.Ids);
+        form.Edit(id, store.Get(id)!);
+        Assert.False(form.HasSuggestion);
+        store.SaveSuggestion(id, "Kiếm của phụ thân hắn.", "的 bị ngược", "Word-Order");
+        form.Reload(store.Get(id)!);
         Assert.Equal("Kiếm của phụ thân hắn.", form.Suggestion);
         Assert.Equal("的 bị ngược", form.SuggestionNote);
         Assert.Equal(ErrorKinds.WordOrder, form.ErrorKind);
         Assert.Equal("Hắn phụ thân của kiếm.", form.Correct);
-        Assert.Equal("Claude Code: Suggested 1 translation.", form.AskStatus);
-        Assert.False(form.IsAsking);
-        Assert.False(form.CanAddBefore);
+
+        reports.IsPanelOpen = true;
+        var row = Assert.Single(reports.Rows);
+        Assert.True(row.HasSuggestion);
+        Assert.True(row.CanUseSuggestion);
+        Assert.Equal("的 bị ngược · word-order", row.SuggestionNote);
 
         form.UseSuggestionCommand.Execute(null);
         form.SaveCommand.Execute(null);
         Assert.False(form.IsOpen);
         Assert.Equal("Kiếm của phụ thân hắn.", store.Get(id)!.Correct);
-
-        // The list asks only about reports without a suggestion.
-        reports.IsPanelOpen = true;
-        var row = Assert.Single(reports.Rows);
-        Assert.True(row.HasSuggestion);
-        Assert.False(row.CanUseSuggestion);
-        Assert.Equal("的 bị ngược · word-order", row.SuggestionNote);
-        await reports.AskForRestCommand.ExecuteAsync(null);
-        Assert.Equal("Every listed report has a suggestion already.", reports.AskStatus);
-        Assert.Single(agent.Ids);
-    }
-
-    [Fact]
-    public void Without_an_ai_nothing_offers_to_ask()
-    {
-        var store = new TranslationReportStore(new MemorySynced<TranslationReport>(), _clock);
-        var reports = new TranslationReportsViewModel(store, new InlineUi(), new MemoryClipboard(), new Phone(), () => null);
-        Assert.False(reports.CanAsk);
-        Assert.False(reports.Editor.CanAsk);
-        Assert.Equal("", reports.AskLabel);
+        Assert.False(Assert.Single(reports.Rows).CanUseSuggestion);
     }
 
     [Fact]
@@ -199,21 +177,4 @@ public sealed class NovelReaderReportTests
         public string DeviceName => "Phone";
     }
 
-    /// <summary>Writes its suggestions into the store, as Claude Code does through novel_suggest_translations.</summary>
-    private sealed class FakeTranslator(TranslationReportStore store) : ITranslationAgent
-    {
-        public List<string> Books { get; } = [];
-        public List<string> Ids { get; } = [];
-        public string Name => "Claude Code";
-        public string? Unavailable() => null;
-
-        public Task<string> SuggestAsync(string bookId, string title, IReadOnlyList<string> reportIds, IProgress<string>? progress, CancellationToken ct)
-        {
-            Books.Add(bookId);
-            Ids.AddRange(reportIds);
-            progress?.Report("Claude Code is writing its suggestions… (3 steps)");
-            foreach (var id in reportIds) store.SaveSuggestion(id, "Kiếm của phụ thân hắn.", "的 bị ngược", "Word-Order");
-            return Task.FromResult("Suggested 1 translation.");
-        }
-    }
 }

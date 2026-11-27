@@ -23,8 +23,6 @@ internal enum VocabStage
     CardMenu,
     /// <summary>The Words tab: add, three words waiting for the agent, the list.</summary>
     Words,
-    /// <summary>The agent at work on the waiting words.</summary>
-    Analyzing,
     /// <summary>An English word's page with a part tapped (lat of relative).</summary>
     Word,
     /// <summary>A Chinese word's page with a component tapped (攵 of 补救).</summary>
@@ -35,7 +33,7 @@ internal enum VocabStage
     RootPractice,
     /// <summary>A family opened (spect).</summary>
     Family,
-    /// <summary>The Analysis sheet while the agent works.</summary>
+    /// <summary>The Analysis sheet: what waits for an AI agent.</summary>
     AnalysisSheet,
     /// <summary>Add text: the paste form and the texts pasted before.</summary>
     AddText,
@@ -91,11 +89,10 @@ internal static class VocabDemo
         });
         var ui = new AvaloniaUi();
         var quiz = new VocabQuiz(store, new Random(3));
-        var agent = new VocabAgentViewModel(new DemoAgent(), store, quiz, settings, ui);
         var voice = new VocabVoice(() => null, null);
         if (stage is VocabStage.CardWord or VocabStage.CardAnswer or VocabStage.CardAsksPinyin or VocabStage.CardPinyin or VocabStage.CardFull)
             return PopupCard(store, quiz, voice, words, stage);
-        var vm = new VocabViewModel(store, quiz, settings, agent, ui, new YesDialogs(), new NoClipboard(), voice, new VocabTextsViewModel(store, ui));
+        var vm = new VocabViewModel(store, quiz, settings, ui, new YesDialogs(), new NoClipboard(), voice, new VocabTextsViewModel(store, ui));
         var view = new VocabView(module, vm, new Host());
 
         void Card(string word) => vm.Card.Show(words[word], store.GetWord(words[word]));
@@ -129,10 +126,6 @@ internal static class VocabDemo
             case VocabStage.Words:
                 vm.Tab = VocabTab.Words;
                 break;
-            case VocabStage.Analyzing:
-                vm.Tab = VocabTab.Words;
-                agent.AnalyzeCommand.Execute(null);
-                break;
             case VocabStage.Word:
                 vm.Open(words["relative"]);
                 Pick(vm, "lat");
@@ -155,7 +148,6 @@ internal static class VocabDemo
                 break;
             case VocabStage.AnalysisSheet:
                 vm.Tab = VocabTab.Words;
-                agent.AnalyzeCommand.Execute(null);
                 vm.OpenAgentCommand.Execute(null);
                 break;
             case VocabStage.AddText:
@@ -615,30 +607,6 @@ internal static class VocabDemo
         public void At(DateTimeOffset time) => _offset = time - DateTimeOffset.UtcNow;
 
         public void Now() => _offset = TimeSpan.Zero;
-    }
-
-    /// <summary>Claude Code at work: a few steps, then it keeps working (the demo never finishes it).</summary>
-    private sealed class DemoAgent : IVocabAgent
-    {
-        public string? Unavailable() => null;
-
-        public async Task<string> AnalyzeAsync(string? model, IProgress<string>? progress, CancellationToken ct)
-        {
-            foreach (var line in new[]
-                     {
-                         "Reading the words waiting (vocab_pending)",
-                         "Breaking reluctant down: re- + luct + -ant",
-                         "✓ reluctant saved: re- (ngược lại) + luct (vật lộn) + -ant",
-                         "“sufficient: suf- (dưới) + fic (làm) + -ient — làm đủ từ dưới lên”",
-                         "Saving sufficient (vocab_save_analysis)",
-                     })
-                progress?.Report(line);
-            await Task.Delay(Timeout.Infinite, ct);
-            return "";
-        }
-
-        public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, string? model, IProgress<string>? progress, CancellationToken ct) =>
-            AnalyzeAsync(model, progress, ct);
     }
 
     private sealed class Host : IVocabPageHost

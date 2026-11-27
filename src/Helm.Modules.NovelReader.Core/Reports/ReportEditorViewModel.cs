@@ -34,8 +34,6 @@ public sealed partial class ReportEditorViewModel : ObservableObject
     [ObservableProperty] private string _suggestion = "";
     [ObservableProperty] private string _suggestionNote = "";
     [ObservableProperty] private string _errorKind = "";
-    [ObservableProperty] private bool _isAsking;
-    [ObservableProperty] private string _askStatus = "";
 
     public ReportEditorViewModel(TranslationReportStore store, Func<string> device)
     {
@@ -51,16 +49,8 @@ public sealed partial class ReportEditorViewModel : ObservableObject
 
     public bool HasSuggestion => Suggestion.Length > 0;
 
-    public bool HasAskStatus => AskStatus.Length > 0;
-
     /// <summary>The report the form shows, once saved (null for a new one).</summary>
     public string? EditingId => _editingId;
-
-    /// <summary>An AI can suggest the translation (the PC with Claude Code); set by the list's view model.</summary>
-    public bool CanAsk { get; set; }
-
-    /// <summary>Asks the AI about one saved report (set by the list's view model).</summary>
-    public Func<string, Task>? Ask { get; set; }
 
     public bool CanAddBefore => IsNew && _first > 0;
 
@@ -71,8 +61,6 @@ public sealed partial class ReportEditorViewModel : ObservableObject
     partial void OnErrorChanged(string? value) => OnPropertyChanged(nameof(HasError));
 
     partial void OnSuggestionChanged(string value) => OnPropertyChanged(nameof(HasSuggestion));
-
-    partial void OnAskStatusChanged(string value) => OnPropertyChanged(nameof(HasAskStatus));
 
     /// <summary>
     /// Opens the form on the sentence holding the clicked word (<paramref name="start"/>/<paramref name="length"/> in
@@ -93,7 +81,6 @@ public sealed partial class ReportEditorViewModel : ObservableObject
         Correct = "";
         Error = null;
         ShowSuggestion(null);
-        AskStatus = "";
         Select(_first, _last);
         RaiseShape();
         IsOpen = true;
@@ -114,32 +101,12 @@ public sealed partial class ReportEditorViewModel : ObservableObject
         Note = report.Note;
         Error = null;
         ShowSuggestion(report);
-        AskStatus = "";
         RaiseShape();
         IsOpen = true;
     }
 
     /// <summary>The saved report changed (an AI's suggestion arrived): shows its suggestion, keeping what the reader typed.</summary>
     public void Reload(TranslationReport report) => ShowSuggestion(report);
-
-    /// <summary>
-    /// Saves the form as it is (a new report without a right translation is fine here) and asks the AI about it; the
-    /// form then edits that report and shows the suggestion when it comes.
-    /// </summary>
-    [RelayCommand]
-    private async Task AskAi()
-    {
-        if (Ask is null || IsAsking) return;
-        try
-        {
-            var id = Keep();
-            if (id is not null) await Ask(id);
-        }
-        catch (InvalidOperationException ex)
-        {
-            Error = ex.Message;
-        }
-    }
 
     /// <summary>Puts the AI's suggestion in the box for the right translation.</summary>
     [RelayCommand]
@@ -201,21 +168,6 @@ public sealed partial class ReportEditorViewModel : ObservableObject
 
     [RelayCommand]
     private void Close() => IsOpen = false;
-
-    /// <summary>Saves the form without checking it and returns the report's id (the form then edits it).</summary>
-    private string? Keep()
-    {
-        var correct = Correct.Trim() == Helm ? "" : Correct.Trim();
-        if (_editingId is { } id)
-        {
-            _store.Update(id, correct, Note);
-            return id;
-        }
-        if (_line is not { } line || _context is not { } context) return null;
-        _editingId = _store.Add(NewReport(line, context, correct, Note.Trim()), _device());
-        RaiseShape();
-        return _editingId;
-    }
 
     private TranslationReport NewReport(ConvertedLine line, ReportContext context, string correct, string note) => new()
     {

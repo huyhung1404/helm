@@ -7,7 +7,7 @@
              x:DataType="rep:TranslationReportsViewModel">
 
     <!-- Sentences marked as translated wrong (this novel's, or all of them): copied or saved as one Markdown document, and
-         on the PC Claude Code suggests the right translation of each. They sync between devices. -->
+         an AI agent over Helm's MCP tools may suggest the right translation of each. They sync between devices. -->
     <UserControl.Styles>
         <Style Selector="Border.reportrow">
             <Setter Property="Padding" Value="0,10" />
@@ -51,18 +51,6 @@
                 </StackPanel>
             </Button>
         </Grid>
-        <!-- Claude Code on this PC suggests the right translation of each report -->
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding CanAsk}">
-            <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding AskForRestCommand}" IsEnabled="{Binding !IsAsking}"
-                    ToolTip.Tip="Suggests the right translation of every listed report that has none yet (through Helm's MCP tools, on your Claude plan)">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ic:SymbolIcon Symbol="Sparkle" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />
-                    <TextBlock Text="{Binding AskLabel, StringFormat='{}{0} for the rest'}" Foreground="{DynamicResource HelmPillForeground}" />
-                </StackPanel>
-            </Button>
-            <Button Grid.Column="1" Classes="ghost" Content="Stop" Command="{Binding StopAskingCommand}" IsVisible="{Binding IsAsking}" />
-        </Grid>
-        <TextBlock Text="{Binding AskStatus}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasAskStatus}" />
         <TextBlock Text="{Binding Status}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasStatus}" />
         <TextBlock Classes="muted" TextWrapping="Wrap" IsVisible="{Binding !HasRows}"
                    Text="Tap a word Helm translates wrong, then Report the sentence. Each report keeps the Chinese, Helm's text and the right one." />

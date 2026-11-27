@@ -50,10 +50,6 @@ public static class WalletCoreServices
         services.AddSingleton(sp => new GoalBook(sp.GetRequiredService<ISyncedCollection<WalletGoal>>(), sp.GetRequiredService<WalletStore>(), sp.GetService<BlobStore>()));
         services.AddSingleton(sp => new BillBook(sp.GetRequiredService<ISyncedCollection<WalletBill>>(), sp.GetRequiredService<WalletStore>()));
         services.AddSingleton<WalletCapture>();
-        // AI where the history and the parser fall short (IAiText comes from AddHelmAi, which both apps call).
-        services.AddSingleton(sp => new WalletCategoryAi(sp.GetRequiredService<WalletStore>(), sp.GetRequiredService<Helm.Core.Ai.IAiText>()));
-        services.AddSingleton(sp => new WalletNotificationAi(sp.GetRequiredService<WalletStore>(), sp.GetRequiredService<WalletCapture>(),
-            sp.GetRequiredService<Helm.Core.Ai.IAiText>()));
         // Quick Capture: "/s 50k coffee" and "/d Nam 200k".
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, SpendCaptureTarget>();
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, DebtCaptureTarget>();

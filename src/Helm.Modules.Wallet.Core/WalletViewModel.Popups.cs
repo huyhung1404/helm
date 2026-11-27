@@ -156,7 +156,6 @@ public sealed partial class WalletViewModel
     private void OpenToCategorize()
     {
         ShowPopup(WalletPopup.ToCategorize, stack: false);
-        ProposeCategories();
     }
 
     [RelayCommand]

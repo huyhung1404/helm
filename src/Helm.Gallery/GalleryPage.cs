@@ -137,7 +137,6 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         new("Vocabulary", "Pinyin card", "Vocabulary", m => VocabDemo.Create(m, VocabStage.Pinyin), Framed: false),
         new("Vocabulary", "Card menu", "Vocabulary", m => VocabDemo.Create(m, VocabStage.CardMenu), Framed: false),
         new("Vocabulary", "Words", "Vocabulary", m => VocabDemo.Create(m, VocabStage.Words), Framed: false),
-        new("Vocabulary", "Analyzing", "Vocabulary", m => VocabDemo.Create(m, VocabStage.Analyzing), Framed: false),
         new("Vocabulary", "Word page", "Vocabulary", m => VocabDemo.Create(m, VocabStage.Word), Framed: false),
         new("Vocabulary", "Chinese word", "Vocabulary", m => VocabDemo.Create(m, VocabStage.ChineseWord), Framed: false),
         new("Vocabulary", "Roots", "Vocabulary", m => VocabDemo.Create(m, VocabStage.Roots), Framed: false),

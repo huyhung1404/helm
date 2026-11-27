@@ -17,13 +17,13 @@ public enum VocabTab
 
 /// <summary>
 /// The Vocabulary page, shared by the Windows and Android apps. It holds the tabs, the guessing card, the Add words and
-/// Analysis dialogs (a dialog on Windows, a bottom sheet on Android) and the opened word; the list (<see cref="List"/>), the roots (<see cref="Roots"/>), the agent (<see cref="Agent"/>) and
+/// Analysis dialogs (a dialog on Windows, a bottom sheet on Android) and the opened word; the list (<see cref="List"/>), the roots (<see cref="Roots"/>) and
 /// the options (<see cref="Settings"/>) are their own view models. All members are used on the UI thread; store changes
 /// (local or synced) are coalesced into one refresh through <see cref="IUiDispatcher"/>.
 /// </summary>
 public sealed partial class VocabViewModel : ObservableObject
 {
-    /// <summary>What to ask Claude Code for the waiting words (copied by the button next to the count).</summary>
+    /// <summary>What to ask an AI agent with Helm's MCP tools for the waiting words (copied by the button next to the count).</summary>
     public const string AgentPrompt = "Đọc các đoạn văn mới trong Helm Vocabulary (vocab_pending_texts) và đề xuất từ nên học bằng vocab_propose_words " +
         "(chữ Hán đổi sang giản thể, bỏ từ đã có), rồi phân tích các từ mới trong Helm Vocabulary (vocab_pending, rồi vocab_save_analyses cho các từ đó), " +
         "rồi làm vocab_follow_ups (mẹo nhớ mới cho từ hay quên, mẹo nhớ pinyin cho từ hay sai pinyin, bổ sung chi tiết còn thiếu) " +
@@ -37,7 +37,6 @@ public sealed partial class VocabViewModel : ObservableObject
     private IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly VocabVoice? _voice;
-    private readonly VocabQuickAnalyzer? _quick;
     private int _refreshQueued;
 
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(AddCommand))] private string _newWord = "";
@@ -57,14 +56,18 @@ public sealed partial class VocabViewModel : ObservableObject
     /// <summary>The Add words dialog is open: new words, and the ones added lately.</summary>
     [ObservableProperty] private bool _isAddOpen;
 
-    /// <summary>The Analysis dialog is open: what waits for the agent, and the agent itself.</summary>
+    /// <summary>The Analysis dialog is open: what waits for an AI agent.</summary>
     [ObservableProperty] private bool _isAgentOpen;
 
-    public VocabViewModel(VocabStore store, VocabQuiz quiz, VocabSettingsViewModel settings, VocabAgentViewModel agent, IUiDispatcher ui,
-        IDialogService dialogs, IClipboardService clipboard, VocabVoice? voice = null, VocabTextsViewModel? texts = null,
-        VocabQuickAnalyzer? quick = null)
+    /// <summary>
+    /// An AI agent over Helm's MCP tools is working on words or texts now: it took them (<see cref="VocabStore.HasClaimedWork"/>)
+    /// and has not finished. The chip's look: at work, words waiting, or all done.
+    /// </summary>
+    [ObservableProperty] private bool _isAgentBusy;
+
+    public VocabViewModel(VocabStore store, VocabQuiz quiz, VocabSettingsViewModel settings, IUiDispatcher ui,
+        IDialogService dialogs, IClipboardService clipboard, VocabVoice? voice = null, VocabTextsViewModel? texts = null)
     {
-        _quick = quick;
         _store = store;
         _quiz = quiz;
         _ui = ui;
@@ -72,10 +75,9 @@ public sealed partial class VocabViewModel : ObservableObject
         _clipboard = clipboard;
         _voice = voice;
         Settings = settings;
-        Agent = agent;
         Texts = texts ?? new VocabTextsViewModel(store, ui);
         List = new VocabWordListViewModel(store, quiz, settings, id => Open(id));
-        Roots = new VocabRootsViewModel(store, agent, settings.PageSize, id => Open(id), strengthOf: id => quiz.StatsOf(id).Level);
+        Roots = new VocabRootsViewModel(store, settings.PageSize, id => Open(id), strengthOf: id => quiz.StatsOf(id).Level);
         // Revealing a card shows how the word is built: the same tree as the Words tab, its links open the word there.
         Card = new VocabCardViewModel(store, quiz, (id, word) => Build(id, word, null), voice, () => Settings.CardOptions)
         {
@@ -84,11 +86,6 @@ public sealed partial class VocabViewModel : ObservableObject
         Card.WordHidden += (_, text) => Message = $"“{text}” is hidden from the cards. Words → Hidden shows it again.";
         if (voice is not null) voice.Problem += (_, problem) => _ui.Post(() => Message = problem);
         settings.Changed += (_, name) => OnSettingChanged(name);
-        agent.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName is nameof(VocabAgentViewModel.IsBusy) or nameof(VocabAgentViewModel.ExternalBusy)
-                or nameof(VocabAgentViewModel.Steps) or nameof(VocabAgentViewModel.Status)) OnAgentWorkChanged();
-        };
 
         _store.Changed += (_, _) => ScheduleRefresh();
         _store.ReviewsChanged += (_, _) => ScheduleRefresh();
@@ -107,8 +104,6 @@ public sealed partial class VocabViewModel : ObservableObject
     public VocabWordListViewModel List { get; }
 
     public VocabRootsViewModel Roots { get; }
-
-    public VocabAgentViewModel Agent { get; }
 
     /// <summary>The guessing card on the Learn tab.</summary>
     public VocabCardViewModel Card { get; }
@@ -154,26 +149,21 @@ public sealed partial class VocabViewModel : ObservableObject
     /// <summary>Something for the agent: words to break down, often forgotten, whose pinyin slips, lacking details.</summary>
     public bool HasAgentWork => PendingCount + HardCount + SlipCount + LackingCount + TextCount > 0;
 
-    /// <summary>The Analysis chip in the page's header: "Analyzing · step 7", "3 waiting for analysis", "All words analyzed".</summary>
-    public string AgentChipText => Agent.IsBusy ? (Agent.Steps > 0 ? $"Analyzing · step {Agent.Steps}" : "Analyzing…") : Agent.ExternalBusy ? "AI agent working…" : PendingCount switch
+    /// <summary>The Analysis chip in the page's header: "AI agent working…", "3 waiting for analysis", "All words analyzed".</summary>
+    public string AgentChipText => IsAgentBusy ? "AI agent working…" : PendingCount switch
     {
         0 => "All words analyzed",
         1 => "1 waiting for analysis",
         _ => $"{PendingCount} waiting for analysis",
     };
 
-    /// <summary>The chip's tooltip: the step the agent is on while it works.</summary>
-    public string AgentChipToolTip => Agent.IsBusy && Agent.HasStatus ? Agent.Status : "What waits for Claude Code, and the analysis now";
+    /// <summary>The chip's tooltip.</summary>
+    public string AgentChipToolTip => "What waits for an AI agent (one connected to Helm's MCP tools)";
 
-    /// <summary>The chip's look: the agent at work, words waiting, or all done.</summary>
-    public bool IsAgentBusy => Agent.IsBusy || Agent.ExternalBusy;
 
     public bool IsAgentWaiting => !IsAgentBusy && PendingCount > 0;
 
     public bool IsAllAnalyzed => !IsAgentBusy && PendingCount == 0;
-
-    /// <summary>An AI agent over MCP (not Helm's own) is working on words or texts: Helm's agent waits for it.</summary>
-    public bool IsExternalAgentBusy => Agent.ExternalBusy;
 
     /// <summary>What waits for the agent, one line per kind.</summary>
     public string AgentWorkText => string.Join(Environment.NewLine, new[]
@@ -252,14 +242,14 @@ public sealed partial class VocabViewModel : ObservableObject
 
     partial void OnLackingCountChanged(int value) => OnAgentWorkChanged();
 
+    partial void OnIsAgentBusyChanged(bool value) => OnAgentWorkChanged();
+
     private void OnAgentWorkChanged()
     {
         OnPropertyChanged(nameof(HasAgentWork));
         OnPropertyChanged(nameof(AgentWorkText));
         OnPropertyChanged(nameof(AgentChipText));
         OnPropertyChanged(nameof(AgentChipToolTip));
-        OnPropertyChanged(nameof(IsAgentBusy));
-        OnPropertyChanged(nameof(IsExternalAgentBusy));
         OnPropertyChanged(nameof(IsAgentWaiting));
         OnPropertyChanged(nameof(IsAllAnalyzed));
     }
@@ -337,11 +327,9 @@ public sealed partial class VocabViewModel : ObservableObject
     {
         try
         {
-            var (id, added) = _store.AddWord(NewWord, NewNote);
+            var (_, added) = _store.AddWord(NewWord, NewNote);
             // The new word shows at the top of "Recently added", waiting for the agent; the user can add the next one.
             Message = added ? null : $"“{VocabText.Tidy(NewWord)}” is already in your words.";
-            // On the phone a single word is analysed at once, instead of waiting for the PC.
-            if (added && _quick?.WordToAnalyse(NewWord) is { } quickId && quickId == id) _ = AnalyseNowAsync(quickId);
             NewWord = "";
             NewNote = "";
         }
@@ -351,34 +339,11 @@ public sealed partial class VocabViewModel : ObservableObject
         }
     }
 
-    private async Task AnalyseNowAsync(string id)
-    {
-        try
-        {
-            var result = await Task.Run(() => _quick!.AnalyzeAsync(id, CancellationToken.None));
-            _ui.Post(() => Message = result.Message);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // It waits for the PC's agent, as before.
-            _ui.Post(() => Message = $"Could not analyse it here ({ex.Message}); it waits for the PC.");
-        }
-    }
-
     [RelayCommand]
     private void CopyPrompt()
     {
         _clipboard.SetText(AgentPrompt);
-        Message = "Copied. Paste it into Claude Code (Helm's MCP server must be connected).";
-    }
-
-    /// <summary>The agent's log (Analysis → Activity) to the clipboard, to keep or to share.</summary>
-    [RelayCommand]
-    private void CopyLog()
-    {
-        if (!Agent.HasLog) return;
-        _clipboard.SetText(Agent.LogText);
-        Message = "The agent's log is copied.";
+        Message = "Copied. Paste it into an AI agent connected to Helm's MCP server.";
     }
 
     [RelayCommand]
@@ -449,6 +414,8 @@ public sealed partial class VocabViewModel : ObservableObject
         SlipCount = _quiz.SlippingWords().Count;
         LackingCount = all.Count(w => w.Value.LacksDetails && !w.Value.Hidden);
         Today = _quiz.Today();
+        // An agent's claim on words or texts comes and goes with the store's changes.
+        IsAgentBusy = _store.HasClaimedWork() || _store.HasClaimedSource();
         RefreshRecent(all);
         List.Refresh();
         Roots.Refresh();
@@ -502,9 +469,6 @@ public sealed partial class VocabViewModel : ObservableObject
                 break;
             case nameof(VocabSettingsViewModel.CardModeIndex) or nameof(VocabSettingsViewModel.TypePinyin):
                 Card.AskAgain();
-                break;
-            case nameof(VocabSettingsViewModel.AutoAnalyze):
-                Agent.Nudge();
                 break;
         }
     }

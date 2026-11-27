@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Helm.Core.Settings;
-using Helm.Core.Tasks;
 using Helm.Modules.Notes;
 using Helm.Modules.Notes.Ui;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -43,8 +42,7 @@ internal static class NotesDemo
 
         var dir = Path.Combine(Path.GetTempPath(), "helm-gallery", Guid.NewGuid().ToString("N"));
         var settings = new SettingsStoreFactory(new HelmPaths(dir));
-        var vm = new NotesViewModel(store, settings, new AvaloniaUi(), new YesDialogs(), new NoClipboard(), NullLogger<NotesViewModel>.Instance,
-            taskMaker: new FakeTaskMaker());
+        var vm = new NotesViewModel(store, settings, new AvaloniaUi(), new YesDialogs(), new NoClipboard(), NullLogger<NotesViewModel>.Instance);
         if (open is not null && stage == NotesStage.Open) vm.OpenNote(open);
         return new NotesView(module, vm, new Host());
     }
@@ -52,38 +50,5 @@ internal static class NotesDemo
     private sealed class Host : INotesPageHost
     {
         public bool CanExport => true;
-    }
-
-    /// <summary>"Make tasks" with a ready answer: three tasks from the meeting note.</summary>
-    private sealed class FakeTaskMaker : INoteTaskMaker
-    {
-        public string ModuleId => "tracker";
-        public string Name => "Tracker";
-        public bool IsAvailable => true;
-
-        public event EventHandler? TasksChanged { add { } remove { } }
-
-        public string? Where() => "Haiku 5.5 · demo";
-
-        public IReadOnlyList<string> Lists() => ["Hôm nay", "Helm", "Nhà"];
-
-        public async Task<NoteTaskAnswer> ProposeAsync(string title, string text, CancellationToken ct)
-        {
-            await Task.Delay(1200, ct).ConfigureAwait(true);
-            var friday = DateTime.Today.AddDays(((int)DayOfWeek.Friday - (int)DateTime.Today.DayOfWeek + 7) % 7);
-            return new NoteTaskAnswer(
-            [
-                new("Gửi báo cáo tuần", "", friday.ToString("yyyy-MM-dd") + "T17:00", friday.ToString("ddd d MMM"), "1. Gửi báo cáo tuần trước 17h thứ Sáu"),
-                new("Nhắc anh Minh review PR đăng nhập", "", null, "", "2. Anh Minh review PR đăng nhập trước thứ Tư"),
-                new("Hỏi lại ngân sách quảng cáo tháng 12", "", null, "", "Cần hỏi lại: ngân sách quảng cáo tháng 12."),
-            ], null);
-        }
-
-        public NoteTaskBatch Add(string listName, IReadOnlyList<NoteTaskProposal> tasks) =>
-            new(listName, [.. tasks.Select((_, i) => "demo-" + i)], null);
-
-        public void Undo(NoteTaskBatch batch) { }
-
-        public bool? IsDone(string taskId) => false;
     }
 }

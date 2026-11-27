@@ -128,7 +128,7 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
 
     /// <summary>Waiting, and what for: a first analysis or a new one after the user's remark.</summary>
     public string PendingText => Word.AnalyzedAt is null
-        ? "Waiting for an AI agent to break this word down. Ask Claude Code to analyze your new words."
+        ? "Waiting for an AI agent to break this word down. Ask an AI agent with Helm's MCP tools to analyze your new words."
         : $"Sent back for a new analysis: {Word.RedoNote}";
 
     public bool HasRedoNote => IsPending && Word.AnalyzedAt is not null;

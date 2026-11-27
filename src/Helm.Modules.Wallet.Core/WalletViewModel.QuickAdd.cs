@@ -86,9 +86,6 @@ public sealed partial class WalletViewModel
         QuickText = "";
     }
 
-    /// <summary>Asks AI about the first transactions waiting for a category (the page lists them, not only the sheet).</summary>
-    public void ProposeCategoriesNow() => ProposeCategories();
-
     /// <summary>The confirmations (delete a transaction, a fund, a goal…) open in the page's own dialog.</summary>
     public void UseDialogs(Helm.Shell.Services.IDialogService dialogs)
     {

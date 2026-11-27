@@ -7,54 +7,13 @@ using Microsoft.Extensions.Logging;
 namespace Helm.Core.Mcp;
 
 /// <summary>
-/// Runs Claude Code (the user's own Claude plan, no API key) without a window (<c>claude -p</c>), allowed only some of
-/// Helm's MCP tools, for the tools' AI helpers (Novel Reader's name scan and suggestions, Vocabulary's analysis). Claude Code reaches Helm's MCP server, which runs inside this Helm, so
-/// what it writes arrives in the library while it works. Needs Claude Code installed and Helm added to it (the AI &amp;
-/// MCP page). The instructions go in on standard input, never through cmd.exe; it runs with the user's normal rights even
-/// when Helm is elevated, and stops with Helm.
+/// Runs Claude Code (the user's own Claude plan, no API key) without a window (<c>claude -p</c>) for Slack Report: one
+/// question about text Helm hands it, with no tools or only reading (or editing) the folders named. The instructions go
+/// in on standard input, never through cmd.exe; it runs with the user's normal rights even when Helm is elevated, and
+/// stops with Helm.
 /// </summary>
-public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher launcher, ILogger<ClaudeCodeRunner> logger)
+public sealed class ClaudeCodeRunner(IChildProcessLauncher launcher, ILogger<ClaudeCodeRunner> logger)
 {
-    /// <summary>MCP tools are named mcp__&lt;server&gt;__&lt;tool&gt; in Claude Code.</summary>
-    public static IReadOnlyList<string> ToolNames(params string[] tools) =>
-        tools.Select(t => $"mcp__{McpClientConfig.ServerName}__{t}").ToList();
-
-    /// <summary>Why Claude Code cannot run now, or null when it can.</summary>
-    public string? Unavailable()
-    {
-        if (!mcp.Enabled) return "Helm's tools for AI agents are off; turn them on in General › MCP.";
-        if (McpClientConfig.FindClaude() is null) return "Claude Code is not installed on this PC.";
-        return mcp.Status(McpClientKind.ClaudeCode).State switch
-        {
-            McpClientState.Added => null,
-            McpClientState.AddedElsewhere => "Claude Code starts another Helm.exe; press Add for me in General › MCP › Claude Code.",
-            McpClientState.Unreadable => "Claude Code's settings file cannot be read.",
-            _ => "Helm is not added to Claude Code yet; press Add for me in General › MCP › Claude Code.",
-        };
-    }
-
-    /// <summary>
-    /// Runs Claude Code on <paramref name="instructions"/> and returns its last answer. Each tool call reports
-    /// <paramref name="describe"/>(tool, calls so far) to <paramref name="progress"/>.
-    /// </summary>
-    /// <param name="model">A Claude Code model name (haiku, sonnet, opus), or null for the user's default.</param>
-    /// <param name="narrator">Tells each step in full (a call with what it was given, its answer, what Claude says between
-    /// them) in place of <paramref name="describe"/>; null keeps the one-line descriptions.</param>
-    /// <exception cref="ClaudeCodeException">It could not start, failed, or did not finish within <paramref name="timeout"/>.</exception>
-    /// <exception cref="OperationCanceledException"><paramref name="ct"/> stopped it.</exception>
-    public Task<string> RunAsync(IReadOnlyList<string> allowedTools, string instructions, Func<string, int, string> describe,
-        IProgress<string>? progress, TimeSpan timeout, CancellationToken ct, string? model = null, IClaudeCodeNarrator? narrator = null)
-    {
-        if (Unavailable() is { } problem) throw new ClaudeCodeException(problem);
-        return StartAsync([.. RunArguments(allowedTools, model)], instructions, describe, progress, timeout, ct, narrator: narrator);
-    }
-
-    internal static IEnumerable<string> RunArguments(IReadOnlyList<string> allowedTools, string? model)
-    {
-        string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--allowedTools", string.Join(",", allowedTools)];
-        return [.. args, .. Choice(model, null)];
-    }
-
     /// <summary>Why <see cref="AskAsync"/> cannot run now, or null when it can (it needs Claude Code only, not Helm's MCP).</summary>
     public static string? AskUnavailable() => McpClientConfig.FindClaude() is null ? "Claude Code is not installed on this PC." : null;
 
@@ -70,7 +29,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     public Task<string> AskAsync(string instructions, string? model, TimeSpan timeout, CancellationToken ct, string? effort = null)
     {
         if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
-        return StartAsync([.. AskArguments(model, effort)], instructions, (_, _) => "", null, timeout, ct);
+        return StartAsync([.. AskArguments(model, effort)], instructions, timeout, ct);
     }
 
     /// <summary>
@@ -83,7 +42,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     {
         if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
         var existing = Existing(folders);
-        return StartAsync([.. FolderArguments(model, existing.Skip(1), effort)], instructions, (_, _) => "", null, timeout, ct, existing[0]);
+        return StartAsync([.. FolderArguments(model, existing.Skip(1), effort)], instructions, timeout, ct, existing[0]);
     }
 
     /// <summary>
@@ -96,7 +55,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     {
         if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
         var existing = Existing(folders);
-        return StartAsync([.. WorkArguments(model, existing.Skip(1), effort)], instructions, (_, _) => "", null, timeout, ct, existing[0]);
+        return StartAsync([.. WorkArguments(model, existing.Skip(1), effort)], instructions, timeout, ct, existing[0]);
     }
 
     private static List<string> Existing(IReadOnlyList<string> folders)
@@ -153,8 +112,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
         return [.. args, .. Choice(model, effort)];
     }
 
-    private async Task<string> StartAsync(IReadOnlyList<string> args, string instructions, Func<string, int, string> describe,
-        IProgress<string>? progress, TimeSpan timeout, CancellationToken ct, string? folder = null, IClaudeCodeNarrator? narrator = null)
+    private async Task<string> StartAsync(IReadOnlyList<string> args, string instructions, TimeSpan timeout, CancellationToken ct, string? folder = null)
     {
         var claude = McpClientConfig.FindClaude() ?? throw new ClaudeCodeException("Claude Code is not installed on this PC.");
         string commandLine;
@@ -195,7 +153,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
             await using (var input = new StreamWriter(process.StandardInput, new UTF8Encoding(false)))
                 await input.WriteAsync(instructions).ConfigureAwait(false);
             var errors = ReadAllAsync(process.StandardError);
-            var (result, failed, calls) = await ReadEventsAsync(process.StandardOutput, progress, describe, narrator).ConfigureAwait(false);
+            var (result, failed, calls) = await ReadEventsAsync(process.StandardOutput).ConfigureAwait(false);
             var exitCode = await process.Exited.ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             if (limit.IsCancellationRequested) throw new ClaudeCodeException($"Claude Code did not finish within {timeout.TotalMinutes:0} minutes.");
@@ -210,22 +168,15 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     }
 
     /// <summary>
-    /// Reads Claude Code's stream of JSON lines: each tool call moves the progress on; the last line is the result
-    /// (its text, and whether it is an error).
+    /// Reads Claude Code's stream of JSON lines: its tool calls are counted; the last line is the result (its text, and
+    /// whether it is an error).
     /// </summary>
-    internal static async Task<(string? Result, bool Failed, int Calls)> ReadEventsAsync(Stream output, IProgress<string>? progress,
-        Func<string, int, string> describe, IClaudeCodeNarrator? narrator = null)
+    internal static async Task<(string? Result, bool Failed, int Calls)> ReadEventsAsync(Stream output)
     {
         using var reader = new StreamReader(output, Encoding.UTF8);
         string? result = null;
         var failed = false;
         var calls = 0;
-        // Which tool each call was, so its answer (which only names the call) can be told.
-        var called = new Dictionary<string, string>(StringComparer.Ordinal);
-        void Report(string? line)
-        {
-            if (line is { Length: > 0 }) progress?.Report(line);
-        }
         while (await reader.ReadLineAsync().ConfigureAwait(false) is { } line)
         {
             if (line.Length == 0 || line[0] != '{') continue;
@@ -238,31 +189,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
                     && content.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var block in content.EnumerateArray())
-                    {
-                        var kind = block.TryGetProperty("type", out var bt) ? bt.GetString() : null;
-                        if (kind == "text" && narrator is not null && block.TryGetProperty("text", out var said) && said.ValueKind == JsonValueKind.String)
-                        {
-                            Report(narrator.Text(said.GetString() ?? ""));
-                            continue;
-                        }
-                        if (kind != "tool_use") continue;
-                        calls++;
-                        var tool = block.TryGetProperty("name", out var n) ? (n.GetString() ?? "").Split("__")[^1] : "";
-                        if (block.TryGetProperty("id", out var callId) && callId.GetString() is { } id) called[id] = tool;
-                        Report(narrator is null ? describe(tool, calls)
-                            : narrator.Call(tool, block.TryGetProperty("input", out var given) ? given : default, calls));
-                    }
-                }
-                else if (type == "user" && narrator is not null && root.TryGetProperty("message", out var reply)
-                    && reply.TryGetProperty("content", out var parts) && parts.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var block in parts.EnumerateArray())
-                    {
-                        if (!block.TryGetProperty("type", out var bt) || bt.GetString() != "tool_result") continue;
-                        var tool = block.TryGetProperty("tool_use_id", out var callId) && callId.GetString() is { } id ? called.GetValueOrDefault(id, "") : "";
-                        var isError = block.TryGetProperty("is_error", out var e) && e.ValueKind == JsonValueKind.True;
-                        Report(narrator.Result(tool, ResultText(block), isError));
-                    }
+                        if (block.TryGetProperty("type", out var bt) && bt.GetString() == "tool_use") calls++;
                 }
                 else if (type == "result")
                 {
@@ -276,18 +203,6 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
             }
         }
         return (result, failed, calls);
-    }
-
-    /// <summary>A tool answer's text: a plain string, or the text blocks it holds.</summary>
-    private static string ResultText(JsonElement block)
-    {
-        if (!block.TryGetProperty("content", out var content)) return "";
-        if (content.ValueKind == JsonValueKind.String) return content.GetString() ?? "";
-        if (content.ValueKind != JsonValueKind.Array) return "";
-        var text = new StringBuilder();
-        foreach (var part in content.EnumerateArray())
-            if (part.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String) text.Append(t.GetString());
-        return text.ToString();
     }
 
     private static async Task<string> ReadAllAsync(Stream stream)

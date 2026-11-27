@@ -46,8 +46,8 @@ public sealed class ReportRowViewModel(string id, TranslationReport report, bool
 
 /// <summary>
 /// The reports of wrong translations: the form to make one from the word popup, the list of the open novel's reports
-/// (or all of them), the whole list as a document to copy or save, and, where an AI is on this device, its suggested
-/// translations. The page view model gives the context (<see cref="ReportContext"/>); everything else lives here.
+/// (or all of them), the whole list as a document to copy or save, and the translations an AI agent suggested over MCP.
+/// The page view model gives the context (<see cref="ReportContext"/>); everything else lives here.
 /// Used on the UI thread; store events are posted.
 /// </summary>
 public sealed partial class TranslationReportsViewModel : ObservableObject
@@ -56,47 +56,22 @@ public sealed partial class TranslationReportsViewModel : ObservableObject
     private readonly IUiDispatcher _ui;
     private readonly IClipboardService _clipboard;
     private readonly Func<ReportContext?> _context;
-    private readonly ITranslationAgent? _agent;
-    private CancellationTokenSource? _askCancel;
     private bool _refreshQueued;
 
     [ObservableProperty] private bool _isPanelOpen;
     [ObservableProperty] private bool _showAllNovels;
     [ObservableProperty] private string _summary = "";
     [ObservableProperty] private string? _status;
-    [ObservableProperty] private bool _isAsking;
-    [ObservableProperty] private string _askStatus = "";
 
     public TranslationReportsViewModel(TranslationReportStore store, IUiDispatcher ui, IClipboardService clipboard, IDeviceInfo device,
-        Func<ReportContext?> context, ITranslationAgent? agent = null)
+        Func<ReportContext?> context)
     {
         _store = store;
         _ui = ui;
         _clipboard = clipboard;
         _context = context;
-        _agent = agent;
-        Editor = new ReportEditorViewModel(store, () => device.DeviceName)
-        {
-            CanAsk = agent is not null,
-            Ask = id => AskAsync([id]),
-        };
+        Editor = new ReportEditorViewModel(store, () => device.DeviceName);
         _store.Changed += (_, _) => _ui.Post(OnStoreChanged);
-    }
-
-    /// <summary>An AI on this device suggests translations (the PC with Claude Code).</summary>
-    public bool CanAsk => _agent is not null;
-
-    /// <summary>The AI's name for buttons ("Ask Claude Code").</summary>
-    public string AskLabel => _agent is null ? "" : $"Ask {_agent.Name}";
-
-    public bool HasAskStatus => AskStatus.Length > 0;
-
-    partial void OnIsAskingChanged(bool value) => Editor.IsAsking = value;
-
-    partial void OnAskStatusChanged(string value)
-    {
-        Editor.AskStatus = value;
-        OnPropertyChanged(nameof(HasAskStatus));
     }
 
     public ReportEditorViewModel Editor { get; }
@@ -143,66 +118,11 @@ public sealed partial class TranslationReportsViewModel : ObservableObject
         if (row is not null) _store.Delete(row.Id);
     }
 
-    /// <summary>Takes the AI's suggestion as the report's right translation.</summary>
+    /// <summary>Takes the suggestion an AI agent wrote (novel_suggest_translations) as the report's right translation.</summary>
     [RelayCommand]
     private void UseSuggestion(ReportRowViewModel? row)
     {
         if (row is not null) _store.UseSuggestion(row.Id);
-    }
-
-    /// <summary>Asks the AI about every listed report it has not suggested a translation for yet.</summary>
-    [RelayCommand]
-    private Task AskForRest() => AskAsync(Listed().Where(r => r.Value.Suggestion.Length == 0).Select(r => r.Id).ToList());
-
-    [RelayCommand]
-    private void StopAsking() => _askCancel?.Cancel();
-
-    /// <summary>
-    /// Has the AI suggest translations for these reports, a novel at a time; its suggestions arrive through the store
-    /// while it works. Nothing happens while it is already working.
-    /// </summary>
-    public async Task AskAsync(IReadOnlyList<string> ids)
-    {
-        if (_agent is null || IsAsking) return;
-        if (ids.Count == 0)
-        {
-            AskStatus = "Every listed report has a suggestion already.";
-            return;
-        }
-        if (_agent.Unavailable() is { } problem)
-        {
-            AskStatus = problem;
-            return;
-        }
-        var byBook = ids.Select(id => (Id: id, Report: _store.Get(id))).Where(r => r.Report is not null)
-            .GroupBy(r => (r.Report!.BookId ?? "", r.Report.BookTitle)).ToList();
-        IsAsking = true;
-        using var cancel = new CancellationTokenSource();
-        _askCancel = cancel;
-        var progress = new UiProgress(_ui, text => AskStatus = text);
-        try
-        {
-            var said = "";
-            foreach (var group in byBook)
-            {
-                AskStatus = $"{_agent.Name} is reading {Count(group.Count())}…";
-                said = await _agent.SuggestAsync(group.Key.Item1, group.Key.BookTitle, group.Select(r => r.Id).ToList(), progress, cancel.Token);
-            }
-            AskStatus = string.IsNullOrWhiteSpace(said) ? $"{_agent.Name} is done." : $"{_agent.Name}: {said.Trim()}";
-        }
-        catch (TranslationAgentException ex)
-        {
-            AskStatus = ex.Message;
-        }
-        catch (OperationCanceledException)
-        {
-            AskStatus = "Stopped. The suggestions made so far stay.";
-        }
-        finally
-        {
-            _askCancel = null;
-            IsAsking = false;
-        }
     }
 
     /// <summary>The listed reports as a Markdown document on the clipboard.</summary>
@@ -278,10 +198,4 @@ public sealed partial class TranslationReportsViewModel : ObservableObject
     }
 
     private static string Count(int n) => n == 1 ? "1 report" : $"{n} reports";
-
-    /// <summary>Progress from the AI's thread, shown on the UI thread.</summary>
-    private sealed class UiProgress(IUiDispatcher ui, Action<string> show) : IProgress<string>
-    {
-        public void Report(string value) => ui.Post(() => show(value));
-    }
 }

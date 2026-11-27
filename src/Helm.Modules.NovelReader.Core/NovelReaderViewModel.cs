@@ -41,8 +41,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private readonly IDeviceInfo _device;
     private readonly SpeechCatalog _catalog;
     private readonly ReadAloudController _reader;
-    private readonly INameScanAgent? _nameAgent;
-    private CancellationTokenSource? _scanCancel;
     private bool _entriesQueued;
     private readonly IProcessLauncher _launcher;
     private readonly ILogger<NovelReaderViewModel> _logger;
@@ -122,9 +120,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private bool _isFindingNames;
     [ObservableProperty] private string _suggestionStatus = "";
     [ObservableProperty] private bool _autoScanNames;
-    [ObservableProperty] private int _nameScanModeIndex;
-    [ObservableProperty] private bool _isAgentScanning;
-    [ObservableProperty] private string _nameAgentStatus = "";
     [ObservableProperty] private int _foundNameCount;
 
     // Dictionaries (settings page)
@@ -135,9 +130,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     public NovelReaderViewModel(NovelStore store, DictionaryLibrary dictionaries, ISettingsStoreFactory settings, IUiDispatcher ui,
         IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, IProcessLauncher launcher,
         IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, VieNeuInstaller? vieneu = null,
-        INameScanAgent? nameAgent = null, WordPronouncer? pronouncer = null, TranslationReportStore? reports = null,
-        ITranslationAgent? translator = null, IEnumerable<Helm.Core.Capture.ICaptureTarget>? captureTargets = null,
-        Helm.Core.Ai.IAiText? ai = null)
+        WordPronouncer? pronouncer = null, TranslationReportStore? reports = null,
+        IEnumerable<Helm.Core.Capture.ICaptureTarget>? captureTargets = null)
     {
         _store = store;
         _dictionaries = dictionaries;
@@ -148,8 +142,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         _dialogs = dialogs;
         _device = device;
         _catalog = catalog;
-        _nameAgent = nameAgent;
-        HeldSentence = new HeldSentenceViewModel(captureTargets, ai, pronouncer is null ? null : pronouncer.SaySentenceAsync);
+        HeldSentence = new HeldSentenceViewModel(captureTargets, pronouncer is null ? null : pronouncer.SaySentenceAsync);
         HeldSentence.PropertyChanged += (_, e) =>
         {
             // The sheet closed: the sentence is no longer marked.
@@ -196,7 +189,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         _logger = logger;
         if (reports is not null)
         {
-            Reports = new TranslationReportsViewModel(reports, ui, clipboard, device, ReportContextNow, translator);
+            Reports = new TranslationReportsViewModel(reports, ui, clipboard, device, ReportContextNow);
             Reports.PanelOpened += (_, _) => ShowNamesPanel = false;
         }
         Editor = new WordEditorViewModel(store, clipboard, () => _converter, () => OpenBookId)
@@ -229,7 +222,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         ConvertTraditional = s.ConvertTraditional;
         FallbackToOfflineVoice = s.FallbackToOfflineVoice;
         AutoScanNames = s.AutoScanNames;
-        NameScanModeIndex = (int)s.NameScanMode;
         DictionarySourcesText = FormatSources(s.DictionarySources);
         LoadVoices();
         _loading = false;
@@ -800,7 +792,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         ClearHeldSentence();
         paragraph.HeldSegments = (held.FirstSegment, held.SegmentCount);
         _heldParagraph = paragraph;
-        _ = HeldSentence.ShowAsync(held);
+        HeldSentence.Show(held);
     }
 
     private void ClearHeldSentence()
@@ -1145,8 +1137,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
     /// <summary>
     /// Looks for the open novel's character names (off the UI thread) and adds the sure ones to its names, marked as
-    /// found; the doubtful ones go to Suggestions. With the AI mode Claude decides; without a key, or when Claude cannot
-    /// answer, the logic scan does. Never over a name the reader saved, nor one they deleted.
+    /// found; the doubtful ones go to Suggestions. Never over a name the reader saved, nor one they deleted.
     /// </summary>
     public async Task ScanNamesAsync(bool automatic)
     {
@@ -1162,58 +1153,10 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             var paragraphs = await Task.Run(() => chapters.SelectMany(c => c.Paragraphs.Prepend(c.Title)).ToList());
             bool Known(string word) => converter.EntriesFor(word).Count > 0;
             var scan = await Task.Run(() => NameScanner.Scan(paragraphs, Known, converter.HanVietOf));
-            IReadOnlyList<NameFinding> sure = scan.Sure;
-            IReadOnlyList<NameFinding> maybe = scan.Maybe;
-            string? note = null;
-            string? said = null;
-            if (NameScanModeIndex == (int)NameScanMode.Ai)
-            {
-                if (_nameAgent is null)
-                {
-                    note = "Finding names with AI runs in Helm on your PC; the names it finds sync to this device.";
-                }
-                else if (_nameAgent.Unavailable() is { } problem)
-                {
-                    note = problem + " The names were found without AI.";
-                }
-                else
-                {
-                    // The AI adds the names itself through Helm's tools: they arrive in the store while it works.
-                    var cts = new CancellationTokenSource();
-                    _scanCancel = cts;
-                    IsAgentScanning = true;
-                    SuggestionStatus = $"{_nameAgent.Name} is reading the possible names…";
-                    try
-                    {
-                        // On the UI thread, and only while it works: a report arriving late must not cover the result.
-                        var progress = new UiProgress<string>(_ui, p =>
-                        {
-                            if (ReferenceEquals(_scanCancel, cts)) SuggestionStatus = p;
-                        });
-                        said = await _nameAgent.FindNamesAsync(bookId, BookTitle, progress, cts.Token);
-                        sure = [];
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        sure = [];
-                        note = "Stopped; the names added so far stay.";
-                    }
-                    catch (NameAgentException ex)
-                    {
-                        _logger.LogWarning(ex, "The AI name scan failed");
-                        note = ex.Message + " The names were found without AI.";
-                    }
-                    finally
-                    {
-                        IsAgentScanning = false;
-                        _scanCancel = null;
-                        cts.Dispose();
-                    }
-                }
-            }
+            var sure = scan.Sure;
+            var maybe = scan.Maybe;
             if (OpenBookId != bookId) return;
             _store.SaveFoundNames(bookId, sure.Select(f => (f.Chinese, f.Vietnamese)));
-            // Counted from the store: the AI adds its names itself.
             var added = Math.Max(0, _store.FoundNameCount(bookId) - foundBefore);
             _store.MarkNamesScanned(bookId);
             var ignored = new HashSet<string>(_store.GetBook(bookId)?.IgnoredNames ?? [], StringComparer.Ordinal);
@@ -1221,10 +1164,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             foreach (var f in maybe.Where(f => !ignored.Contains(f.Chinese) && _store.GetEntry(bookId, EntryKind.Name, f.Chinese) is null))
                 Suggestions.Add(new SuggestionRowViewModel(f.Chinese, f.Count, f.Vietnamese));
             SuggestionStatus = (added == 0 ? "No new names found" : added == 1 ? "Added 1 name" : $"Added {added} names")
-                + (Suggestions.Count > 0 ? $"; {Suggestions.Count} more to check below." : ".") + (note is null ? "" : " " + note)
-                + (string.IsNullOrWhiteSpace(said) ? "" : $" {_nameAgent?.Name}: {said.Trim()}");
+                + (Suggestions.Count > 0 ? $"; {Suggestions.Count} more to check below." : ".");
             if (automatic && added > 0) Message = $"Found {added} character names in this novel and added them (Names shows them; undo there).";
-            else if (automatic && note is not null) Message = note;
         }
         finally
         {
@@ -1250,34 +1191,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
     private void RefreshFoundNames() => FoundNameCount = OpenBookId is { } id ? _store.FoundNameCount(id) : 0;
 
-    // ---- The AI name scan: an AI on this PC through Helm's MCP tools ----------------------------------------------
-
-    /// <summary>The AI scan can run here (Windows: Claude Code); elsewhere the AI scan is done on the PC.</summary>
-    public bool CanScanWithAi => _nameAgent is not null;
-
-    public IReadOnlyList<string> NameScanModeNames { get; } = ["Logic (free, offline)", "AI: Claude Code on this PC (through MCP)"];
-
-    public bool IsAiScan => NameScanModeIndex == (int)NameScanMode.Ai;
-
     partial void OnAutoScanNamesChanged(bool value) => Save(s => s.AutoScanNames = value);
-
-    partial void OnNameScanModeIndexChanged(int value)
-    {
-        OnPropertyChanged(nameof(IsAiScan));
-        if (value is 0 or 1) Save(s => s.NameScanMode = (NameScanMode)value);
-        RefreshNameAgentStatus();
-    }
-
-    /// <summary>Stops the AI scan (the names it added so far stay).</summary>
-    [RelayCommand]
-    private void StopNameScan() => _scanCancel?.Cancel();
-
-    /// <summary>Whether the AI can run now, in words, for the settings page.</summary>
-    [RelayCommand]
-    private void RefreshNameAgentStatus() =>
-        NameAgentStatus = _nameAgent is null ? ""
-            : _nameAgent.Unavailable() is { } problem ? problem
-            : $"Ready: {_nameAgent.Name} reaches Helm's tools.";
 
     [RelayCommand]
     private void AddSuggestion(SuggestionRowViewModel? row)
@@ -1633,11 +1547,5 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private void Save(Action<NovelReaderSettings> change)
     {
         if (!_loading) _settings.Update(change);
-    }
-
-    /// <summary>Progress reported from any thread, handled on the UI thread in the order it was reported.</summary>
-    private sealed class UiProgress<T>(IUiDispatcher ui, Action<T> report) : IProgress<T>
-    {
-        public void Report(T value) => ui.Post(() => report(value));
     }
 }

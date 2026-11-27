@@ -113,7 +113,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         IClipboardService clipboard,
         ILogger<NotesViewModel> logger,
         LinkHub? links = null,
-        Helm.Core.Tasks.INoteTaskMaker? taskMaker = null,
+        Helm.Core.Tasks.ITaskBridge? tasks = null,
         NoteMeaning? meaning = null,
         NoteSearchModelViewModel? searchModel = null)
     {
@@ -121,11 +121,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         _links = links;
         _meaning = meaning;
         SearchModel = searchModel;
-        _general = settings.Get<GeneralSettings>(GeneralSettings.StoreId);
-        _taskMaker = taskMaker;
-        Tasks = taskMaker is null ? null : new NoteTasksViewModel(taskMaker, () => (EditTitle, EditBody), body => EditBody = body,
-            links => { if (_editorId is { } note) _store.AddTaskLinks(note, links); },
-            tasks => { if (_editorId is { } note) _store.RemoveTaskLinks(note, tasks); });
+        _tasks = tasks;
         _settings = settings.Get<NotesSettings>(NotesIds.ModuleId);
         _ui = ui;
         _dialogs = dialogs;
@@ -145,7 +141,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         _store.Changed += (_, _) => ScheduleRefresh();
         if (_links is not null) _links.Changed += (_, _) => _ui.Post(() => EditorLinks?.Refresh());
         // A task made from a line of the open note was done (or opened again): its tag shows it.
-        if (taskMaker is not null) taskMaker.TasksChanged += (_, _) => _ui.Post(MarkDoneLines);
+        if (tasks is not null) tasks.Changed += (_, _) => _ui.Post(MarkDoneLines);
         Refresh();
     }
 
@@ -154,9 +150,6 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     {
         if (_editorId == id) return;
         _editorId = id;
-        // "Make tasks" is about the note it was opened on.
-        Tasks?.Close();
-        OnPropertyChanged(nameof(CanMakeTasks));
         var canLink = _links is not null && (_links.Provider(LinkKinds.Task) is not null || _links.Provider(LinkKinds.Person) is not null || _links.Provider(LinkKinds.Mission) is not null);
         EditorLinks = id is null || !canLink ? null
             : new LinksViewModel(_links!, new LinkRef(LinkKinds.Note, id), [LinkKinds.Task, LinkKinds.Person, LinkKinds.Mission], () => EditTitle);
@@ -552,14 +545,9 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsEditorClosed));
         OnPropertyChanged(nameof(CanEditPin));
-        OnPropertyChanged(nameof(CanMakeTasks));
     }
 
-    partial void OnEditTrashedChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanEditPin));
-        OnPropertyChanged(nameof(CanMakeTasks));
-    }
+    partial void OnEditTrashedChanged(bool value) => OnPropertyChanged(nameof(CanEditPin));
 
     partial void OnTrashCountChanged(int value)
     {

@@ -6,7 +6,7 @@
              x:DataType="rep:ReportEditorViewModel">
 
     <!-- Report a wrong translation: the sentence (one more before or after, one less), Helm's text, the right one and a
-         note; on the PC Claude Code can suggest the right one. Ctrl+Enter saves, Esc closes without saving. -->
+         note; an AI agent over Helm's MCP tools may suggest the right one. Ctrl+Enter saves, Esc closes without saving. -->
     <StackPanel Spacing="12">
         <Grid ColumnDefinitions="*,Auto">
             <StackPanel>
@@ -52,11 +52,11 @@
             <TextBox Classes="glass" Text="{Binding Note}" TextWrapping="Wrap" PlaceholderText="道 means nói here · the 的 phrase is reversed…" AutomationProperties.Name="Note" />
         </StackPanel>
 
-        <!-- Claude Code's suggestion: shown when it arrives, put in the box with Use it -->
+        <!-- An AI agent's suggestion: shown when it arrives, put in the box with Use it -->
         <Border Classes="glass" IsVisible="{Binding HasSuggestion}" BorderBrush="{DynamicResource HelmGlassStrokeStrong}">
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="3">
-                    <TextBlock Text="✦ Claude Code suggests" Foreground="{DynamicResource HelmEyebrow}" FontSize="12" />
+                    <TextBlock Text="✦ AI suggests" Foreground="{DynamicResource HelmEyebrow}" FontSize="12" />
                     <SelectableTextBlock Text="{Binding Suggestion}" TextWrapping="Wrap" />
                     <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap">
                         <Run Text="{Binding SuggestionNote}" /><Run Text=" · " /><Run Text="{Binding ErrorKind}" />
@@ -66,20 +66,12 @@
                         ToolTip.Tip="Put the suggestion in the box for the right translation" />
             </Grid>
         </Border>
-        <TextBlock Text="{Binding AskStatus}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasAskStatus}" />
         <TextBlock Text="{Binding Error}" Foreground="{DynamicResource HelmDanger}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
 
-        <Grid x:Name="Footer" ColumnDefinitions="*,*,*" ColumnSpacing="8">
-            <Button x:Name="AskButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding AskAiCommand}"
-                    IsEnabled="{Binding !IsAsking}" ToolTip.Tip="Saves the report and has Claude Code suggest the right translation, with what Helm got wrong">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ic:SymbolIcon Symbol="Sparkle" FontSize="15" />
-                    <TextBlock Text="Ask Claude Code" />
-                </StackPanel>
-            </Button>
-            <Button x:Name="CancelButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel"
+        <Grid x:Name="Footer" ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button x:Name="CancelButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel"
                     Command="{Binding CloseCommand}" ToolTip.Tip="Close without saving (Esc)" />
-            <Button x:Name="SaveButton" Grid.Column="2" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding SaveCommand}"
+            <Button x:Name="SaveButton" Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding SaveCommand}"
                     ToolTip.Tip="Save the report (Ctrl+Enter)">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <ic:SymbolIcon Symbol="Flag" FontSize="15" Foreground="{DynamicResource HelmPillForeground}" />

@@ -76,12 +76,8 @@ public sealed class ColorChoice(int slot, Action<int> pick)
     public IRelayCommand PickCommand { get; } = new RelayCommand(() => pick(slot));
 }
 
-/// <summary>
-/// A notification Helm could not read, on the settings page; or one AI just read (<see cref="UnreadReading"/>), which
-/// says what was saved and offers Undo in the same place.
-/// </summary>
-public sealed class UnreadRow(UnreadNotification notification, string when, Action<UnreadNotification> copy, string? text = null,
-    string? actionText = null, Func<Task>? action = null)
+/// <summary>A notification Helm could not read, on the settings page, to copy (and send in to fix the reader).</summary>
+public sealed class UnreadRow(UnreadNotification notification, string when, Action<UnreadNotification> copy)
 {
     public string When { get; } = when;
 
@@ -89,17 +85,9 @@ public sealed class UnreadRow(UnreadNotification notification, string when, Acti
 
     public string Title { get; } = notification.Title;
 
-    public string Text { get; } = text ?? notification.Text;
+    public string Text { get; } = notification.Text;
 
     public IRelayCommand CopyCommand { get; } = new RelayCommand(() => copy(notification));
-
-    /// <summary>"Read with AI", or "Undo" once it was; empty when AI is not set up on this device.</summary>
-    public string ActionText { get; } = action is null ? "" : actionText ?? "";
-
-    public bool HasAction => ActionText.Length > 0;
-
-    /// <summary>Off while it runs, so a second tap does not read it twice.</summary>
-    public IAsyncRelayCommand ActionCommand { get; } = new AsyncRelayCommand(action ?? (() => Task.CompletedTask));
 }
 
 /// <summary>A category on the settings page: rename, hide, change its icon and colour, or delete (the user's own only).</summary>
@@ -344,14 +332,6 @@ public sealed partial class TransactionRow : ObservableObject
     /// <summary>One-tap categories (only while it waits for one).</summary>
     public ObservableCollection<CategoryChip> Suggestions { get; } = [];
 
-    /// <summary>A new category AI proposes for it ("Thú cưng"), made only when its "+" chip is clicked; null for none.</summary>
-    public string? ProposedCategory { get; private set; }
-
-    public bool HasProposedCategory => ProposedCategory is not null;
-
-    /// <summary>"+ Thú cưng".</summary>
-    public string ProposedCategoryText => ProposedCategory is { } name ? "+ " + name : "";
-
     /// <summary>Every category for this direction (the picker in the expanded row).</summary>
     public ObservableCollection<CategoryChoice> Choices { get; } = [];
 
@@ -415,19 +395,6 @@ public sealed partial class TransactionRow : ObservableObject
         Suggestions.Clear();
         foreach (var s in suggestions) Suggestions.Add(new CategoryChip(s.Id, s.Name, s.Icon, s.Color, Pick));
     }
-
-    internal void SetProposedCategory(string? name)
-    {
-        if (name == ProposedCategory) return;
-        ProposedCategory = name;
-        OnPropertyChanged(nameof(ProposedCategory));
-        OnPropertyChanged(nameof(HasProposedCategory));
-        OnPropertyChanged(nameof(ProposedCategoryText));
-    }
-
-    /// <summary>The "+ Name" chip: makes the category AI proposed and files this transaction in it.</summary>
-    [RelayCommand]
-    private void AcceptProposedCategory() => _owner.AcceptProposedCategory(this);
 
     private void Pick(string categoryId) => _owner.Categorize(this, categoryId);
 

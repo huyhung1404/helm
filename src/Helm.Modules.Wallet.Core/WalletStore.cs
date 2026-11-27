@@ -305,6 +305,20 @@ public sealed class WalletStore
     }
 
     /// <summary>
+    /// <see cref="Suggest"/>, with the category the history is sure of (<see cref="Guess"/>) first even when the
+    /// suggestions did not have it; <c>Sure</c> says whether it was. For a transaction waiting for its category: the PC's
+    /// "To categorize" and the phone's "What was it?" notification.
+    /// </summary>
+    /// <param name="id">The transaction's own id (it does not vote for itself).</param>
+    public (IReadOnlyList<CategoryInfo> Categories, bool Sure) SuggestSureFirst(WalletTransaction transaction, string? id, int count)
+    {
+        var suggestions = Suggest(transaction, count);
+        if (count <= 0 || Guess(transaction, id) is not { IsSure: true } guess || Category(guess.CategoryId) is not { Hidden: false } sure)
+            return (suggestions, false);
+        return ([sure, .. suggestions.Where(s => s.Id != sure.Id).Take(count - 1)], true);
+    }
+
+    /// <summary>
     /// The category the history is sure of for a transaction with this description and amount (see
     /// <see cref="WalletClassifier"/>: at least two earlier ones alike, nearly all in that category); null otherwise.
     /// </summary>
@@ -320,7 +334,7 @@ public sealed class WalletStore
         return WalletClassifier.Guess(transaction, _transactions.All(), c => categories.GetValueOrDefault(c), id);
     }
 
-    /// <summary>A few earlier filed transactions most like this one (for AI to see how the user files them), best first.</summary>
+    /// <summary>A few earlier filed transactions most like this one (for an AI agent to see how the user files them, wallet_unfiled), best first.</summary>
     public IReadOnlyList<WalletTransaction> SimilarFiled(WalletTransaction transaction, int count)
     {
         var words = WalletText.Words(transaction.Description);

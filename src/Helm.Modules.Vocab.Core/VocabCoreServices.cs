@@ -46,9 +46,6 @@ public static class VocabCoreServices
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, VocabTextTools>();
         services.AddSingleton(sp => new VocabSettingsViewModel(
             sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>().Get<VocabSettings>(VocabIds.ModuleId)));
-        // The agent that breaks words down: Claude Code on Windows (IVocabAgent), none on the phone.
-        services.AddSingleton(sp => new VocabAgentViewModel(sp.GetService<IVocabAgent>(), sp.GetRequiredService<VocabStore>(), sp.GetRequiredService<VocabQuiz>(),
-            sp.GetRequiredService<VocabSettingsViewModel>(), sp.GetRequiredService<Helm.Core.Services.IUiDispatcher>()));
         services.AddSingleton(sp => new VocabTextsViewModel(sp.GetRequiredService<VocabStore>(), sp.GetRequiredService<Helm.Core.Services.IUiDispatcher>()));
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<VocabViewModel>();

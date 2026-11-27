@@ -8,7 +8,6 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
-using Helm.Core.Ai;
 using Helm.Core.Capture;
 using Helm.Core.Services;
 using Helm.Core.Settings;
@@ -96,7 +95,7 @@ internal static class NovelDemo
         var phone = stage is NovelStage.LibraryPhone or NovelStage.SettingsPhone;
         var vm = new NovelReaderViewModel(store, dictionaries, settings, new AvaloniaUi(), new YesDialogs(), device,
             new SpeechCatalog([new DemoVoices("vieneu", phone), new DemoVoices(phone ? "android" : "win", phone)]), new SilentAudio(), new NoLauncher(), new NoClipboard(),
-            NullLogger<NovelReaderViewModel>.Instance, reports: reports, captureTargets: [new DemoVocabulary()], ai: new DemoAi());
+            NullLogger<NovelReaderViewModel>.Instance, reports: reports, captureTargets: [new DemoVocabulary()]);
         var host = new Host(phone);
         var view = new NovelReaderView(module, vm, host, new NoClipboard());
 
@@ -475,19 +474,6 @@ internal static class NovelDemo
         public int Order => 0;
         public CapturePreview Preview(string text) => new(true, text);
         public CaptureResult Capture(string text) => new(true, "Added");
-    }
-
-    /// <summary>An agent on the PC that explains the held sentence.</summary>
-    private sealed class DemoAi : IAiText
-    {
-        public string? Unavailable(string feature) => null;
-
-        public Task<AiTextAnswer> AskAsync(AiTextRequest request, CancellationToken ct) => Task.FromResult(new AiTextAnswer("""
-            {"translation": "“Sư tỷ, chúng ta thật sự phải lên núi sao?” Thanh Trúc khẽ hỏi.",
-             "meaning": "Thanh Trúc ngại đi lên núi trong đêm mưa và hỏi lại cho chắc; 真的 nhấn mạnh sự ngờ vực.",
-             "grammar": ["真的要…吗：thật sự phải… sao — hỏi lại điều mình nghi ngờ", "小声问道：trạng ngữ cách thức + 问道 (hỏi), dùng trong văn kể"],
-             "words": [{"word": "师姐", "reading": "shījiě", "meaning": "sư tỷ"}, {"word": "上山", "reading": "shàng shān", "meaning": "lên núi"}, {"word": "小声", "reading": "xiǎoshēng", "meaning": "nhỏ giọng"}]}
-            """, null, "HUNG-PC"));
     }
 
     private sealed class Host(bool phone) : INovelReaderPageHost

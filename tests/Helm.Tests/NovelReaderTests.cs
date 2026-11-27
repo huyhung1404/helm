@@ -471,43 +471,6 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task Claude_codes_stream_moves_the_progress_on_and_ends_with_its_answer()
-    {
-        var lines = string.Join("\n",
-            """{"type":"system","subtype":"init"}""",
-            """{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__helm__novel_name_candidates","input":{}}]}}""",
-            """{"type":"assistant","message":{"content":[{"type":"text","text":"Reading."},{"type":"tool_use","name":"mcp__helm__novel_add_names","input":{}}]}}""",
-            "a warning line",
-            """{"type":"result","subtype":"success","is_error":false,"result":"Added 42 names, set aside 17 words."}""");
-        var steps = new List<string>();
-
-        var (result, failed, calls) = await ClaudeCodeRunner.ReadEventsAsync(new MemoryStream(Encoding.UTF8.GetBytes(lines)), new InlineProgress(steps.Add),
-            ClaudeCodeNameAgent.Describe);
-
-        Assert.Equal(("Added 42 names, set aside 17 words.", false, 2), (result, failed, calls));
-        Assert.Equal("Claude Code is adding names… (2 steps)", steps[^1]);
-        Assert.All(ClaudeCodeNameAgent.AllowedTools, t => Assert.StartsWith("mcp__helm__novel_", t, StringComparison.Ordinal));
-        Assert.Contains("novel_add_names", ClaudeCodeNameAgent.Instructions("b1", "Novel"), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Claude_code_suggests_translations_with_only_the_report_tools()
-    {
-        Assert.Equal(["mcp__helm__novel_translation_reports", "mcp__helm__novel_names", "mcp__helm__novel_suggest_translations"],
-            ClaudeCodeTranslationAgent.AllowedTools);
-        var instructions = ClaudeCodeTranslationAgent.Instructions("b1", "Novel", ["r1", "r2"]);
-        Assert.Contains("ids \"r1\", \"r2\"", instructions, StringComparison.Ordinal);
-        Assert.Contains("novel_suggest_translations", instructions, StringComparison.Ordinal);
-        Assert.All(ErrorKinds.All, kind => Assert.Contains(kind, instructions, StringComparison.Ordinal));
-        Assert.Equal("Claude Code is writing its suggestions… (3 steps)", ClaudeCodeTranslationAgent.Describe("novel_suggest_translations", 3));
-    }
-
-    private sealed class InlineProgress(Action<string> report) : IProgress<string>
-    {
-        public void Report(string value) => report(value);
-    }
-
-    [Fact]
     public async Task Opening_a_novel_the_first_time_adds_its_names_and_undo_takes_them_back()
     {
         var page = NewPage("a");
@@ -528,69 +491,6 @@ public sealed class NovelReaderTests : IDisposable
         await page.ViewModel.UndoFoundNamesCommand.ExecuteAsync(null);
         Assert.Null(page.Store.GetEntry(id, EntryKind.Name, "林宛"));
         Assert.False(page.ViewModel.HasFoundNames);
-    }
-
-    [Fact]
-    public async Task The_ai_scan_without_an_ai_on_this_device_falls_back_to_the_logic_one()
-    {
-        var page = NewPage("a");
-        page.ViewModel.AutoScanNames = false;
-        page.ViewModel.NameScanModeIndex = (int)NameScanMode.Ai;
-        var id = await page.Store.AddBookAsync("Novel", "n.txt", NamesText, 1, "PC");
-        await page.ViewModel.OpenBookAsync(id);
-        Assert.Null(page.Store.GetBook(id)!.NamesScannedAt);
-
-        await page.ViewModel.ScanNamesAsync(automatic: false);
-
-        Assert.True(page.Store.GetEntry(id, EntryKind.Name, "林宛")!.Auto);
-        Assert.Contains("runs in Helm on your PC", page.ViewModel.SuggestionStatus, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task The_ai_scan_lets_the_ai_add_the_names_through_helms_tools()
-    {
-        var agent = new FakeNameAgent();
-        var page = NewPage("a", agent: agent);
-        page.ViewModel.AutoScanNames = false;
-        page.ViewModel.NameScanModeIndex = (int)NameScanMode.Ai;
-        var id = await page.Store.AddBookAsync("Novel", "n.txt", NamesText, 1, "PC");
-        await page.ViewModel.OpenBookAsync(id);
-        // What the AI does through novel_add_names, while Helm waits for it.
-        agent.Work = () => page.Store.SaveFoundNames(id, [("林宛", "Lâm Uyển"), ("洛景桓", "Lạc Cảnh Hoàn")]);
-
-        await page.ViewModel.ScanNamesAsync(automatic: false);
-
-        Assert.Equal((id, "Novel"), agent.Asked);
-        Assert.True(page.Store.GetEntry(id, EntryKind.Name, "洛景桓")!.Auto);
-        // The AI decided: the logic scan's own sure names are not added on top.
-        Assert.Null(page.Store.GetEntry(id, EntryKind.Name, "景桓"));
-        Assert.StartsWith("Added 2 names", page.ViewModel.SuggestionStatus, StringComparison.Ordinal);
-        Assert.Contains("Claude Code: 2 names added.", page.ViewModel.SuggestionStatus, StringComparison.Ordinal);
-
-        agent.Problem = "Claude Code is not installed on this PC.";
-        page.ViewModel.RefreshNameAgentStatusCommand.Execute(null);
-        Assert.Equal("Claude Code is not installed on this PC.", page.ViewModel.NameAgentStatus);
-    }
-
-    private sealed class FakeNameAgent : INameScanAgent
-    {
-        public string Name => "Claude Code";
-
-        public string? Problem { get; set; }
-
-        public Action? Work { get; set; }
-
-        public (string BookId, string Title)? Asked { get; private set; }
-
-        public string? Unavailable() => Problem;
-
-        public Task<string> FindNamesAsync(string bookId, string title, IProgress<string>? progress, CancellationToken ct)
-        {
-            Asked = (bookId, title);
-            progress?.Report("Claude Code is reading the possible names… (1 steps)");
-            Work?.Invoke();
-            return Task.FromResult("2 names added.");
-        }
     }
 
     // ---- The synced library ----------------------------------------------------------------------------------------
@@ -712,8 +612,7 @@ public sealed class NovelReaderTests : IDisposable
         Assert.True(held.IsShown);
         Assert.StartsWith("永和", held.Sentence, StringComparison.Ordinal);
         Assert.Equal((paragraph.Sentences[0].FirstSegment, paragraph.Sentences[0].SegmentCount), paragraph.HighlightSegments);
-        // No AI in this page: the sheet says so, nothing is asked.
-        Assert.Equal(HeldSentenceViewModel.NoAi, held.Problem);
+        Assert.Equal("", held.Problem);
 
         held.DismissCommand.Execute(null);
         Assert.Null(paragraph.HeldSegments);
@@ -1390,7 +1289,7 @@ public sealed class NovelReaderTests : IDisposable
     {
         // The phone's text-to-speech starts after Helm: its voices are missing at first.
         var phone = new FakeEngine("android", online: false, voices: []);
-        var page = NewPage("a", "android:vi-vn-x-gft-local", null, null, phone);
+        var page = NewPage("a", "android:vi-vn-x-gft-local", null, phone);
         Assert.Equal("test:mai", page.ViewModel.SelectedVoice?.Id);
         // Filling the list again meanwhile does not make the stand-in the saved choice.
         page.ViewModel.RefreshVoicesCommand.Execute(null);
@@ -1563,7 +1462,7 @@ public sealed class NovelReaderTests : IDisposable
     private sealed record Page(NovelReaderViewModel ViewModel, NovelStore Store, MemorySynced<NovelProgress> Progress, FakeEngine Engine, FakeOutput Output,
         DictionaryLibrary Dictionaries);
 
-    private Page NewPage(string name, string voiceId = "test:mai", INameScanAgent? agent = null, TranslationReportStore? reports = null,
+    private Page NewPage(string name, string voiceId = "test:mai", TranslationReportStore? reports = null,
         params ISpeechEngine[] moreEngines)
     {
         var paths = new HelmPaths(Path.Combine(_dir, name));
@@ -1580,7 +1479,7 @@ public sealed class NovelReaderTests : IDisposable
         var output = new FakeOutput();
         var viewModel = new NovelReaderViewModel(store, dictionaries, settings, new InlineUi(), new AcceptDialogs(), new Device(),
             new SpeechCatalog([engine, .. moreEngines]), output, new Launcher(), new MemoryClipboard(),
-            NullLogger<NovelReaderViewModel>.Instance, nameAgent: agent, reports: reports);
+            NullLogger<NovelReaderViewModel>.Instance, reports: reports);
         return new Page(viewModel, store, progress, engine, output, dictionaries);
     }
 

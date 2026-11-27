@@ -6,8 +6,7 @@
              x:Class="Helm.Modules.Notes.Ui.NoteEditorView"
              x:DataType="vm:NotesViewModel">
 
-    <!-- One note: the toolbar, the title, its links and the text; "Make tasks" beside it (wide) or under the toolbar (phone).
-         It saves as you type. -->
+    <!-- One note: the toolbar, the title, its links and the text. It saves as you type. -->
     <UserControl.Styles>
         <Style Selector="TextBox.body.mono">
             <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, monospace" />
@@ -30,13 +29,6 @@
                 <Button Classes="chip" Classes.on="{Binding EditPinned}" Command="{Binding TogglePinCommand}" IsVisible="{Binding CanEditPin}"
                         ToolTip.Tip="Pin to the top" AutomationProperties.Name="Pin">
                     <ic:SymbolIcon Symbol="Pin" FontSize="16" />
-                </Button>
-                <Button Classes="chip" Command="{Binding MakeTasksCommand}" IsVisible="{Binding CanMakeTasks}"
-                        ToolTip.Tip="AI reads the note and proposes its tasks for the to-do lists" AutomationProperties.Name="Make tasks">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Foreground="{DynamicResource HelmEyebrow}" />
-                        <TextBlock x:Name="MakeTasksLabel" Text="Make tasks" />
-                    </StackPanel>
                 </Button>
                 <Button Classes="chip" Command="{Binding EditorLinks.StartPickingCommand}"
                         IsVisible="{Binding EditorLinks, Converter={x:Static ObjectConverters.IsNotNull}}"
@@ -79,80 +71,5 @@
             </StackPanel>
         </ScrollViewer>
 
-        <!-- "Make tasks": the note's tasks as AI found them, into one list; the lines they came from get a "→ Tracker" tag -->
-        <Border x:Name="TasksPane" Grid.Column="1" Grid.Row="1" Grid.RowSpan="2" Width="340" Margin="0,0,16,16" Classes="glass" BoxShadow=""
-                IsVisible="{Binding Tasks.IsOpen, FallbackValue=False}" core:Motion.EnterOnShow="True">
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                <StackPanel DataContext="{Binding Tasks}" x:DataType="vm:NoteTasksViewModel" Spacing="12">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-                        <ic:SymbolIcon Symbol="Sparkle" FontSize="16" VerticalAlignment="Center" Foreground="{DynamicResource HelmEyebrow}" />
-                        <TextBlock Grid.Column="1" Text="Tasks from this note" Classes="head" VerticalAlignment="Center" />
-                        <Button Grid.Column="2" Classes="chip" Command="{Binding CloseCommand}" ToolTip.Tip="Close" AutomationProperties.Name="Close the tasks panel">
-                            <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
-                        </Button>
-                    </Grid>
-
-                    <!-- Asking: placeholder lines, and where it runs -->
-                    <StackPanel IsVisible="{Binding IsBusy}">
-                        <Border Classes="shimmer" Width="240" />
-                        <Border Classes="shimmer" Width="180" />
-                        <Border Classes="shimmer" Width="210" />
-                        <TextBlock Text="{Binding Status}" Classes="muted" TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <!-- The tasks to pick from, all into one list -->
-                    <StackPanel Spacing="10" IsVisible="{Binding IsProposing}">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="eyebrow" Text="ADD TO" />
-                            <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Lists}" SelectedItem="{Binding SelectedList}"
-                                      AutomationProperties.Name="Add to list" />
-                        </StackPanel>
-                        <ItemsControl ItemsSource="{Binding Choices}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="vm:NoteTaskChoice">
-                                    <CheckBox IsChecked="{Binding Keep}" AutomationProperties.Name="{Binding Title}" Margin="0,2">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
-                                            <Border Classes="tag" HorizontalAlignment="Left" Margin="0,3,0,0" IsVisible="{Binding HasDue}">
-                                                <TextBlock Text="{Binding DueText}" />
-                                            </Border>
-                                        </StackPanel>
-                                    </CheckBox>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Text="{Binding SkippedText}" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding HasSkipped}" />
-                        <TextBlock Text="{Binding Status}" Classes="muted" TextWrapping="Wrap"
-                                   IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                        <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
-                            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CloseCommand}" />
-                            <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                                    Content="{Binding AddText}" Command="{Binding AddCommand}" />
-                        </Grid>
-                    </StackPanel>
-
-                    <!-- A problem, or no task in the note -->
-                    <StackPanel Spacing="10" IsVisible="{Binding IsStuck}">
-                        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CloseCommand}" />
-                            <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Try again" Command="{Binding RetryCommand}" />
-                        </Grid>
-                    </StackPanel>
-
-                    <!-- Added: Undo takes the tasks and the note's tags back -->
-                    <StackPanel Spacing="10" IsVisible="{Binding IsDone}">
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                            <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="16" VerticalAlignment="Center" Foreground="{DynamicResource HelmSuccess}" />
-                            <TextBlock Grid.Column="1" Text="{Binding DoneText}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                        </Grid>
-                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Undo" Command="{Binding UndoCommand}" />
-                            <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" Command="{Binding CloseCommand}" />
-                        </Grid>
-                    </StackPanel>
-                </StackPanel>
-            </ScrollViewer>
-        </Border>
     </Grid>
 </UserControl>

@@ -42,11 +42,9 @@ analysis: `often_forgotten` (forgotten 4 times or more since the last help: they
 last pinyin help: they get a `pinyin_mnemonic` only, never a new analysis) and `missing_details` (analyzed before Helm
 asked for word forms, synonyms and antonyms); `vocab_save_details` saves those details without touching the trees,
 marks a hard word as helped (a slipping word once it has a `pinyin_mnemonic`), and takes a word off `missing_details`
-even when it has no forms (`[]`). Nothing is deleted through them. On the PC, Vocabulary's **Analyze now** (and its automatic run
-a little after there is something to do) runs Claude Code without a window with only these tools allowed
-(`claude -p --allowedTools mcp__helm__vocab_…`), 12 words of each kind per run; when a run leaves the same work behind
-it does not start by itself again until something changes. "Suggest words with this root" on the Roots tab does the
-same to add a family's words.
+even when it has no forms (`[]`). Nothing is deleted through them. Helm runs no agent of its own on the words (since
+0.96): Fairy, or any agent connected to Helm's MCP server, does the analysis through these tools; Vocabulary's Analysis
+shows what waits and when an agent is at work (it took the words with `vocab_pending`).
 
 **Texts.** The user can paste an article or song lyrics (Vocabulary → **Add text**, Ctrl+Shift+N). `vocab_pending_texts` lists the
 texts waiting (with the user's title); `vocab_propose_words` sends the words worth learning from one text (simplified Chinese,
@@ -85,16 +83,15 @@ feedback".
 
 Novel Reader's tools (`novel_list`, `novel_name_candidates`, `novel_names`, `novel_add_names`, `novel_ignore_names`)
 let an agent find a novel's character names: it reads the possible names with sentences where they appear and adds
-the real ones, marked as found; it never replaces a name the user saved. Novel Reader's AI name scan runs Claude Code
-without a window with only these tools allowed (`claude -p --allowedTools mcp__helm__novel_…`), so it needs Claude
-Code installed and Helm added to it.
+the real ones, marked as found; it never replaces a name the user saved. Novel Reader's own name scan (no AI) finds
+names from how words are used.
 
 `novel_translation_reports` (read only) gives the sentences the user reported as translated wrong in Novel Reader: the
 Chinese, what Helm showed, the right translation and the user's note, the dictionary pieces Helm cut the sentence
 into, and what Helm shows for it now (`helm_now`, `right_now`), so an agent improving the converter can work from them
 and check its changes. `novel_suggest_translations` writes an agent's suggested translation of reports, with a note
-and the kind of error; the user's own translation is never replaced. Novel Reader's **Ask Claude Code** runs Claude
-Code without a window with only `novel_translation_reports`, `novel_names` and `novel_suggest_translations` allowed.
+and the kind of error; the user's own translation is never replaced: the report shows the suggestion beside it, with
+**Use it**.
 
 ## Connect a client
 

@@ -6,7 +6,7 @@ namespace Helm.Modules.Wallet;
 /// <param name="Matches">Earlier transactions in that category that look like this one.</param>
 public sealed record CategoryGuess(string CategoryId, double Confidence, int Matches)
 {
-    /// <summary>Sure enough to file the transaction without asking (or asking AI).</summary>
+    /// <summary>Sure enough to file the transaction without asking.</summary>
     public bool IsSure => Confidence >= WalletClassifier.SureAt && Matches >= 2;
 }
 
@@ -14,7 +14,7 @@ public sealed record CategoryGuess(string CategoryId, double Confidence, int Mat
 /// Files a transaction from the user's own history, without AI: earlier transactions of the same direction whose
 /// description has the same words (the same shop, the same person), or most of them, vote for their category; one
 /// in the same amount band (a fixed price, the rent) counts a little more. Sure only when at least two agree and
-/// almost nothing points elsewhere; anything less is a guess that AI or the user settles.
+/// almost nothing points elsewhere; anything less is a guess that the user (or an AI agent over MCP) settles.
 /// </summary>
 public static class WalletClassifier
 {

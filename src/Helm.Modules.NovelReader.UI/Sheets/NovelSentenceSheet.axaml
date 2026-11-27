@@ -6,8 +6,8 @@
              x:Class="Helm.Modules.NovelReader.Ui.NovelSentenceSheet"
              x:DataType="vm:HeldSentenceViewModel">
 
-    <!-- A word held down: its sentence ("Câu này") said aloud, explained (meaning, grammar, a natural translation) and its
-         words ticked to go to Vocabulary. In Vietnamese, like the explanation itself. -->
+    <!-- A word held down: its sentence ("Câu này") said aloud, and the held word ticked to go to Vocabulary. In
+         Vietnamese. -->
     <StackPanel Spacing="12">
         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
             <StackPanel Spacing="2">
@@ -23,42 +23,12 @@
             </Button>
         </Grid>
 
-        <!-- Waiting for the answer -->
-        <StackPanel Spacing="8" IsVisible="{Binding IsExplaining}">
-            <TextBlock Text="Đang giải thích…" Classes="muted" />
-            <ProgressBar IsIndeterminate="True" Height="4" MinHeight="4" CornerRadius="2" />
-        </StackPanel>
-
-        <!-- No explanation (or the sentence could not be said): why, and another try -->
+        <!-- The sentence could not be said, or its words added: why -->
         <Border Classes="glass" IsVisible="{Binding HasProblem}" BorderBrush="{DynamicResource HelmDanger}" core:Motion.EnterOnShow="True">
-            <StackPanel Spacing="10">
-                <TextBlock Text="{Binding Problem}" TextWrapping="Wrap" />
-                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ExplainCommand}" IsVisible="{Binding !HasExplanation}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <ic:SymbolIcon Symbol="ArrowClockwise" FontSize="15" />
-                        <TextBlock Text="Thử lại" />
-                    </StackPanel>
-                </Button>
-            </StackPanel>
+            <TextBlock Text="{Binding Problem}" TextWrapping="Wrap" />
         </Border>
 
-        <!-- The explanation -->
-        <StackPanel Spacing="12" IsVisible="{Binding HasExplanation}" core:Motion.EnterOnShow="True">
-            <StackPanel Spacing="4">
-                <TextBlock Classes="eyebrow" Text="NGHĨA" />
-                <TextBlock Text="{Binding Explanation.Meaning}" TextWrapping="Wrap" />
-            </StackPanel>
-            <StackPanel Spacing="4" IsVisible="{Binding HasGrammar}">
-                <TextBlock Classes="eyebrow" Text="NGỮ PHÁP" />
-                <TextBlock Text="{Binding Grammar}" TextWrapping="Wrap" />
-            </StackPanel>
-            <StackPanel Spacing="4">
-                <TextBlock Classes="eyebrow" Text="DỊCH TỰ NHIÊN" />
-                <TextBlock Text="{Binding Explanation.Translation}" TextWrapping="Wrap" FontSize="16" />
-            </StackPanel>
-        </StackPanel>
-
-        <!-- The sentence's words: the held one first, then the explanation's; tap one to tick it -->
+        <!-- The held word: tap it to tick it -->
         <StackPanel Spacing="8" IsVisible="{Binding HasWords}">
             <TextBlock Classes="eyebrow" Text="THÊM TỪ TRONG CÂU" />
             <ItemsControl ItemsSource="{Binding Words}">
@@ -74,8 +44,5 @@
             </ItemsControl>
             <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding AddWordsText}" Command="{Binding AddWordsCommand}" />
         </StackPanel>
-
-        <!-- Where it ran and what it cost -->
-        <TextBlock Text="{Binding RanOn}" Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasRanOn}" />
     </StackPanel>
 </UserControl>

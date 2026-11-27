@@ -19,14 +19,6 @@ public partial class NovelReportForm : UserControl
         DataContext = editor;
         InitializeComponent();
         CloseButton.Click += (_, _) => editor.CloseCommand.Execute(null);
-        // Ask is there only where an agent can answer (the PC); Cancel and Save then share the row.
-        AskButton.IsVisible = editor.CanAsk;
-        if (!editor.CanAsk)
-        {
-            Footer.ColumnDefinitions = ColumnDefinitions.Parse("*,*");
-            Grid.SetColumn(CancelButton, 0);
-            Grid.SetColumn(SaveButton, 1);
-        }
         AttachedToVisualTree += (_, _) => Dispatcher.UIThread.Post(() =>
         {
             CorrectBox.Focus();

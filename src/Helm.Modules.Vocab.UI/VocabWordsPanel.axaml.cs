@@ -67,20 +67,18 @@ public partial class VocabWordsPanel : UserControl
         if (_vm is not null)
         {
             _vm.PropertyChanged -= OnChanged;
-            _vm.Agent.PropertyChanged -= OnChanged;
             _vm.List.PropertyChanged -= OnChanged;
         }
         _vm = DataContext as VocabViewModel;
         if (_vm is null) return;
         _vm.PropertyChanged += OnChanged;
-        _vm.Agent.PropertyChanged += OnChanged;
         _vm.List.PropertyChanged += OnChanged;
         Update();
     }
 
     private void OnChanged(object? sender, PropertyChangedEventArgs e) => Update();
 
-    /// <summary>The line under the title, and the waiting card's buttons (Analyze now only where an agent runs).</summary>
+    /// <summary>The line under the title, and what else waits for the agent.</summary>
     private void Update()
     {
         if (_vm is not { } vm) return;
@@ -89,17 +87,10 @@ public partial class VocabWordsPanel : UserControl
         if (vm.TextCount > 0) parts.Add(vm.TextCount == 1 ? "1 text to pick words from" : $"{vm.TextCount} texts to pick words from");
         Summary.Text = string.Join(" · ", parts);
 
-        var analyze = vm.Agent.CanRun && !vm.Agent.IsBusy;
-        var stop = vm.Agent.IsBusy;
-        AnalyzeButton.IsVisible = analyze;
-        StopButton.IsVisible = stop;
-        var first = analyze || stop;
-        Grid.SetColumn(DetailsButton, first ? 1 : 0);
-        Grid.SetColumnSpan(DetailsButton, first ? 1 : 2);
         LanguageSeg.IsVisible = vm.List.ChineseCount > 0;
         var others = VocabWork.Others(vm);
         OtherWork.Text = others.Count == 0 ? "" : "Also on its list: " + string.Join(" · ", others) + ".";
-        OtherWork.IsVisible = others.Count > 0 && !vm.Agent.IsBusy;
+        OtherWork.IsVisible = others.Count > 0;
         ArrangeFind();
     }
 }

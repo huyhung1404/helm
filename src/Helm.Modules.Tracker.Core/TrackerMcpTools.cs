@@ -248,7 +248,7 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
         if (!args.TryGetProperty("tasks", out var list) || list.ValueKind != JsonValueKind.Array)
             throw new McpToolException("tasks must be a list of { title, notes, due }.");
         var tasks = list.EnumerateArray().Where(t => t.ValueKind == JsonValueKind.Object)
-            .Select(t => new ProposedTask(McpArgs.String(t, "title")?.Trim() ?? "", McpArgs.String(t, "notes")?.Trim() ?? "", McpArgs.String(t, "due")))
+            .Select(t => (Title: McpArgs.String(t, "title")?.Trim() ?? "", Notes: McpArgs.String(t, "notes")?.Trim() ?? "", Due: McpArgs.String(t, "due")?.Trim()))
             .Where(t => t.Title.Length > 0)
             .ToList();
         if (tasks.Count == 0) throw new McpToolException("Give at least one task with a title.");
@@ -267,7 +267,13 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
             created = true;
         }
         else listId = TaskLists(McpArgs.String(args, "list")).FirstOrDefault()?.Id ?? throw new McpToolException("There is no to-do list yet; name one.");
-        var ids = TaskProposals.AddAll(store, listId, parentId, tasks);
+        var ids = new List<string>();
+        foreach (var task in tasks)
+        {
+            (DateOnly? day, DateTimeOffset? at) = (null, null);
+            if (task.Due is { } due) (day, at) = ParseDue(due);
+            ids.Add(store.AddItem(listId, new TrackerItemDraft(task.Title, DueDate: day, Notes: task.Notes, DueAt: at, ParentId: parentId)));
+        }
         var listName = store.GetWorkspace(listId)?.Name ?? "";
         return new { ids, list_id = listId, list = listName, created_list = created, tasks = ids.Select(id => Describe(id, store.GetItem(id)!, listName)).ToList() };
     }

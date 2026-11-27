@@ -89,23 +89,13 @@
                             <ic:SymbolIcon Symbol="HourglassHalf" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding !IsAgentBusy}" />
                         </Panel>
                         <StackPanel Grid.Column="1" Spacing="2">
-                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding Agent.IsBusy}">
-                                <Run Text="Claude Code is at work · step " /><Run Text="{Binding Agent.Steps}" />
-                            </TextBlock>
-                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="Another AI agent is reading it" IsVisible="{Binding IsExternalAgentBusy}" />
+                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="An AI agent is reading it" IsVisible="{Binding IsAgentBusy}" />
                             <TextBlock TextWrapping="Wrap" IsVisible="{Binding !IsAgentBusy}"
-                                       Text="Waiting for an AI agent to pick the words. It starts by itself, or press Analyze now in Analysis." />
+                                       Text="Waiting for an AI agent connected to Helm's MCP tools to pick the words." />
                         </StackPanel>
                     </Grid>
-                    <ItemsControl ItemsSource="{Binding Agent.RecentLog}" IsVisible="{Binding Agent.IsBusy}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:VocabAgentLogLine">
-                                <TextBlock Text="{Binding Text}" Classes="secondary" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding OpenAgentCommand}" Content="See every step"
-                            ToolTip.Tip="Analysis: every step, with Stop and Copy log" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding OpenAgentCommand}" Content="See what waits"
+                            ToolTip.Tip="Analysis: what waits for the agent, and its request" />
                 </StackPanel>
             </Border>
 

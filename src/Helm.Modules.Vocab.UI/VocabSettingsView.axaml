@@ -146,33 +146,16 @@
         <Border Classes="glass">
             <StackPanel Spacing="12">
                 <TextBlock Text="AI agent" Classes="head" />
-                <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !Agent.CanRun}"
-                           Text="Words you add wait until Claude Code on your PC breaks them down (Helm's tools must be allowed there). The analysis comes back here through sync." />
-                <StackPanel Spacing="12" IsVisible="{Binding Agent.CanRun}">
-                    <DockPanel>
-                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.AutoAnalyze}" OnContent="" OffContent="" AutomationProperties.Name="Break new words down by itself" />
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Break new words down by itself" />
-                            <TextBlock Classes="secondary" TextWrapping="Wrap"
-                                       Text="A moment after words arrive (typed here, from Quick Capture or from the phone), Claude Code breaks them down without a window." />
-                        </StackPanel>
-                    </DockPanel>
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Claude model" />
-                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.AnalysisModelNames}" SelectedIndex="{Binding Settings.AnalysisModelIndex}"
-                                  AutomationProperties.Name="Claude model" />
-                        <TextBlock Classes="secondary" TextWrapping="Wrap"
-                                   Text="For Analyze now, by itself and Suggest words. Sonnet is enough for roots and components; Opus costs more of your plan for little gain." />
-                    </StackPanel>
-                </StackPanel>
-                <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding CopyPromptCommand}" AutomationProperties.Name="Copy the request for Claude Code">
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="Words you add wait until an AI agent connected to Helm's MCP tools breaks them down. The analysis comes back here through sync." />
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding CopyPromptCommand}" AutomationProperties.Name="Copy the request for an AI agent">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <ic:SymbolIcon Symbol="Copy" FontSize="14" />
-                        <TextBlock Text="Copy the request for Claude Code" />
+                        <TextBlock Text="Copy the request for an AI agent" />
                     </StackPanel>
                 </Button>
                 <TextBlock Classes="secondary" TextWrapping="Wrap"
-                           Text="To run it yourself: let AI agents use Helm's tools (General › MCP), then paste the request into Claude Code." />
+                           Text="To run it yourself: let AI agents use Helm's tools (General › MCP), then paste the request into the agent." />
             </StackPanel>
         </Border>
 

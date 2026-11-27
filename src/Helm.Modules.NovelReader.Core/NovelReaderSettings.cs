@@ -95,9 +95,6 @@ public sealed class NovelReaderSettings : IVersionedSettings
     /// <summary>Opening a novel for the first time looks for its character names and adds the sure ones.</summary>
     public bool AutoScanNames { get; set; } = true;
 
-    /// <summary>How names are found: from how words are used (free, offline), or by an AI on this PC through MCP.</summary>
-    public NameScanMode NameScanMode { get; set; } = NameScanMode.Logic;
-
     // ---- Dictionaries ----------------------------------------------------------------------------------------------
 
     /// <summary>File name → address for "Download dictionaries"; editable in case a source moves.</summary>
@@ -135,13 +132,4 @@ public sealed class NovelReaderSettings : IVersionedSettings
 
     /// <summary>The novel open on this device; null opens the one read most recently on any device.</summary>
     public string? OpenBookId { get; set; }
-}
-
-/// <summary>How the name scan decides what is a name.</summary>
-public enum NameScanMode
-{
-    /// <summary>From how words are used in the novel: free and offline.</summary>
-    Logic,
-    /// <summary>Claude Code on this PC reads the candidates through Helm's MCP tools and adds the names (the user's own Claude plan, no API key).</summary>
-    Ai,
 }

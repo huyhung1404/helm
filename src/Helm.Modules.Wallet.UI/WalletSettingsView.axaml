@@ -286,7 +286,7 @@
                 <StackPanel Spacing="2">
                     <TextBlock Text="Notifications Helm could not read" Classes="head" />
                     <TextBlock Classes="secondary"
-                               Text="Your bank's notifications that talk about money but that Helm did not understand, kept on this phone only. Read with AI sends that one notification to AI, which finds the transaction in it; or copy one and add it by hand." />
+                               Text="Your bank's notifications that talk about money but that Helm did not understand, kept on this phone only. Copy one and add it by hand." />
                 </StackPanel>
                 <TextBlock Text="None." Classes="secondary" IsVisible="{Binding !HasUnread}" />
                 <ItemsControl ItemsSource="{Binding Unread}">
@@ -301,11 +301,7 @@
                                         </TextBlock>
                                         <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                                        <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Copy" Command="{Binding CopyCommand}" />
-                                        <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" Content="{Binding ActionText}" Command="{Binding ActionCommand}"
-                                                IsVisible="{Binding HasAction}" />
-                                    </Grid>
+                                    <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Copy" Command="{Binding CopyCommand}" />
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

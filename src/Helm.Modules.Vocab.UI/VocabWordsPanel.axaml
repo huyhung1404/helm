@@ -71,14 +71,6 @@
                     <StackPanel Grid.Column="1" Spacing="2">
                         <TextBlock Classes="head" Text="{Binding AgentChipText}" TextWrapping="Wrap" IsVisible="{Binding IsAgentBusy}" />
                         <TextBlock Classes="head" Text="Waiting for the AI agent" TextWrapping="Wrap" IsVisible="{Binding !IsAgentBusy}" />
-                        <TextBlock Classes="muted" FontSize="13" Text="{Binding Agent.Status}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis">
-                            <TextBlock.IsVisible>
-                                <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                    <Binding Path="Agent.IsBusy" />
-                                    <Binding Path="Agent.HasStatus" />
-                                </MultiBinding>
-                            </TextBlock.IsVisible>
-                        </TextBlock>
                     </StackPanel>
                 </Grid>
                 <ItemsControl ItemsSource="{Binding PendingWords}" IsVisible="{Binding HasPending}">
@@ -102,18 +94,9 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <TextBlock x:Name="OtherWork" Classes="muted" FontSize="13" TextWrapping="Wrap" />
-                <Grid x:Name="WaitingActions" ColumnDefinitions="*,*" ColumnSpacing="8">
-                    <Button x:Name="AnalyzeButton" Classes="pill" HorizontalAlignment="Stretch" Command="{Binding Agent.AnalyzeCommand}"
-                            ToolTip.Tip="Claude Code breaks new words down, writes new ways to remember the words you keep forgetting, and fills in missing details"
-                            AutomationProperties.Name="Analyze now">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
-                            <TextBlock Text="Analyze now" Foreground="{DynamicResource HelmPillForeground}" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="StopButton" Classes="ghost" HorizontalAlignment="Stretch" Content="Stop" Command="{Binding Agent.StopCommand}" />
-                    <Button x:Name="DetailsButton" Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding OpenAgentCommand}"
-                            ToolTip.Tip="Every step of the agent, what else waits, the request for Claude Code" AutomationProperties.Name="Analysis details">
+                <Grid x:Name="WaitingActions">
+                    <Button x:Name="DetailsButton" Classes="ghost" HorizontalAlignment="Stretch" Command="{Binding OpenAgentCommand}"
+                            ToolTip.Tip="What waits for the agent, and the request to paste into one" AutomationProperties.Name="Analysis details">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <ic:SymbolIcon Symbol="TextBulletList" FontSize="16" />
                             <TextBlock Text="Details" />

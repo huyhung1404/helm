@@ -174,7 +174,7 @@ public partial class WalletView : UserControl
 
     /// <summary>
     /// On screen again (opened, or back at the app on it): transactions the phone saved meanwhile, "today" after
-    /// midnight, AI's categories for what waits. The platform calls it when the window or the app comes back.
+    /// midnight. The platform calls it when the window or the app comes back.
     /// </summary>
     public void Shown()
     {
@@ -182,7 +182,6 @@ public partial class WalletView : UserControl
         _viewModel.TransactionPager.Reset();
         _viewModel.Refresh();
         UpdateTodayLine();
-        if (_module?.IsEnabled != false && _viewModel.HasToCategorize) _viewModel.ProposeCategoriesNow();
         try
         {
             _host?.Opened();

@@ -59,8 +59,6 @@ public partial class NovelSettingsView : UserControl
         AttachedToVisualTree += (_, _) =>
         {
             module.PropertyChanged += OnModule;
-            // The Claude Code check runs when the settings show, not on every start.
-            if (viewModel.CanScanWithAi) viewModel.RefreshNameAgentStatusCommand.Execute(null);
         };
         DetachedFromVisualTree += (_, _) => module.PropertyChanged -= OnModule;
     }

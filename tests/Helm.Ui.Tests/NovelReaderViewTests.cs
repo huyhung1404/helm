@@ -144,13 +144,15 @@ public sealed class NovelReaderViewTests : IDisposable
     }
 
     [AvaloniaFact]
-    public async Task A_held_sentence_is_explained_in_a_sheet()
+    public async Task A_held_sentence_shows_in_a_sheet_with_its_word_for_Vocabulary()
     {
         var (window, view, _) = await Show(NovelStage.Sentence);
         await Settle();
         Assert.True(view.SentenceSheet?.IsOpen);
-        Assert.True(Says(window, "DỊCH TỰ NHIÊN"));
-        Assert.Contains(Shown<ToggleButton>(window), b => b.Content as string == "上山 lên núi");
+        Assert.True(Says(window, "CÂU NÀY"));
+        Assert.True(Says(window, "THÊM TỪ TRONG CÂU"));
+        Assert.False(Says(window, "DỊCH TỰ NHIÊN"));
+        Assert.Single(Shown<ToggleButton>(window), b => b.Classes.Contains("chip"));
     }
 
     [AvaloniaFact]
