@@ -346,6 +346,18 @@
 
                         <!-- HELP & TROUBLESHOOTING -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsHelp}" core:Motion.EnterOnShow="True">
+                            <!-- For checking smoothness: Avalonia flashes what each frame draws again (RenderDebug). -->
+                            <Border Classes="glass">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Classes="head" Text="Show what is redrawn" />
+                                        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                                   Text="Flashes the parts of the window drawn again each frame, with the frame rate. Smooth motion redraws only what moves. Until Helm restarts." />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="RedrawSwitch" Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent=""
+                                                  AutomationProperties.Name="Show what is redrawn" />
+                                </Grid>
+                            </Border>
                             <Border Classes="glass">
                                 <StackPanel Spacing="12">
                                     <StackPanel Spacing="2" IsVisible="{Binding HasSettingsFolder}">

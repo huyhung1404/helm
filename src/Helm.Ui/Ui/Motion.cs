@@ -15,7 +15,7 @@ namespace Helm.Core.Ui;
 /// from its top edge (<see cref="FromTopProperty"/>); a dialog from its centre. A whole page opened in the shell does not
 /// grow: it fades in over its still backdrop (<see cref="EnterPage"/>).
 /// </summary>
-public static class Motion
+public static partial class Motion
 {
     public static readonly AttachedProperty<bool> EnterOnShowProperty =
         AvaloniaProperty.RegisterAttached<Control, bool>("EnterOnShow", typeof(Motion));
@@ -44,6 +44,7 @@ public static class Motion
 
     static Motion()
     {
+        HookLoops();
         EnterOnShowProperty.Changed.AddClassHandler<Control>((control, e) =>
         {
             control.PropertyChanged -= OnPropertyChanged;
@@ -89,15 +90,16 @@ public static class Motion
     /// target is left with no animated value (an opacity of 0.9999 would keep a layer under the whole page). Avalonia does
     /// not always play the last frame when nothing else is drawn.
     /// </summary>
-    private static void RunToEnd(Animation animation, Control target)
+    private static Task RunToEnd(Animation animation, Control target)
     {
         var stop = new CancellationTokenSource();
-        _ = animation.RunAsync(target, stop.Token);
+        var run = animation.RunAsync(target, stop.Token);
         DispatcherTimer.RunOnce(() =>
         {
             stop.Cancel();
             stop.Dispose();
         }, animation.Duration + TimeSpan.FromMilliseconds(60));
+        return run;
     }
 
     /// <summary>How long a page takes to come in (<see cref="EnterPage"/>): short, so switching tabs never waits on it.</summary>
@@ -113,12 +115,28 @@ public static class Motion
         var targets = PageLayers(page);
         foreach (var target in targets)
         {
+            // While it fades, the page is drawn once into a bitmap and only that is blended each frame (not every card,
+            // shadow and text again). The cache goes when the fade is over: a cached page would be redrawn whole on any
+            // change inside it.
             var start = new KeyFrame { Cue = new Cue(0), Setters = { new Setter(Visual.OpacityProperty, 0.0) } };
             var end = new KeyFrame { Cue = new Cue(1), Setters = { new Setter(Visual.OpacityProperty, 1.0) } };
             var animation = new Animation { Duration = PageDuration, Easing = new CubicEaseOut(), FillMode = FillMode.Backward, Children = { start, end } };
-            RunToEnd(animation, target);
+            FadeCached(animation, target);
         }
         return targets;
+    }
+
+    private static async void FadeCached(Animation animation, Control target)
+    {
+        target.CacheMode = new BitmapCache();
+        try
+        {
+            await RunToEnd(animation, target);
+        }
+        finally
+        {
+            target.CacheMode = null;
+        }
     }
 
     /// <summary>The layers drawn over the page's backdrop (its siblings), or the page itself when it has none.</summary>

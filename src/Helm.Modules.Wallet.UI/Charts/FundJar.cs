@@ -2,15 +2,15 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
-using Avalonia.Threading;
+using Helm.Core.Ui;
 
 namespace Helm.Modules.Wallet.Ui;
 
 /// <summary>
 /// A fund drawn as a honey pot: the water is what is left of it (0–1), two slow waves move on its surface, and the
 /// water drops smoothly when a transaction comes off the fund. The outline says the status (amber low, orange used up,
-/// red over) next to the words the pages print, so colour never carries it alone. Every jar on screen shares one
-/// clock (about 30 frames a second) that runs only while a jar is shown.
+/// red over) next to the words the pages print, so colour never carries it alone. The water moves only for a few
+/// seconds after the jar comes on screen or its level changes, then it rests (no frames at all, see <see cref="MotionClock"/>).
 /// </summary>
 public sealed class FundJar : Control
 {
@@ -33,8 +33,16 @@ public sealed class FundJar : Control
     /// <summary>Draws an empty pot with a dashed outline and a plus ("Add fund").</summary>
     public static readonly StyledProperty<bool> IsAddProperty = AvaloniaProperty.Register<FundJar, bool>(nameof(IsAdd));
 
+    /// <summary>How long the waves move after the jar shows or its level changes.</summary>
+    private const double WavesFor = 2.5;
+
     private double _shown = -1;
     private double _phase;
+    private double _wavesLeft;
+    private IDisposable? _moving;
+
+    /// <summary>The water or the waves move right now (a jar at rest asks for no frames).</summary>
+    public bool IsMoving => _moving is not null;
 
     static FundJar()
     {
@@ -88,19 +96,41 @@ public sealed class FundJar : Control
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        if (!IsAdd) Clock.Add(this);
+        Wake();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        Clock.Remove(this);
+        _moving?.Dispose();
+        _moving = null;
         base.OnDetachedFromVisualTree(e);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == LevelProperty) Wake();
+    }
+
+    /// <summary>The waves move (again) for a few seconds and the water eases to its level, then everything rests.</summary>
+    private void Wake()
+    {
+        if (IsAdd || VisualRoot is null) return;
+        _wavesLeft = WavesFor;
+        _moving ??= MotionClock.Run(this, seconds =>
+        {
+            Tick(seconds);
+            var moving = _wavesLeft > 0 || _shown != Target;
+            if (!moving) _moving = null;
+            return moving;
+        });
     }
 
     /// <summary>One frame: the waves move on, the water eases toward its level.</summary>
     private void Tick(double seconds)
     {
         _phase = (_phase + seconds / 3.2) % 1;
+        _wavesLeft -= seconds;
         var target = Target;
         if (_shown < 0) _shown = target;
         // About 0.9 s to settle, easing out.
@@ -165,36 +195,5 @@ public sealed class FundJar : Control
         var brush = level > 0.55 ? Brushes.White : WalletTheme.Primary(this);
         var text = WalletTheme.Text(this, Text, TextSize, brush, FontWeight.Bold);
         context.DrawText(text, new Point((w - text.Width) / 2, (h - text.Height) / 2 + 4 * scale));
-    }
-
-    /// <summary>The one clock all shown jars move by; it stops when none is shown.</summary>
-    private static class Clock
-    {
-        private static readonly List<FundJar> s_jars = [];
-        private static DispatcherTimer? s_timer;
-        private static DateTime s_last;
-
-        public static void Add(FundJar jar)
-        {
-            if (!s_jars.Contains(jar)) s_jars.Add(jar);
-            if (s_timer is not null) return;
-            s_last = DateTime.UtcNow;
-            s_timer = new DispatcherTimer(TimeSpan.FromMilliseconds(33), DispatcherPriority.Render, (_, _) =>
-            {
-                var now = DateTime.UtcNow;
-                var seconds = Math.Min(0.1, (now - s_last).TotalSeconds);
-                s_last = now;
-                foreach (var j in s_jars.ToList()) j.Tick(seconds);
-            });
-            s_timer.Start();
-        }
-
-        public static void Remove(FundJar jar)
-        {
-            s_jars.Remove(jar);
-            if (s_jars.Count > 0 || s_timer is null) return;
-            s_timer.Stop();
-            s_timer = null;
-        }
     }
 }

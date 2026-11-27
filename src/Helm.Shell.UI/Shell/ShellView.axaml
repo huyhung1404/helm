@@ -14,17 +14,8 @@
 
         <Grid RowDefinitions="48,*" ColumnDefinitions="Auto,*">
             <!-- The room the menu takes beside the page (its full width pinned, the rail otherwise). -->
-            <Border x:Name="MenuSpace" Grid.Row="1" Width="{Binding Menu.ReservedWidth}">
-                <Border.Transitions>
-                    <Transitions>
-                        <DoubleTransition Property="Width" Duration="0:0:0.2">
-                            <DoubleTransition.Easing>
-                                <CubicEaseOut />
-                            </DoubleTransition.Easing>
-                        </DoubleTransition>
-                    </Transitions>
-                </Border.Transitions>
-            </Border>
+            <!-- No width transition: the page is laid out once at its new width and slides there (Motion.SlideFrom). -->
+            <Border x:Name="MenuSpace" Grid.Row="1" Width="{Binding Menu.ReservedWidth}" />
 
             <Grid x:Name="PageColumn" Grid.Row="1" Grid.Column="1" RowDefinitions="Auto,*">
                 <vm:TabStripView x:Name="Strip" Margin="2,0,12,8" />

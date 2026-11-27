@@ -109,6 +109,21 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   black shows at its edges). A page opened in the shell fades in: `Motion.EnterPage(page)` keeps its `core:Backdrop`
   still and fades what is on it in, 150 ms (`ShellView` does it). No blur or other effect over a whole page: it made
   every tab switch stutter. Motion stops every animation once its time is up, so nothing is left at 0.9999.
+- **Motion pipeline: lots of motion, never a lag.** Every frame redraws only what moves; a page at rest draws nothing.
+  - Animate only opacity and transforms (scale, rotate, translate). Never a size, a margin or a padding: that lays the
+    whole page out every frame. Lay out once and slide the layer (`Motion.SlideFrom`), or scale it.
+  - Anything that goes on (a glyph turning, a placeholder breathing) runs on the compositor: `core:Motion.Spin` /
+    `core:Motion.Pulse`. Never a style animation with `IterationCount="INFINITE"` (it sets a property on the UI thread
+    every frame, also while hidden). Loops stop by themselves while hidden.
+  - Motion a control draws itself (a jar's water, a goal's fill, confetti) asks `MotionClock.Run` for frames and says
+    when it rests; never a fast `DispatcherTimer`. Keep it in a small control of its own (only that control is drawn
+    again) and let it come to rest (a jar's waves move ~2.5 s after a change, then stop).
+  - Never animate the backdrop or anything behind content, and no effect (blur, shadow growth) over a large area. A big
+    layer that fades (a page) is a `BitmapCache` while it fades (`Motion.EnterPage` does it), and only then.
+  - Moving things use `RenderTransform`, never `Canvas.Left/Top` or margins (no layout while they move).
+  - Check it: Ctrl+Alt+Shift+R (or General › Help & troubleshooting › Show what is redrawn) flashes what each frame
+    draws, with the frame rate. A turning glyph flashes the glyph only; a page at rest flashes nothing. `MotionRulesTests`
+    (Helm.Tests) and `MotionPipelineTests` (Helm.Ui.Tests) keep the rules.
 - ComboBox lists grow open from the top (`ComboBox.glass:dropdownopen` style) and open under the field with the left
   edges lined up (`Placement=BottomEdgeAlignedLeft` on its Popup; the default centres a list wider than the field).
 - Disclosure arrows point **right when closed, turn a quarter to point down when open, and turn back**: a

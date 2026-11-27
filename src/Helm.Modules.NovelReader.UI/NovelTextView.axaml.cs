@@ -27,7 +27,7 @@ public partial class NovelTextView : UserControl
     private bool _touching;
     private DateTime _lastTouch = DateTime.MinValue;
     private DateTime _autoScrollUntil = DateTime.MinValue;
-    private DispatcherTimer? _animation;
+    private IDisposable? _animation;
     private double _width;
 
     /// <summary>The paragraph at the top of the view, kept there when the text wraps again.</summary>
@@ -87,7 +87,7 @@ public partial class NovelTextView : UserControl
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         Unhook();
-        _animation?.Stop();
+        _animation?.Dispose();
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -167,7 +167,7 @@ public partial class NovelTextView : UserControl
         }
         _autoScrollUntil = DateTime.MinValue;
         _lastTouch = DateTime.UtcNow;
-        _animation?.Stop();
+        _animation?.Dispose();
         _viewModel.StopFollowing();
     }
 
@@ -203,7 +203,7 @@ public partial class NovelTextView : UserControl
         if (TopParagraph() is { } top) _top = top;
         var now = DateTime.UtcNow;
         if (now < _autoScrollUntil || (!_touching && now - _lastTouch > FlingTime)) return;
-        _animation?.Stop();
+        _animation?.Dispose();
         _viewModel?.StopFollowing();
         if (_top is { } index) _viewModel?.ReportVisibleParagraph(index);
     }
@@ -268,7 +268,7 @@ public partial class NovelTextView : UserControl
 
     private void Jump(double target)
     {
-        _animation?.Stop();
+        _animation?.Dispose();
         target = Math.Clamp(target, 0, Math.Max(0, Scroller.Extent.Height - Scroller.Viewport.Height));
         _autoScrollUntil = DateTime.UtcNow.AddMilliseconds(300);
         Scroller.Offset = new Vector(0, target);
@@ -276,7 +276,7 @@ public partial class NovelTextView : UserControl
 
     private void ScrollTo(double target)
     {
-        _animation?.Stop();
+        _animation?.Dispose();
         target = Math.Clamp(target, 0, Math.Max(0, Scroller.Extent.Height - Scroller.Viewport.Height));
         var start = Scroller.Offset.Y;
         if (Math.Abs(target - start) > Scroller.Viewport.Height * 3)
@@ -287,13 +287,13 @@ public partial class NovelTextView : UserControl
         var began = DateTime.UtcNow;
         var duration = TimeSpan.FromMilliseconds(280);
         _autoScrollUntil = began + duration + TimeSpan.FromMilliseconds(200);
-        _animation = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, (_, _) =>
+        // In step with the screen (MotionClock), until it is there.
+        _animation = Helm.Core.Ui.MotionClock.Run(Scroller, _ =>
         {
             var t = Math.Min(1, (DateTime.UtcNow - began) / duration);
             var eased = 1 - Math.Pow(1 - t, 3);
             Scroller.Offset = new Vector(0, start + (target - start) * eased);
-            if (t >= 1) _animation?.Stop();
+            return t < 1;
         });
-        _animation.Start();
     }
 }

@@ -27,6 +27,7 @@ public partial class ShellView : UserControl
     private readonly TranslateTransform _drawerShift = new();
     private Rect _canvas;
     private bool _narrow;
+    private double? _reserved;
 
     /// <summary>For the XAML loader and the previewer only.</summary>
     public ShellView() => InitializeComponent();
@@ -44,6 +45,7 @@ public partial class ShellView : UserControl
         Menu.Peek.Watch(TitleBar.MenuTrigger);
         Scrim.PointerPressed += (_, _) => shell.Menu.IsDrawerOpen = false;
         TitleBar.TabsButton.Click += (_, _) => TabSwitcher.Show(TitleBar.TabsButton, _strip);
+        _reserved = shell.Menu.ReservedWidth;
         _strip.PropertyChanged += OnStripChanged;
         shell.Menu.PropertyChanged += OnMenuChanged;
         AddHandler(KeyDownEvent, OnKey, RoutingStrategies.Tunnel);
@@ -92,6 +94,13 @@ public partial class ShellView : UserControl
 
     private void OnMenuChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(NavMenuViewModel.ReservedWidth) && _shell is not null)
+        {
+            // The page takes its new width at once and slides from where it was.
+            var width = _shell.Menu.ReservedWidth;
+            if (_reserved is { } was && !_narrow && IsMainWindow) Motion.SlideFrom(PageColumn, was - width);
+            _reserved = width;
+        }
         if (e.PropertyName is nameof(NavMenuViewModel.IsDrawerOpen) or nameof(NavMenuViewModel.ReservedWidth) or nameof(NavMenuViewModel.OpenWidth)) Layout();
     }
 
@@ -160,6 +169,13 @@ public partial class ShellView : UserControl
     /// <summary>The browser's keys: Ctrl+Tab / Ctrl+Shift+Tab switch tabs, Ctrl+W / Ctrl+F4 close one, Ctrl+F searches.</summary>
     private void OnKey(object? sender, KeyEventArgs e)
     {
+        // Ctrl+Alt+Shift+R: show what is redrawn (RenderDebug), to check that motion stays cheap.
+        if (e.Key == Key.R && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Shift))
+        {
+            RenderDebug.Toggle(TopLevel.GetTopLevel(this));
+            e.Handled = true;
+            return;
+        }
         if (_strip is null || e.KeyModifiers is not (KeyModifiers.Control or (KeyModifiers.Control | KeyModifiers.Shift))) return;
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         switch (e.Key)

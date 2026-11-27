@@ -89,16 +89,6 @@
         </Style>
         <Style Selector="ic|SymbolIcon.syncglyph.turning">
             <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
-            <Style.Animations>
-                <Animation Duration="0:0:1.1" IterationCount="Infinite">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="RotateTransform.Angle" Value="0" />
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="RotateTransform.Angle" Value="360" />
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
         </Style>
 
         <Style Selector=":is(UserControl).narrow Border#SearchArea">
@@ -175,13 +165,10 @@
                 <!-- Sync: its state at a glance on every page; click to sync now (or to set it up). -->
                 <Button x:Name="SyncButton" Classes="bar" DataContext="{Binding Sync}" Command="{Binding SyncNowCommand}"
                         ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="Sync now" AutomationProperties.HelpText="{Binding ToolTip}">
+                    <!-- It turns on the compositor (core:Motion.Spin): only the glyph is drawn again while it turns. -->
                     <ic:SymbolIcon x:Name="SyncGlyph" Symbol="ArrowSync" Width="20" Height="20" FontSize="18" Classes="syncglyph"
-                                   RenderTransformOrigin="50%,50%" Classes.turning="{Binding IsTurning}" Classes.done="{Binding JustSynced}"
-                                   Classes.muted="{Binding IsMuted}" Classes.problem="{Binding HasProblem}">
-                        <ic:SymbolIcon.RenderTransform>
-                            <RotateTransform />
-                        </ic:SymbolIcon.RenderTransform>
-                    </ic:SymbolIcon>
+                                   core:Motion.Spin="{Binding IsTurning}" Classes.turning="{Binding IsTurning}" Classes.done="{Binding JustSynced}"
+                                   Classes.muted="{Binding IsMuted}" Classes.problem="{Binding HasProblem}" />
                 </Button>
                 <!-- Report a bug (also Ctrl+Alt+F12 anywhere, and the tray menu): the black box freezes as it opens. -->
                 <Button x:Name="BugButton" Classes="bar" Command="{Binding ReportBugCommand}" ToolTip.Tip="Report a bug (Ctrl+Alt+F12)"

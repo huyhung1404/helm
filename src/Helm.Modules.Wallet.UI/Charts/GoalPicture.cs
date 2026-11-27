@@ -5,7 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using Avalonia.Threading;
+using Helm.Core.Ui;
 
 namespace Helm.Modules.Wallet.Ui;
 
@@ -30,8 +30,7 @@ public sealed class GoalPicture : Control
     public static readonly StyledProperty<double> CornerRadiusProperty = AvaloniaProperty.Register<GoalPicture, double>(nameof(CornerRadius));
 
     private double _shown = -1;
-    private DispatcherTimer? _timer;
-    private DateTime _last;
+    private IDisposable? _moving;
 
     static GoalPicture()
     {
@@ -97,29 +96,22 @@ public sealed class GoalPicture : Control
 
     private void StartMoving()
     {
-        if (_timer is not null) return;
-        _last = DateTime.UtcNow;
-        _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, (_, _) =>
+        _moving ??= MotionClock.Run(this, seconds =>
         {
-            var now = DateTime.UtcNow;
-            var seconds = Math.Min(0.1, (now - _last).TotalSeconds);
-            _last = now;
             var target = Target;
             _shown += (target - _shown) * Math.Min(1, seconds * 4.5);
-            if (Math.Abs(target - _shown) < 0.002)
-            {
-                _shown = target;
-                StopMoving();
-            }
+            var resting = Math.Abs(target - _shown) < 0.002;
+            if (resting) _shown = target;
             InvalidateVisual();
+            if (resting) _moving = null;
+            return !resting;
         });
-        _timer.Start();
     }
 
     private void StopMoving()
     {
-        _timer?.Stop();
-        _timer = null;
+        _moving?.Dispose();
+        _moving = null;
     }
 
     public override void Render(DrawingContext context)

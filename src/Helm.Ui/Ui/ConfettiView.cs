@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Media;
-using Avalonia.Threading;
 
 namespace Helm.Core.Ui;
 
@@ -22,15 +21,13 @@ public sealed class ConfettiView : Canvas
     private static readonly TimeSpan Length = TimeSpan.FromSeconds(3.2);
 
     private readonly List<Piece> _pieces = [];
-    private readonly DispatcherTimer _timer;
-    private DateTime _startedAt;
-    private DateTime _last;
+    private IDisposable? _moving;
+    private double _age;
 
     public ConfettiView()
     {
         IsHitTestVisible = false;
         ClipToBounds = false;
-        _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, (_, _) => Tick());
     }
 
     /// <summary>Starts a burst (more pieces for <paramref name="big"/>).</summary>
@@ -50,15 +47,16 @@ public sealed class ConfettiView : Canvas
                 RadiusY = 1.5,
                 Fill = new SolidColorBrush(Palette[random.Next(Palette.Length)]),
                 RenderTransformOrigin = RelativePoint.Center,
-                RenderTransform = new RotateTransform(random.Next(360)),
+                // Moved by its transform only (never Canvas.Left/Top): no layout while it falls.
+                RenderTransform = new TransformGroup { Children = { new RotateTransform(random.Next(360)), new TranslateTransform(width / 2, 10) } },
             };
             var angle = (-90 + (random.NextDouble() - 0.5) * 140) * Math.PI / 180;
             var speed = 260 + random.NextDouble() * 420;
             _pieces.Add(new Piece(shape, width / 2, 10, Math.Cos(angle) * speed, Math.Sin(angle) * speed, (random.NextDouble() - 0.5) * 720));
             Children.Add(shape);
         }
-        _startedAt = _last = DateTime.UtcNow;
-        _timer.Start();
+        _age = 0;
+        _moving = MotionClock.Run(this, Tick);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -67,34 +65,36 @@ public sealed class ConfettiView : Canvas
         base.OnDetachedFromVisualTree(e);
     }
 
-    private void Tick()
+    /// <summary>One frame; false once the burst is over.</summary>
+    private bool Tick(double dt)
     {
-        var now = DateTime.UtcNow;
-        var dt = Math.Min((now - _last).TotalSeconds, 0.05);
-        _last = now;
-        var age = now - _startedAt;
-        if (age > Length)
+        dt = Math.Min(dt, 0.05);
+        _age += dt;
+        if (_age > Length.TotalSeconds)
         {
             Stop();
-            return;
+            return false;
         }
-        var fade = age.TotalSeconds > Length.TotalSeconds - 0.8 ? (Length.TotalSeconds - age.TotalSeconds) / 0.8 : 1;
+        var fade = _age > Length.TotalSeconds - 0.8 ? (Length.TotalSeconds - _age) / 0.8 : 1;
         foreach (var p in _pieces)
         {
             p.VelocityY += 900 * dt;
             p.VelocityX *= 1 - 1.2 * dt;
             p.X += p.VelocityX * dt;
             p.Y += p.VelocityY * dt;
-            ((RotateTransform)p.Shape.RenderTransform!).Angle += p.Spin * dt;
-            SetLeft(p.Shape, p.X);
-            SetTop(p.Shape, p.Y);
+            var moves = ((TransformGroup)p.Shape.RenderTransform!).Children;
+            ((RotateTransform)moves[0]).Angle += p.Spin * dt;
+            ((TranslateTransform)moves[1]).X = p.X;
+            ((TranslateTransform)moves[1]).Y = p.Y;
             p.Shape.Opacity = fade;
         }
+        return true;
     }
 
     private void Stop()
     {
-        _timer.Stop();
+        _moving?.Dispose();
+        _moving = null;
         _pieces.Clear();
         Children.Clear();
     }

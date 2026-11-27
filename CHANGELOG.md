@@ -13,6 +13,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - **Searching starts as you type**, in the title bar and in every tool's search, also while Helm Keyboard is still
   composing a word (before, it waited for Enter).
 - **Scratch on the phone**: the search has its own row, the buttons under it, so it is never squeezed.
+- **Motion no longer slows Helm down.** Turning glyphs and loading placeholders run on the graphics thread and stop while
+  hidden (Vocabulary's busy glyphs turned even when hidden); a fund jar's water moves for a moment after a change, then
+  rests (it moved forever); opening or closing the menu lays the page out once and slides it, instead of every frame; a
+  page fades in as one picture.
 
 ### Changed
 - **The tool pages no longer show today's date** at the top (PC and phone): only the counts stay, when there are any.
@@ -23,6 +27,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - **Android: Quick Capture has the new look**: the same page as on the PC, with the share sheet and the Quick Settings
   tile where the PC has its shortcut.
 - **Android: the menu has no scrollbar.**
+- **Show what is redrawn** (General › Help & troubleshooting, or Ctrl+Alt+Shift+R on the PC): flashes what each frame
+  draws, with the frame rate, to check that the app stays smooth.
 
 ## [0.93.0] - 2026-11-26
 

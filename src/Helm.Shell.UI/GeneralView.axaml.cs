@@ -23,6 +23,9 @@ public partial class GeneralView : UserControl
         DataContext = viewModel;
         InitializeComponent();
         viewModel.Refresh();
+        // Show what is redrawn: a view concern, for this window and this run only (Ctrl+Alt+Shift+R does the same).
+        RedrawSwitch.IsCheckedChanged += (_, _) => RenderDebug.Set(TopLevel.GetTopLevel(this), RedrawSwitch.IsChecked == true);
+        AttachedToVisualTree += (_, _) => RedrawSwitch.IsChecked = RenderDebug.IsOn(TopLevel.GetTopLevel(this));
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
