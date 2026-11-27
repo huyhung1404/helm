@@ -92,6 +92,21 @@ public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandl
     {
         RefreshWidgets();
         WarnFunds();
+        ClearFiled();
+    }
+
+    /// <summary>A transaction filed elsewhere (Fairy, the PC) no longer asks "what was it?" here.</summary>
+    private void ClearFiled()
+    {
+        try
+        {
+            WalletNotifications.ClearFiled(AndroidApp.Context, _store);
+        }
+        catch (Exception ex)
+        {
+            // Timer callback: never let an exception escape.
+            _logger.LogWarning(ex, "Could not clear the questions of filed transactions");
+        }
     }
 
     /// <summary>A fund that got worse (past its warning share, used up, over) warns once per level and month.</summary>

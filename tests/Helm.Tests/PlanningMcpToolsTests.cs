@@ -54,7 +54,7 @@ public sealed class PlanningMcpToolsTests
             Assert.DoesNotContain("delete", tool.Name);
         }
         var readers = tools.Where(t => t.ReadOnly).Select(t => t.Name).Order().ToList();
-        Assert.Equal(["mission_get", "missions_list", "notes_read", "notes_search", "tracker_lists", "tracker_tasks", "wallet_debts", "wallet_summary"], readers);
+        Assert.Equal(["mission_get", "missions_list", "notes_read", "notes_search", "tracker_lists", "tracker_tasks", "wallet_debts", "wallet_summary", "wallet_unfiled"], readers);
     }
 
     [Fact]

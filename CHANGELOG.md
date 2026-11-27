@@ -3,6 +3,17 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Fairy can file your new transactions.** A new agent tool, `wallet_unfiled`, lists the transactions waiting for a
+  category, with the categories that fit, the ones you filed like them and the history's sure pick; Fairy files them
+  through `wallet_update_transaction` (Undo works as before).
+
+### Changed
+- **Android: a transaction filed elsewhere stops asking "what was it?"** When a sync brings a transaction that Fairy or
+  the PC filed, its question on the phone goes away.
+
 ## [0.94.1] - 2026-11-27
 
 ### Fixed

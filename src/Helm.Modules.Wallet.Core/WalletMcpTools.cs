@@ -87,6 +87,16 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
             BriefArgs = new Dictionary<string, string> { ["from"] = "2026-11-01; default the 1st of this month", ["to"] = "default today" },
             BriefResult = McpTool.Drop("currency"),
         },
+        new("wallet_unfiled",
+            "Transactions waiting for a category (newest first), each with what is needed to file it: the categories that fit it, " +
+            "how the user filed transactions like it, and the category the history is sure of, if any. File one with " +
+            "wallet_update_transaction, using one of its categories exactly as listed.",
+            McpArgs.Schema(("limit", McpArgs.Number($"How many at most (default {UnfiledLimit})."), false)),
+            (args, _) => Task.FromResult<object?>(Unfiled(args)))
+        {
+            ReadOnly = true,
+            Brief = "Transactions waiting for a category, with the categories that fit, like ones filed, and the history's sure pick.",
+        },
         .. funds is null ? Array.Empty<McpTool>() :
         [
             new("wallet_funds", "This month's funds (money set aside per category): what each held, spent, has left, and whether it runs low, is used up or over.",
@@ -107,6 +117,41 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
             status = s.Status switch { FundStatus.Low => "low", FundStatus.UsedUp => "used up", FundStatus.Over => "over", _ => "on track" },
             runsOutOn = s.RunsOutOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
         }).ToList();
+    }
+
+    private const int UnfiledLimit = 20;
+
+    /// <summary>
+    /// What an agent needs to file the transactions waiting for a category, as <see cref="WalletCategoryAi"/> asks it:
+    /// the categories that fit (spending or money in), up to <see cref="WalletCategoryAi.Examples"/> filed ones like it,
+    /// and the history's category when it is sure (no AI needed then).
+    /// </summary>
+    private object Unfiled(JsonElement args)
+    {
+        var zone = TimeZoneInfo.Local;
+        var limit = Math.Clamp(McpArgs.Int(args, "limit") ?? UnfiledLimit, 1, 100);
+        var waiting = store.Uncategorized();
+        return new
+        {
+            total = waiting.Count,
+            transactions = waiting.Take(limit).Select(t => new
+            {
+                id = t.Id,
+                amount = t.Value.Amount,
+                at = TimeZoneInfo.ConvertTime(t.Value.OccurredAt, zone).ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture),
+                weekday = TimeZoneInfo.ConvertTime(t.Value.OccurredAt, zone).DayOfWeek.ToString(),
+                bank = t.Value.Bank.Length > 0 ? t.Value.Bank : null,
+                description = t.Value.Description,
+                categories = store.Categories().Where(c => c.Fits(t.Value.Amount)).Select(c => c.Name).ToList(),
+                alike = store.SimilarFiled(t.Value, WalletCategoryAi.Examples).Select(a => new
+                {
+                    amount = a.Amount,
+                    description = a.Description,
+                    category = store.Category(a.CategoryId!)?.Name,
+                }).ToList(),
+                sure = store.Guess(t.Value, t.Id) is { IsSure: true } g ? store.Category(g.CategoryId)?.Name : null,
+            }).ToList(),
+        };
     }
 
     private object Summary(JsonElement args)

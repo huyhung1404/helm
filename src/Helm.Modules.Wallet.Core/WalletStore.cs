@@ -89,6 +89,13 @@ public sealed class WalletStore
     public IReadOnlyList<SyncedItem<WalletTransaction>> Uncategorized() => Transactions().Where(t => !t.Value.IsCategorized).ToList();
 
     /// <summary>
+    /// The filed transactions that happened since <paramref name="since"/>, newest first: the ones whose "what was it?"
+    /// question may still be shown although someone filed them elsewhere (Fairy, the PC, through a sync).
+    /// </summary>
+    public IReadOnlyList<string> FiledSince(DateTimeOffset since) =>
+        Transactions().TakeWhile(t => t.Value.OccurredAt >= since).Where(t => t.Value.IsCategorized).Select(t => t.Id).ToList();
+
+    /// <summary>
     /// Saves a transaction read from a notification, unless it is already saved. With <paramref name="autoCategorize"/>,
     /// a transaction whose description is the same as earlier ones that all went in one category goes there too.
     /// </summary>

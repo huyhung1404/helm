@@ -195,6 +195,24 @@ internal static class WalletNotifications
         if (context.GetSystemService(Context.NotificationService) is NotificationManager manager) manager.Cancel(NotificationId(GapKey(gap)));
     }
 
+    /// <summary>How far back a "what was it?" question may still be shown.</summary>
+    internal static readonly TimeSpan AskedWithin = TimeSpan.FromDays(3);
+
+    /// <summary>
+    /// The "what was it?" notifications of transactions someone filed elsewhere (Fairy, the PC: a synced change) go away,
+    /// as if the user had answered them.
+    /// </summary>
+    public static void ClearFiled(Context context, WalletStore store)
+    {
+        if (context.GetSystemService(Context.NotificationService) is not NotificationManager manager) return;
+        var shown = manager.GetActiveNotifications()?.Select(n => n.Id).ToHashSet();
+        if (shown is not { Count: > 0 }) return;
+        foreach (var id in store.FiledSince(store.Now - AskedWithin))
+        {
+            if (shown.Contains(NotificationId(id))) manager.Cancel(NotificationId(id));
+        }
+    }
+
     public static void Cancel(Context context, string transactionId)
     {
         if (context.GetSystemService(Context.NotificationService) is NotificationManager manager) manager.Cancel(NotificationId(transactionId));

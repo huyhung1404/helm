@@ -65,7 +65,7 @@ public sealed class McpTests
 
         var readOnly = await Server(readOnly: true).HandleAsync("""{"jsonrpc":"2.0","id":1,"method":"tools/list"}""", default);
         var names = readOnly!["result"]!["tools"]!.AsArray().Select(t => t!["name"]!.GetValue<string>()).ToList();
-        Assert.Equal(["notes_read", "notes_search", "tracker_lists", "tracker_tasks", "wallet_debts", "wallet_summary"], names);
+        Assert.Equal(["notes_read", "notes_search", "tracker_lists", "tracker_tasks", "wallet_debts", "wallet_summary", "wallet_unfiled"], names);
     }
 
     [Fact]
