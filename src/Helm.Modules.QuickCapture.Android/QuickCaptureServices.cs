@@ -7,6 +7,5 @@ public static class QuickCaptureServices
 {
     public static IServiceCollection AddQuickCaptureModule(this IServiceCollection services) =>
         services
-            .AddAndroidModule<QuickCaptureModule, QuickCapturePage>()
-            .AddSingleton<QuickCaptureViewModel>();
+            .AddAndroidModule<QuickCaptureModule, QuickCapturePage>();
 }

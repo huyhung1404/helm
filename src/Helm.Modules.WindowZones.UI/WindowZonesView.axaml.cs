@@ -191,10 +191,8 @@ public partial class WindowZonesView : UserControl
         if (_viewModel is null || _module is null || _host is null) return;
         var zones = _viewModel.Zones.Count;
         var windows = _viewModel.Zones.Sum(z => z.Windows.Count);
-        var day = DateTime.Now.ToString("dddd d MMMM", CultureInfo.InvariantCulture);
-        TodayLine.Text = zones == 0
-            ? day.ToUpperInvariant()
-            : $"{day} · {Count(zones, "zone")} · {Count(windows, "window")}".ToUpperInvariant();
+        TodayLine.Text = zones == 0 ? "" : $"{Count(zones, "zone")} · {Count(windows, "window")}".ToUpperInvariant();
+        TodayLine.IsVisible = TodayLine.Text.Length > 0;
         StepDrop.Text = $"Hold {_viewModel.DragKeyName} while dragging a window";
         var monitors = _host.Monitors();
         Overview.Session = monitors.Count == 0 ? null : new EditorSession(_module.Data, monitors, monitors[0]);

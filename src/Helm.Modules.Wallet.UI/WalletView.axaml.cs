@@ -74,12 +74,12 @@ public partial class WalletView : UserControl
         Classes.Set("narrow", narrow);
         Page.Margin = narrow ? new Thickness(16, 18, 16, 28) : new Thickness(40, 28, 40, 40);
         MenuRow.IsVisible = _host?.OpenMenu is not null;
-        // Tabs and gear beside today's line on a wide page, on their own line under it on a phone (still on the right).
+        // Tabs and gear beside today's line on a wide page, on their own line under it on a phone, on the left (as on every page).
         Grid.SetColumn(Tabs, narrow ? 0 : 1);
         Grid.SetRow(Tabs, narrow ? 1 : 0);
         Grid.SetColumnSpan(Tabs, narrow ? 2 : 1);
         Tabs.Margin = narrow ? new Thickness(0, 12, 0, 0) : default;
-        Tabs.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;
+        Tabs.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
     }
 
     /// <summary>Each tab replaces the whole page under the tabs, from its title down, and scrolls to the top.</summary>
@@ -200,9 +200,8 @@ public partial class WalletView : UserControl
     private void UpdateTodayLine()
     {
         if (_viewModel is null) return;
-        var parts = new List<string> { DateTime.Now.ToString("dddd d MMMM", CultureInfo.CurrentCulture) };
-        if (_viewModel.HasToCategorize) parts.Add(_viewModel.ToCategorizeTitle);
-        TodayLine.Text = string.Join(" · ", parts).ToUpper(CultureInfo.CurrentCulture);
+        TodayLine.Text = _viewModel.HasToCategorize ? _viewModel.ToCategorizeTitle.ToUpper(CultureInfo.CurrentCulture) : "";
+        TodayLine.IsVisible = TodayLine.Text.Length > 0;
     }
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)

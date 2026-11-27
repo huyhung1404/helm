@@ -30,7 +30,6 @@ public sealed class ScratchContentPage : UserControl, IFullPage, IScratchPageHos
 
     public string AddHint => "Tip: in Gallery or any app, tap Share → Helm Scratch to put photos, videos and files here.";
 
-    public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
 
     /// <summary>The phone's clipboard: files or pictures another app copied (content URIs), else its text.</summary>
     public async Task PasteAsync()

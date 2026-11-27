@@ -10,7 +10,7 @@ public sealed class SyncIndicatorTests
     public async Task Not_set_up_opens_the_settings_and_set_up_syncs_now()
     {
         var sync = new FakeSync(new SyncStatus(SyncState.NotConfigured, null, null));
-        var vm = new SyncIndicatorViewModel(sync, new Inline());
+        var vm = new SyncIndicatorViewModel(sync, new Inline(), turnFor: TimeSpan.Zero);
         var opened = 0;
         vm.OpenSettings = () => opened++;
         Assert.True(vm.IsNotSetUp);
@@ -47,6 +47,22 @@ public sealed class SyncIndicatorTests
         sync.Set(new SyncStatus(SyncState.Syncing, null, null));
         Assert.True(vm.IsSyncing);
         Assert.False(vm.IsSynced);
+    }
+
+    [Fact]
+    public async Task A_click_turns_the_glyph_at_least_once_even_when_the_sync_is_instant()
+    {
+        var sync = new FakeSync(new SyncStatus(SyncState.Idle, DateTimeOffset.Now, null));
+        var vm = new SyncIndicatorViewModel(sync, new Inline(), turnFor: TimeSpan.FromMilliseconds(150));
+        Assert.False(vm.IsTurning);
+
+        var click = vm.SyncNowCommand.ExecuteAsync(null);
+        Assert.True(vm.IsTurning); // the sync is already over (FakeSync), the glyph still turns
+        Assert.False(vm.IsSyncing);
+        await click;
+
+        Assert.False(vm.IsTurning);
+        Assert.Equal(1, sync.Runs);
     }
 
     [Fact]

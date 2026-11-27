@@ -38,7 +38,6 @@ internal sealed class ToolWindowView : UserControl
         bar.Children.Add(BarButton(Symbol.ArrowMinimize, "Move to main window", 1, moveToMain));
         bar.Children.Add(BarButton(Symbol.Dismiss, "Close window", 2, close));
         DockPanel.SetDock(bar, Dock.Top);
-        bar.IsVisible = !PageViews.IsFull(tab);
 
         var page = new Border
         {

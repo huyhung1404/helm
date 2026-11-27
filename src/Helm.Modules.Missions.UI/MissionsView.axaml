@@ -51,7 +51,7 @@
 
                 <!-- Today, and which view -->
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                    <TextBlock Classes="eyebrow" Text="{Binding TodayLine, Converter={x:Static core:UpperCase.Instance}}" VerticalAlignment="Center"
+                    <TextBlock Classes="eyebrow" Text="{Binding TodayLine, Converter={x:Static core:UpperCase.Instance}}" IsVisible="{Binding TodayLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" VerticalAlignment="Center"
                                TextWrapping="Wrap" Margin="0,0,12,0" />
                     <StackPanel x:Name="Tabs" Grid.Column="1" Orientation="Horizontal" Spacing="8">
                         <Border Classes="glass" Padding="3" CornerRadius="10" BoxShadow="" IsVisible="{Binding HasMissions}">

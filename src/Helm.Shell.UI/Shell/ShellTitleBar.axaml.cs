@@ -20,6 +20,37 @@ public partial class ShellTitleBar : UserControl
         SearchBox.GotFocus += (_, _) => Model?.Search.Reopen();
         SearchBox.LostFocus += (_, _) => Model?.Search.CloseCommand.Execute(null);
         SearchArea.SizeChanged += (_, e) => Results.Width = e.NewSize.Width;
+        MinimizeButton.Click += (_, _) => { if (Window is { } w) w.WindowState = WindowState.Minimized; };
+        MaximizeButton.Click += (_, _) =>
+        {
+            if (Window is { } w) w.WindowState = w.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        };
+        CloseButton.Click += (_, _) => Window?.Close();
+    }
+
+    private Window? _window;
+
+    private Window? Window => TopLevel.GetTopLevel(this) as Window;
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _window = Window;
+        if (_window is null) return;
+        _window.PropertyChanged += OnWindowPropertyChanged;
+        SetMaximized(_window.WindowState == WindowState.Maximized);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_window is not null) _window.PropertyChanged -= OnWindowPropertyChanged;
+        _window = null;
+    }
+
+    private void OnWindowPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == Window.WindowStateProperty) SetMaximized(e.GetNewValue<WindowState>() == WindowState.Maximized);
     }
 
     private ShellViewModel? Model => DataContext as ShellViewModel;
@@ -56,7 +87,8 @@ public partial class ShellTitleBar : UserControl
     public void SetMaximized(bool maximized)
     {
         MaximizeGlyph.Symbol = maximized ? Symbol.SquareMultiple : Symbol.Maximize;
-        ToolTip.SetTip((Control)MaximizeGlyph.Parent!, maximized ? "Restore" : "Maximize");
+        ToolTip.SetTip(MaximizeButton, maximized ? "Restore" : "Maximize");
+        Avalonia.Automation.AutomationProperties.SetName(MaximizeButton, maximized ? "Restore" : "Maximize");
     }
 
     /// <summary>Ctrl+F puts the cursor in the search box.</summary>

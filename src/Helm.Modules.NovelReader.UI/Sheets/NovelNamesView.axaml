@@ -37,7 +37,7 @@
 
         <!-- SAVED -->
         <StackPanel x:Name="SavedPanel" Spacing="10" core:Motion.EnterOnShow="True">
-            <TextBox Classes="glass" Text="{Binding EntryFilter}" PlaceholderText="Search names" AutomationProperties.Name="Search names" />
+            <TextBox Classes="glass" core:TypingText.Text="{Binding EntryFilter}" PlaceholderText="Search names" AutomationProperties.Name="Search names" />
             <Grid x:Name="FileButtons" ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="False">
                 <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Export" Click="Export_Click"
                         ToolTip.Tip="This novel's names as a QuickTranslator Names.txt" />

@@ -291,10 +291,8 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public bool HasUpNext => UpNext is not null;
 
-    /// <summary>The line above the page title: today's date and what is open, e.g. "Wednesday, 25 November · 4 open".</summary>
-    public string TodayLine =>
-        $"{TimeZoneInfo.ConvertTime(_store.Now, TimeZoneInfo.Local).ToString("dddd, d MMMM", System.Globalization.CultureInfo.CurrentCulture)}"
-        + (SelectedWorkspace is null ? "" : $" · {OpenSummary}");
+    /// <summary>The line above the page title: what is open, e.g. "4 open" (empty with no list).</summary>
+    public string TodayLine => SelectedWorkspace is null ? "" : OpenSummary;
 
     public bool HasWorkspaces => Workspaces.Count > 0;
     public bool HasNoWorkspaces => Workspaces.Count == 0;

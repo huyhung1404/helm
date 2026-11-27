@@ -131,8 +131,6 @@ public sealed partial class HomeViewModel(IHomeHost host, string version, TimePr
 
     public bool IsAllClear => !HasAlerts && !HasToday;
 
-    public string DateLine => _time.GetLocalNow().ToString("dddd, d MMMM", CultureInfo.CurrentCulture);
-
     public string Greeting => _time.GetLocalNow().Hour switch
     {
         < 5 => "Good night",

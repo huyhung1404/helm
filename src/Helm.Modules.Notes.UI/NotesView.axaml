@@ -157,7 +157,7 @@
                 <Border Grid.Column="1" Classes="glass" Padding="14,0,6,0" BoxShadow="">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                         <ic:SymbolIcon Symbol="Search" FontSize="16" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
-                        <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search notes (Ctrl+F)" Text="{Binding Search}"
+                        <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search notes (Ctrl+F)" core:TypingText.Text="{Binding Search}"
                                  VerticalContentAlignment="Center" MinHeight="40" AutomationProperties.Name="Search notes" />
                         <Button Grid.Column="2" Classes="flat" Width="32" Height="32" Padding="0" HorizontalContentAlignment="Center"
                                 Command="{Binding ClearSearchCommand}" IsVisible="{Binding IsSearching}" ToolTip.Tip="Clear the search"

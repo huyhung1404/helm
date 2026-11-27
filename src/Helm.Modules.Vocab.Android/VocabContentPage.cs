@@ -39,7 +39,6 @@ public sealed class VocabContentPage : UserControl, IFullPage, IVocabPageHost
         Content = _view;
     }
 
-    public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
 
     public string AddHint => "Several at once with commas. From any app: select the text, then choose Add word.";
 

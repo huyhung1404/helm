@@ -79,9 +79,10 @@ public partial class TrackerView : UserControl
         Grid.SetColumn(DaysBox, narrow ? 0 : 2);
         Grid.SetColumnSpan(DaysBox, narrow ? 2 : 1);
         Grid.SetRow(DaysBox, narrow ? 2 : 1);
-        // Tabs on the right, like the other screens, on a phone too (own line under the date).
+        // Tabs beside the date on a wide page; on a phone on their own line under it, on the left (as on every page).
         Grid.SetColumnSpan(Tabs, narrow ? 2 : 1);
-        Tabs.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;        // Lists are added in the settings (the gear); only a phone keeps a quick "New list" at the end of the row.
+        Tabs.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
+        // Lists are added in the settings (the gear); only a phone keeps a quick "New list" at the end of the row.
         NewListButton.IsVisible = narrow;
         if (!narrow) NewListBox.IsVisible = false;
         // First run: the three steps side by side on a wide page, one under the other on a phone.

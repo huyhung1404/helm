@@ -57,10 +57,14 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid>
+    <!-- ONE surface, as on Windows: Helm's background (ui:Backdrop) under the status bar, the app bar and the page; each
+         page paints its part of it lined up with this one (Backdrop.Canvas), so there is no seam. -->
+    <Panel x:Name="Root">
+    <ui:Backdrop />
+    <Grid x:Name="Body">
         <DockPanel>
             <!-- App bar: drawer button + page title (the Windows title bar + nav pane toggle) -->
-            <Grid x:Name="AppBar" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
+            <Grid x:Name="AppBar" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Height="56" Background="Transparent">
                 <!-- Report a bug (also by shaking the phone, or from the Quick Settings tile): the black box freezes as it opens. -->
                 <Button Grid.Column="2" Classes="flat" Width="48" Height="48" Padding="0" HorizontalContentAlignment="Center"
                         Command="{Binding ReportBugCommand}" ToolTip.Tip="Report a bug" AutomationProperties.Name="Report a bug">
@@ -88,7 +92,7 @@
                          syncing, green for a moment when a sync finishes, red on a problem, faded when offline or not set up.
                          The origin must be in percent: Avalonia reads "0.5,0.5" as pixels, which turned it around its corner. -->
                     <ic:SymbolIcon Symbol="ArrowSync" Width="24" Height="24" FontSize="22" Classes="syncglyph" RenderTransformOrigin="50%,50%"
-                                   Classes.turning="{Binding IsSyncing}" Classes.done="{Binding JustSynced}"
+                                   Classes.turning="{Binding IsTurning}" Classes.done="{Binding JustSynced}"
                                    Classes.muted="{Binding IsMuted}" Classes.problem="{Binding HasProblem}">
                         <ic:SymbolIcon.RenderTransform>
                             <RotateTransform />
@@ -99,7 +103,7 @@
 
             <Panel>
                 <!-- The shown page; MainView keeps the last few pages' views (PageViews), so going back to one is instant. -->
-                <Border x:Name="PageArea" Background="{DynamicResource HelmPageBackground}" CornerRadius="8,8,0,0" ClipToBounds="True" />
+                <Border x:Name="PageArea" ClipToBounds="True" />
 
                 <!-- Navigation drawer: slides in over the dimmed page (MainView animates it); tap the page to close it.
                      Long press a tool to open it in a window of its own. -->
@@ -133,7 +137,7 @@
                                 <Border Classes="navmark" IsVisible="{Binding GeneralEntry.IsActive}" />
                             </Panel>
                         </StackPanel>
-                        <ScrollViewer>
+                        <ScrollViewer VerticalScrollBarVisibility="Hidden">
                             <ItemsControl ItemsSource="{Binding Entries}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="vm:NavEntry">
@@ -199,4 +203,5 @@
             </Border>
         </Border>
     </Grid>
+    </Panel>
 </UserControl>

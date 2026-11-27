@@ -3,6 +3,27 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **The window buttons work again** on the PC: minimize, maximize (and restore) and close.
+- **Switching tabs is smooth.** Helm's background no longer drifts: it repainted the whole window 20 times a second, on
+  the PC and the phone. A page now fades in quickly instead of coming into focus through a blur.
+- **The sync button turns when you press it**, for at least a moment, even when the sync is over at once.
+- **Searching starts as you type**, in the title bar and in every tool's search, also while Helm Keyboard is still
+  composing a word (before, it waited for Enter).
+- **Scratch on the phone**: the search has its own row, the buttons under it, so it is never squeezed.
+
+### Changed
+- **The tool pages no longer show today's date** at the top (PC and phone): only the counts stay, when there are any.
+- **"Helm" in the title bar** uses the app's own type (larger, semibold) instead of the small window-title text.
+- **Android: the top bar is on every page**: the menu, the bug button and sync stay at the top of every tool, also Novel
+  Reader, Notes, Scratch and the other new pages, and the background fills the screen behind it (Home, General too).
+- **Android: the tabs of a tool sit on the left** on every page.
+- **Android: Quick Capture has the new look**: the same page as on the PC, with the share sheet and the Quick Settings
+  tile where the PC has its shortcut.
+- **Android: the menu has no scrollbar.**
+
 ## [0.93.0] - 2026-11-26
 
 Helm becomes a passive app: it shows and keeps your things, and Fairy does the automating through Helm's MCP tools.

@@ -58,12 +58,12 @@ public partial class MissionsView : UserControl
         Classes.Set("narrow", narrow);
         Page.Margin = narrow ? new Thickness(16, 18, 16, 28) : new Thickness(40, 28, 40, 40);
         MenuRow.IsVisible = _host?.OpenMenu is not null;
-        // Tabs and gear beside today's line on a wide page, on their own line under it on a phone (still on the right).
+        // Tabs and gear beside today's line on a wide page, on their own line under it on a phone, on the left (as on every page).
         Grid.SetColumn(Tabs, narrow ? 0 : 1);
         Grid.SetRow(Tabs, narrow ? 1 : 0);
         Grid.SetColumnSpan(Tabs, narrow ? 2 : 1);
         Tabs.Margin = narrow ? new Thickness(0, 12, 0, 0) : default;
-        Tabs.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;
+        Tabs.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
         // Today's cards: two side by side on a wide page, one under the other on a phone.
         foreach (var grid in TodayList.GetVisualDescendants().OfType<UniformGrid>()) grid.Columns = narrow ? 1 : 2;
     }

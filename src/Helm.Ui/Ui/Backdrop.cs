@@ -2,13 +2,12 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Styling;
-using Avalonia.Threading;
 
 namespace Helm.Core.Ui;
 
 /// <summary>
 /// The full-bleed background of a glass page (<see cref="BackdropSpec"/>): put it behind the page's content; frosted
-/// cards (Border.glass) sit on it. Inside the WPF shell the host sets <see cref="CanvasProperty"/> to the whole
+/// cards (Border.glass) sit on it. Inside the shell the host sets <see cref="CanvasProperty"/> to the whole
 /// window, so this page paints its part of the window's background and meets the shell's without a seam.
 /// </summary>
 public sealed class Backdrop : Panel
@@ -24,7 +23,6 @@ public sealed class Backdrop : Panel
     private readonly Border _base = new();
     private readonly List<Border> _glows = [];
     private BackdropSpec.Look _look = BackdropSpec.Dark;
-    private DispatcherTimer? _timer;
 
     static Backdrop() => AffectsArrange<Backdrop>(CanvasProperty);
 
@@ -35,7 +33,7 @@ public sealed class Backdrop : Panel
         Children.Add(_base);
         foreach (var _ in BackdropSpec.Dark.Glows)
         {
-            var glow = new Border { RenderTransform = new TranslateTransform() };
+            var glow = new Border();
             _glows.Add(glow);
             Children.Add(glow);
         }
@@ -45,18 +43,9 @@ public sealed class Backdrop : Panel
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        // The glows stand still: drifting them repainted the whole window (every card and shadow on it) 20 times a
+        // second, which made every page, and tab switching, sluggish (worst on a phone).
         Paint();
-        // The page breathes: the glows drift slowly (tens of seconds), in step with the shell's (same clock).
-        _timer = new DispatcherTimer(BackdropSpec.Tick, DispatcherPriority.Background, (_, _) => Move());
-        _timer.Start();
-        Move();
-    }
-
-    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        _timer?.Stop();
-        _timer = null;
-        base.OnDetachedFromVisualTree(e);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
@@ -66,18 +55,6 @@ public sealed class Backdrop : Panel
         var layer = canvas.Inflate(BackdropSpec.Bleed);
         foreach (var glow in _glows) glow.Arrange(layer);
         return finalSize;
-    }
-
-    private void Move()
-    {
-        var now = Environment.TickCount64;
-        for (var i = 0; i < _glows.Count; i++)
-        {
-            var (x, y) = BackdropSpec.Drift(_look.Glows[i], now);
-            var shift = (TranslateTransform)_glows[i].RenderTransform!;
-            shift.X = x;
-            shift.Y = y;
-        }
     }
 
     private void Paint()

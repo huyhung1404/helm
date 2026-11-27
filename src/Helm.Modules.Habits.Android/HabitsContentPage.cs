@@ -33,7 +33,6 @@ public sealed class HabitsContentPage : UserControl, IFullPage, IHabitsPageHost
         Content = _view;
     }
 
-    public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
 
     /// <summary>Asks for notifications (Android 13+, once) and catches today's reminder.</summary>
     public void Opened() => _module.PageShown();

@@ -60,12 +60,12 @@ public partial class SlackBotView : UserControl
         var narrow = e.NewSize.Width < Narrow;
         Classes.Set("narrow", narrow);
         Page.Margin = narrow ? new Thickness(16, 18, 16, 28) : new Thickness(40, 28, 40, 40);
-        // Tabs and gear beside today's line on a wide page, on their own line under it on a phone (still on the right).
+        // Tabs and gear beside today's line on a wide page, on their own line under it on a phone, on the left (as on every page).
         Grid.SetColumn(Tabs, narrow ? 0 : 1);
         Grid.SetRow(Tabs, narrow ? 1 : 0);
         Grid.SetColumnSpan(Tabs, narrow ? 2 : 1);
         Tabs.Margin = narrow ? new Thickness(0, 12, 0, 0) : default;
-        Tabs.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;
+        Tabs.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
         FirstRunSteps.Columns = narrow ? 1 : 3;
     }
 
@@ -175,10 +175,10 @@ public partial class SlackBotView : UserControl
     private void UpdateLines()
     {
         if (_inbox is null) return;
-        var day = DateTime.Now.ToString("dddd d MMMM", CultureInfo.InvariantCulture);
         TodayLine.Text = _settings?.HasTokens == false
-            ? day.ToUpperInvariant()
-            : $"{day} · {_inbox.ToDoCount} to do · {_inbox.KnowingCount} worth knowing".ToUpperInvariant();
+            ? ""
+            : $"{_inbox.ToDoCount} to do · {_inbox.KnowingCount} worth knowing".ToUpperInvariant();
+        TodayLine.IsVisible = TodayLine.Text.Length > 0;
         var handled = _inbox.Handled.Count;
         HandledHeader.IsVisible = handled > 0;
         HandledTitle.Text = handled == 1 ? "Handled today · 1" : $"Handled today · {handled}";

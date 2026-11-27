@@ -37,6 +37,7 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
     private readonly ISyncService _sync;
     private readonly IUiDispatcher _ui;
     private readonly TimeSpan _doneFor;
+    private readonly TimeSpan _turnFor;
     private int _doneRun;
 
     [ObservableProperty] private SyncState _state;
@@ -45,11 +46,12 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
     /// <summary>A sync just finished: the glyph is green for a moment, then back to its usual colour.</summary>
     [ObservableProperty] private bool _justSynced;
 
-    public SyncIndicatorViewModel(ISyncService sync, IUiDispatcher ui, TimeSpan? doneFor = null)
+    public SyncIndicatorViewModel(ISyncService sync, IUiDispatcher ui, TimeSpan? doneFor = null, TimeSpan? turnFor = null)
     {
         _sync = sync;
         _ui = ui;
         _doneFor = doneFor ?? TimeSpan.FromSeconds(1.5);
+        _turnFor = turnFor ?? TimeSpan.FromSeconds(1.1);
         _sync.StatusChanged += (_, _) => _ui.Post(Update);
         Update();
     }
@@ -58,6 +60,11 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
     public Action? OpenSettings { get; set; }
 
     public bool IsSyncing => State == SyncState.Syncing;
+
+    /// <summary>The glyph turns: while syncing, and for at least one turn after a click (a sync often ends too soon to see).</summary>
+    public bool IsTurning => IsSyncing || _clickTurn;
+
+    private bool _clickTurn;
 
     public bool IsSynced => State == SyncState.Idle;
 
@@ -81,6 +88,7 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
         else
             JustSynced = false;
         OnPropertyChanged(nameof(IsSyncing));
+        OnPropertyChanged(nameof(IsTurning));
         OnPropertyChanged(nameof(IsSynced));
         OnPropertyChanged(nameof(IsNotSetUp));
         OnPropertyChanged(nameof(IsOffline));
@@ -117,6 +125,16 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
             OpenSettings?.Invoke();
             return;
         }
-        await _sync.SyncNowAsync().ConfigureAwait(true);
+        _clickTurn = true;
+        OnPropertyChanged(nameof(IsTurning));
+        try
+        {
+            await Task.WhenAll(_sync.SyncNowAsync(), Task.Delay(_turnFor)).ConfigureAwait(true);
+        }
+        finally
+        {
+            _clickTurn = false;
+            OnPropertyChanged(nameof(IsTurning));
+        }
     }
 }

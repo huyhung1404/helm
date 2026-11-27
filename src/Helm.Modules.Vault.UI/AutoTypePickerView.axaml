@@ -18,7 +18,7 @@
             </Grid>
             <TextBlock FontSize="18" FontWeight="SemiBold" Text="Type which login?" />
 
-            <TextBox x:Name="SearchBox" Classes="glass" Text="{Binding Search}" PlaceholderText="Search the vault — Enter types the chosen login"
+            <TextBox x:Name="SearchBox" Classes="glass" core:TypingText.Text="{Binding Search}" PlaceholderText="Search the vault — Enter types the chosen login"
                      AutomationProperties.Name="Search the vault" />
 
             <TextBlock Classes="muted" Text="No login matches. Try another word." IsVisible="{Binding IsEmpty}" Margin="2,0" />

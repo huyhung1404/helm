@@ -3,7 +3,7 @@ namespace Helm.Core.Ui;
 /// <summary>
 /// A page that fills the shell's page area itself, edge to edge and without the shell's scrolling: it lays out its
 /// own fixed bars and scrolling parts (a conversation with its composer at the bottom, a terminal). The shell's app bar
-/// is hidden too, to leave a phone screen to the page; the page offers the menu (<see cref="ShellChrome.OpenNavigation"/>).
+/// (menu, bug, sync) stays above it, as on every page.
 /// </summary>
 public interface IFullPage;
 

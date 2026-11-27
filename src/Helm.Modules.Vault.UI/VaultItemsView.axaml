@@ -170,7 +170,7 @@
                 <Border x:Name="SearchBar" Classes="glass" Padding="14,6,6,6" VerticalAlignment="Top" Background="{DynamicResource HelmSheetBackground}">
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <ic:SymbolIcon Symbol="Search" FontSize="16" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search the vault" Text="{Binding Search}"
+                        <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search the vault" core:TypingText.Text="{Binding Search}"
                                  VerticalAlignment="Center" AutomationProperties.Name="Search" />
                         <Button Grid.Column="2" Classes="pill" Width="40" Height="40" MinHeight="40" Padding="0" VerticalAlignment="Center"
                                 Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Login}"

@@ -98,6 +98,14 @@ public partial class ScratchView : UserControl
         TopBar.Margin = new Thickness(side, _narrow ? 14 : 20, side, 12);
         TrashFab.Margin = new Thickness(0, 0, side, _narrow ? 20 : 28);
         MenuButton.IsVisible = _host?.OpenMenu is not null;
+        // The bar: one row on a wide page; on a phone the search on its own row, the buttons under it.
+        Grid.SetColumn(SearchCard, _narrow ? 0 : 1);
+        Grid.SetColumnSpan(SearchCard, _narrow ? 4 : 1);
+        TopBar.RowSpacing = _narrow ? 10 : 0;
+        Grid.SetColumn(AddActions, _narrow ? 0 : 2);
+        Grid.SetColumnSpan(AddActions, _narrow ? 3 : 1);
+        Grid.SetRow(AddActions, _narrow ? 1 : 0);
+        Grid.SetRow(SettingsButton, _narrow ? 1 : 0);
         FitUnderBar();
         if (Wall.ItemsPanelRoot is MasonryPanel wall) wall.MinColumnWidth = _narrow ? 150 : 220;
         // The title and the filters: side by side on a wide page, the filters under the title on a phone.

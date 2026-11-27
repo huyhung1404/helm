@@ -37,7 +37,6 @@ public sealed class WalletContentPage : UserControl, IFullPage, IWalletPageHost
         Content = _view;
     }
 
-    public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
 
     public string ExportText => "Share CSV";
 

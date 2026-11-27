@@ -23,6 +23,7 @@ public partial class MainView : UserControl
         InitializeComponent();
         _drawer = new DrawerController(Drawer, (TranslateTransform)Drawer.RenderTransform!, DrawerScrim, () => _viewModel);
         SheetScrim.PointerPressed += (_, _) => _viewModel?.HideSheetCommand.Execute(null);
+        LayoutUpdated += (_, _) => AlignPageBackdrop();
         DataContextChanged += (_, _) =>
         {
             if (_navigator is not null) _navigator.PropertyChanged -= OnNavigatorChanged;
@@ -69,8 +70,6 @@ public partial class MainView : UserControl
         // A view outlives its window when Android makes the activity again (the tabs are the app's, not the window's).
         if (tab.View.Parent is Decorator old) old.Child = null;
         PageArea.Child = tab.View;
-        // A page that lays itself out (fixed bars, its own scrolling) gets the whole area, without the app bar.
-        AppBar.IsVisible = !PageViews.IsFull(tab);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -122,7 +121,19 @@ public partial class MainView : UserControl
     /// Pads the shell clear of the status/navigation bars and cutout, once. The amount comes from Android itself (see
     /// <see cref="ContentInsets"/>), not from Avalonia's safe area, which could be read before edge to edge took effect.
     /// </summary>
-    private void UpdatePadding() => Padding = ContentInsets.Current;
+    private void UpdatePadding() => Body.Margin = ContentInsets.Current;
+
+    /// <summary>The page's own background spans the whole screen, lined up with the one behind the app bar.</summary>
+    private void AlignPageBackdrop()
+    {
+        if (PageArea.TranslatePoint(default, Root) is not { } at) return;
+        var canvas = new Rect(-at.X, -at.Y, Root.Bounds.Width, Root.Bounds.Height);
+        if (canvas == _canvas) return;
+        _canvas = canvas;
+        Helm.Core.Ui.Backdrop.SetCanvas(PageArea, canvas);
+    }
+
+    private Rect _canvas;
 
     private void OnBackRequested(object? sender, RoutedEventArgs e)
     {

@@ -275,16 +275,19 @@
             </ScrollViewer>
 
             <!-- The bar stays on top over the page's own background; the cards fade out under it -->
-            <Grid x:Name="TopBar" VerticalAlignment="Top" Margin="40,20,40,12" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+            <!-- Wide: one row (search, then the add buttons and the gear). Phone: the search has the whole first row, the buttons the
+                 one under it (on the left, the gear on the right), so the search is never squeezed. -->
+            <Grid x:Name="TopBar" VerticalAlignment="Top" Margin="40,20,40,12" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto"
+                  ColumnSpacing="10">
                 <!-- A phone's page has no app bar: the menu button opens the drawer -->
                 <Button x:Name="MenuButton" Classes="chip" Click="Menu_Click" IsVisible="False" VerticalAlignment="Center"
                         ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
                     <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
                 </Button>
-                <Border Grid.Column="1" Classes="glass" Padding="14,0,6,0" BoxShadow="">
+                <Border x:Name="SearchCard" Grid.Column="1" Classes="glass" Padding="14,0,6,0" BoxShadow="">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                         <ic:SymbolIcon Symbol="Search" FontSize="16" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
-                        <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search (Ctrl+F)" Text="{Binding Search}"
+                        <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search (Ctrl+F)" core:TypingText.Text="{Binding Search}"
                                  VerticalContentAlignment="Center" MinHeight="40" AutomationProperties.Name="Search Scratch" />
                         <Button Grid.Column="2" Classes="flat" Width="32" Height="32" Padding="0" HorizontalContentAlignment="Center"
                                 Command="{Binding ClearSearchCommand}" IsVisible="{Binding IsSearching}" ToolTip.Tip="Clear the search"
@@ -293,28 +296,30 @@
                         </Button>
                     </Grid>
                 </Border>
-                <Button x:Name="FilesButton" Grid.Column="2" Classes="pill" Command="{Binding AddFilesCommand}" IsEnabled="{Binding IsNotBusy}"
+                <StackPanel x:Name="AddActions" Grid.Column="2" Orientation="Horizontal" Spacing="10">
+                <Button x:Name="FilesButton" Classes="pill" Command="{Binding AddFilesCommand}" IsEnabled="{Binding IsNotBusy}"
                         ToolTip.Tip="Add files, photos or videos" AutomationProperties.Name="Add files">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <ic:SymbolIcon Symbol="Add" FontSize="14" Foreground="{DynamicResource HelmPillForeground}" />
                         <TextBlock Classes="label" Text="Files" Foreground="{DynamicResource HelmPillForeground}" />
                     </StackPanel>
                 </Button>
-                <Button x:Name="TextButton" Grid.Column="3" Classes="chip" Command="{Binding OpenTextBoxCommand}" IsEnabled="{Binding IsNotBusy}"
+                <Button x:Name="TextButton" Classes="chip" Command="{Binding OpenTextBoxCommand}" IsEnabled="{Binding IsNotBusy}"
                         ToolTip.Tip="Add a piece of text" AutomationProperties.Name="Add text">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ic:SymbolIcon Symbol="TextT" FontSize="16" />
                         <TextBlock Classes="label" Text="Text" />
                     </StackPanel>
                 </Button>
-                <Button x:Name="PasteButton" Grid.Column="4" Classes="chip" Click="Paste_Click" IsEnabled="{Binding IsNotBusy}"
+                <Button x:Name="PasteButton" Classes="chip" Click="Paste_Click" IsEnabled="{Binding IsNotBusy}"
                         ToolTip.Tip="Paste what you copied (Ctrl+V)" AutomationProperties.Name="Paste">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ic:SymbolIcon Symbol="ClipboardPaste" FontSize="16" />
                         <TextBlock Classes="label" Text="Paste" />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="5" Classes="chip" Click="Settings_Click" ToolTip.Tip="Scratch settings" AutomationProperties.Name="Scratch settings">
+                </StackPanel>
+                <Button x:Name="SettingsButton" Grid.Column="3" Classes="chip" Click="Settings_Click" ToolTip.Tip="Scratch settings" AutomationProperties.Name="Scratch settings">
                     <ic:SymbolIcon Symbol="Settings" FontSize="16" />
                 </Button>
             </Grid>

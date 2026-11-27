@@ -20,6 +20,4 @@ public sealed class NotesContentPage : UserControl, IFullPage, INotesPageHost
     }
 
     public NotesContentPage(NotesModule module, NotesViewModel viewModel) => Content = new NotesView(module, viewModel, this);
-
-    public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
 }

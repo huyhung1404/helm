@@ -78,4 +78,40 @@ public sealed class TextBoxTests
         Assert.Equal("•••", text);
         window.Close();
     }
+
+    private sealed class Query : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
+    {
+        private string _text = "";
+
+        public string Text
+        {
+            get => _text;
+            set => SetProperty(ref _text, value);
+        }
+    }
+
+    [AvaloniaFact]
+    public void A_search_follows_the_word_being_composed_without_typing_it_twice()
+    {
+        var (window, box) = Show();
+        var query = new Query();
+        box.DataContext = query;
+        box.Bind(TypingText.TextProperty, new Avalonia.Data.Binding(nameof(Query.Text)));
+        var presenter = Presenter(box);
+
+        // Helm Keyboard composes "việt": not in Text yet, but the search has it.
+        presenter.PreeditText = "việt";
+        Assert.Equal("việt", query.Text);
+        Assert.True(string.IsNullOrEmpty(box.Text));
+
+        // The word is done: it moves into Text, the search keeps the same words.
+        presenter.PreeditText = null;
+        box.Text = "việt";
+        Assert.Equal("việt", query.Text);
+
+        // The view model clears the search: the box empties.
+        query.Text = "";
+        Assert.True(string.IsNullOrEmpty(box.Text));
+        window.Close();
+    }
 }

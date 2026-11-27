@@ -176,7 +176,6 @@ public sealed class AndroidBugReporter(
     ISettingsStore<BugReportSettings>? IBugReportsPageHost.ShakeSettings => _settings;
 
     /// <summary>The page has no app bar on a phone: its menu button opens the drawer.</summary>
-    Action<Avalonia.Controls.Control>? IBugReportsPageHost.OpenMenu => Helm.Core.Ui.ShellChrome.OpenNavigation;
 
     void IBugReportFormHost.Close() => CloseReport();
 

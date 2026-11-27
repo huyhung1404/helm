@@ -119,8 +119,8 @@
                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="18,0,12,0" VerticalAlignment="Center">
                     <Image x:Name="TitleIcon" Width="18" Height="18" VerticalAlignment="Center" ToolTip.Tip="Menu"
                            RenderOptions.BitmapInterpolationMode="HighQuality" />
-                    <TextBlock x:Name="AppTitle" Text="{Binding AppName}" FontSize="12.5" VerticalAlignment="Center"
-                               Foreground="{DynamicResource HelmSecondaryText}" />
+                    <TextBlock x:Name="AppTitle" Text="{Binding AppName}" FontSize="15" FontWeight="SemiBold" LetterSpacing="0.2"
+                               VerticalAlignment="Center" />
                 </StackPanel>
             </Panel>
 
@@ -130,7 +130,7 @@
 
             <Border x:Name="SearchArea" Grid.Column="2" MaxWidth="520" HorizontalAlignment="Stretch" Margin="4,0,16,0">
                 <Panel>
-                    <TextBox x:Name="SearchBox" Classes="glass search" Text="{Binding Search.Query}" VerticalAlignment="Center"
+                    <TextBox x:Name="SearchBox" Classes="glass search" core:TypingText.Text="{Binding Search.Query}" VerticalAlignment="Center"
                              PlaceholderText="Search for settings" AutomationProperties.Name="Search for settings"
                              chrome:WindowDecorationProperties.ElementRole="User">
                         <TextBox.InnerLeftContent>
@@ -176,7 +176,7 @@
                 <Button x:Name="SyncButton" Classes="bar" DataContext="{Binding Sync}" Command="{Binding SyncNowCommand}"
                         ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="Sync now" AutomationProperties.HelpText="{Binding ToolTip}">
                     <ic:SymbolIcon x:Name="SyncGlyph" Symbol="ArrowSync" Width="20" Height="20" FontSize="18" Classes="syncglyph"
-                                   RenderTransformOrigin="50%,50%" Classes.turning="{Binding IsSyncing}" Classes.done="{Binding JustSynced}"
+                                   RenderTransformOrigin="50%,50%" Classes.turning="{Binding IsTurning}" Classes.done="{Binding JustSynced}"
                                    Classes.muted="{Binding IsMuted}" Classes.problem="{Binding HasProblem}">
                         <ic:SymbolIcon.RenderTransform>
                             <RotateTransform />
@@ -196,16 +196,17 @@
                 </Button>
             </StackPanel>
 
+            <!-- The window buttons do their own clicks (Windows' caption roles left them dead under BorderOnly). -->
             <StackPanel x:Name="WindowButtons" Grid.Column="4" Orientation="Horizontal">
-                <Button Classes="caption" chrome:WindowDecorationProperties.ElementRole="MinimizeButton" ToolTip.Tip="Minimize"
+                <Button x:Name="MinimizeButton" Classes="caption" chrome:WindowDecorationProperties.ElementRole="User" ToolTip.Tip="Minimize"
                         AutomationProperties.Name="Minimize">
                     <ic:SymbolIcon Symbol="Subtract" FontSize="16" />
                 </Button>
-                <Button Classes="caption" chrome:WindowDecorationProperties.ElementRole="MaximizeButton" ToolTip.Tip="Maximize"
+                <Button x:Name="MaximizeButton" Classes="caption" chrome:WindowDecorationProperties.ElementRole="User" ToolTip.Tip="Maximize"
                         AutomationProperties.Name="Maximize">
                     <ic:SymbolIcon x:Name="MaximizeGlyph" Symbol="Maximize" FontSize="14" />
                 </Button>
-                <Button Classes="caption close" chrome:WindowDecorationProperties.ElementRole="CloseButton" ToolTip.Tip="Close"
+                <Button x:Name="CloseButton" Classes="caption close" chrome:WindowDecorationProperties.ElementRole="User" ToolTip.Tip="Close"
                         AutomationProperties.Name="Close">
                     <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
                 </Button>

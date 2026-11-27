@@ -136,14 +136,13 @@ public sealed partial class HabitsViewModel : ObservableObject
     /// <summary>"2 of 5 habits done today".</summary>
     public string TodayText => $"{DoneToday.Count} of {Plural(DoneToday.Count + ToDo.Count, "habit")} done today";
 
-    /// <summary>The line at the top of the page: "Thursday 26 November · 2 of 5 done".</summary>
+    /// <summary>The line at the top of the page: "2 of 5 done" (empty with no habits; the date is not repeated here).</summary>
     public string TodayLine
     {
         get
         {
-            var date = _store.Today.ToString("dddd d MMMM", CultureInfo.CurrentCulture);
             var total = DoneToday.Count + ToDo.Count;
-            return total == 0 ? date : $"{date} · {DoneToday.Count} of {total} done";
+            return total == 0 ? "" : $"{DoneToday.Count} of {total} done";
         }
     }
 

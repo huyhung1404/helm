@@ -55,7 +55,7 @@
             <!-- The bugs -->
             <Grid x:Name="ListPane" Grid.Row="1" RowDefinitions="Auto,*">
                 <StackPanel Spacing="10" Margin="0,0,14,12" IsVisible="{Binding HasAnyBug}">
-                    <TextBox Classes="glass" PlaceholderText="Search bugs — a word or #B12" Text="{Binding Query}" AutomationProperties.Name="Search bugs">
+                    <TextBox Classes="glass" PlaceholderText="Search bugs — a word or #B12" core:TypingText.Text="{Binding Query}" AutomationProperties.Name="Search bugs">
                         <TextBox.InnerLeftContent>
                             <ic:SymbolIcon Symbol="Search" FontSize="15" Margin="12,0,0,0" Foreground="{DynamicResource HelmSecondaryText}" />
                         </TextBox.InnerLeftContent>

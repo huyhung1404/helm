@@ -63,6 +63,25 @@ public sealed class ScratchViewTests
         window.Close();
     }
 
+    private static Control Named(Control root, string name) =>
+        root.GetVisualDescendants().OfType<Control>().First(c => c.Name == name);
+
+    [AvaloniaFact]
+    public void On_a_phone_the_search_has_its_own_row_and_the_filters_sit_on_the_left()
+    {
+        var (window, view, _) = Show(ScratchStage.Wall, width: 390);
+        var bar = (Grid)Named(view, "TopBar");
+        var search = Named(view, "SearchCard");
+        var actions = Named(view, "AddActions");
+        var filters = Named(view, "FilterScroller");
+
+        Assert.Equal(bar.Bounds.Width, search.Bounds.Width, 1);
+        Assert.True(actions.Bounds.Top >= search.Bounds.Bottom, "the buttons are under the search");
+        Assert.Equal(0, actions.Bounds.Left, 1);
+        Assert.Equal(0, filters.Bounds.Left, 1);
+        window.Close();
+    }
+
     [AvaloniaFact]
     public void The_trash_button_switches_to_the_trash_and_back()
     {

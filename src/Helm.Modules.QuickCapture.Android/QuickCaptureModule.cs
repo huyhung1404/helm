@@ -14,7 +14,8 @@ namespace Helm.Modules.QuickCapture;
 /// <see cref="QuickCaptureActivity"/>, a small dialog over the current app. While the tool is off, both are hidden
 /// (their components are disabled), so Helm does not show up in the share sheet.
 /// </summary>
-public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : AndroidModuleBase
+public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger, ISettingsStoreFactory settings, IServiceProvider services)
+    : AndroidModuleBase, IQuickCapture
 {
     public const string ModuleId = "quick-capture";
 
@@ -31,6 +32,27 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : And
     /// <summary>The same vector icon as on Windows (<see cref="QuickCaptureIconShape"/>).</summary>
     public override Avalonia.Media.IImage? IconImage => QuickCaptureIcon.Image;
     public override Type PageType => typeof(QuickCapturePage);
+
+    /// <summary>settings/quick-capture.json, shared with Windows (the shortcut there is unused here).</summary>
+    public ISettingsStore<QuickCaptureSettings> Settings { get; } = settings.Get<QuickCaptureSettings>(ModuleId);
+
+    /// <summary>Every tool's target, read when the page asks (the tools register them after this module).</summary>
+    public IReadOnlyList<ICaptureTarget> AllTargets =>
+        [.. ((IEnumerable<ICaptureTarget>?)services.GetService(typeof(IEnumerable<ICaptureTarget>)) ?? []).OrderBy(t => t.Order)];
+
+    /// <summary>Opens the capture dialog, as the tile does.</summary>
+    public void Open()
+    {
+        try
+        {
+            var context = AndroidApp.Context;
+            context.StartActivity(new Intent(context, typeof(QuickCaptureActivity)).AddFlags(ActivityFlags.NewTask));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not open the Quick Capture dialog");
+        }
+    }
 
     public override Task EnableAsync(CancellationToken ct)
     {

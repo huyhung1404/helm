@@ -55,7 +55,4 @@ public sealed class TrackerContentPage : UserControl, IFullPage, ITrackerPageHos
     }
 
     public Control? CreatePlatformSettings() => new TrackerAndroidSettings(_viewModel);
-
-    /// <summary>The page has no app bar of the shell's: its menu button opens the drawer.</summary>
-    public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
 }

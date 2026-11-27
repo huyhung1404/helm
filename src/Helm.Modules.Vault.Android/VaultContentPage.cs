@@ -24,7 +24,5 @@ public sealed class VaultContentPage : UserControl, IFullPage
         public Control? CreatePlatformSettings() => new VaultAutofillCard();
 
         public bool CanLockWithSystem => false;
-
-        public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
     }
 }

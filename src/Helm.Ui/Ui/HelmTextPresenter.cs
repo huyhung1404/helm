@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
@@ -12,6 +14,17 @@ namespace Helm.Core.Ui;
 public sealed class HelmTextPresenter : TextPresenter
 {
     protected override Type StyleKeyOverride => typeof(TextPresenter);
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property != TextProperty && change.Property != PreeditTextProperty) return;
+        if (TemplatedParent is not TextBox box || box.IsSet(TextBox.PasswordCharProperty)) return;
+        // What the box shows, the composing word included (TypingText: a search follows every letter).
+        var text = Text ?? "";
+        var preedit = PreeditText;
+        TypingText.Update(box, string.IsNullOrEmpty(preedit) ? text : text.Insert(Math.Clamp(CaretIndex, 0, text.Length), preedit));
+    }
 
     protected override TextLayout CreateTextLayout()
     {

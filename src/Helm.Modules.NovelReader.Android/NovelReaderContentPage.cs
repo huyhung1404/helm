@@ -53,7 +53,6 @@ public sealed class NovelReaderContentPage : UserControl, IFullPage, INovelReade
 
     public INovelLens? Lens => _lens;
 
-    public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
 
     /// <summary>The phone's own voices start when Novel Reader is opened, and again when the app comes back to it.</summary>
     public void Opened() => _platform.StartPhoneVoices();

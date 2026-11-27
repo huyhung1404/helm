@@ -68,12 +68,12 @@ public partial class VocabView : UserControl
         var narrow = e.NewSize.Width < Narrow;
         Classes.Set("narrow", narrow);
         MenuRow.IsVisible = _host?.OpenMenu is not null;
-        // Tabs and gear beside today's line on a wide page, on their own line under it on a phone (still on the right).
+        // Tabs and gear beside today's line on a wide page, on their own line under it on a phone, on the left (as on every page).
         Grid.SetColumn(Tabs, narrow ? 0 : 1);
         Grid.SetRow(Tabs, narrow ? 1 : 0);
         Grid.SetColumnSpan(Tabs, narrow ? 2 : 1);
         Tabs.Margin = narrow ? new Thickness(0, 12, 0, 0) : default;
-        Tabs.HorizontalAlignment = narrow ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        Tabs.HorizontalAlignment = HorizontalAlignment.Left;
         FirstRunSteps.Columns = narrow ? 1 : 3;
         AnswerBar.Margin = narrow ? new Thickness(12, 0, 12, 12) : new Thickness(40, 0, 40, 18);
         LearnPanel.SetNarrow(narrow);
@@ -138,9 +138,8 @@ public partial class VocabView : UserControl
     private void UpdateTodayLine()
     {
         if (_viewModel is not { } vm) return;
-        var day = DateTime.Today.ToString("dddd d MMMM", English);
-        var due = vm.Today.Total == 0 ? "" : vm.Today.Due > 0 ? $" · {vm.Today.Due} due now" : " · all caught up";
-        TodayLine.Text = (day + due).ToUpper(English);
+        TodayLine.Text = (vm.Today.Total == 0 ? "" : vm.Today.Due > 0 ? $"{vm.Today.Due} due now" : "all caught up").ToUpper(English);
+        TodayLine.IsVisible = TodayLine.Text.Length > 0;
     }
 
     // ---- sheets ----------------------------------------------------------------------------------------------------

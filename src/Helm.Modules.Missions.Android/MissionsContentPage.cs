@@ -36,7 +36,6 @@ public sealed class MissionsContentPage : UserControl, IFullPage, IMissionsPageH
         Content = _view;
     }
 
-    public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
 
     public string ExportLabel => "Share CSV";
 

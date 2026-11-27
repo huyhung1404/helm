@@ -350,7 +350,7 @@
                         </StackPanel>
                     </Border>
                 </Grid>
-                <TextBox Classes="glass" Text="{Binding SearchText}" PlaceholderText="Search descriptions, notes, banks, categories" AutomationProperties.Name="Search transactions"
+                <TextBox Classes="glass" core:TypingText.Text="{Binding SearchText}" PlaceholderText="Search descriptions, notes, banks, categories" AutomationProperties.Name="Search transactions"
                          Margin="0,0,0,6">
                     <TextBox.InnerLeftContent>
                         <ic:SymbolIcon Symbol="Search" FontSize="16" Margin="12,0,4,0" Foreground="{DynamicResource HelmSecondaryText}" />

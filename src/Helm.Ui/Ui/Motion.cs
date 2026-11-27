@@ -3,6 +3,7 @@ using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.Styling;
 
 namespace Helm.Core.Ui;
@@ -12,7 +13,7 @@ namespace Helm.Core.Ui;
 /// they appear, quickly and eased. <see cref="Enter"/> plays it once; <c>core:Motion.EnterOnShow="True"</c> plays it
 /// every time a control is shown again (a tab, a folded section, a task opened). A section that opens downwards grows
 /// from its top edge (<see cref="FromTopProperty"/>); a dialog from its centre. A whole page opened in the shell does not
-/// grow: it comes into focus over its still backdrop (<see cref="EnterPage"/>).
+/// grow: it fades in over its still backdrop (<see cref="EnterPage"/>).
 /// </summary>
 public static class Motion
 {
@@ -80,35 +81,42 @@ public static class Motion
             end.Setters.Add(new Setter(ScaleTransform.ScaleYProperty, 1d));
         }
         var animation = new Animation { Duration = Duration, Easing = new CubicEaseOut(), FillMode = FillMode.Backward, Children = { start, end } };
-        _ = animation.RunAsync(control);
+        RunToEnd(animation, control);
     }
 
-    /// <summary>How far out of focus a page starts (<see cref="EnterPage"/>).</summary>
-    public const double PageBlur = 16;
+    /// <summary>
+    /// Runs <paramref name="animation"/> on <paramref name="target"/> and stops it for sure once its time is up, so the
+    /// target is left with no animated value (an opacity of 0.9999 would keep a layer under the whole page). Avalonia does
+    /// not always play the last frame when nothing else is drawn.
+    /// </summary>
+    private static void RunToEnd(Animation animation, Control target)
+    {
+        var stop = new CancellationTokenSource();
+        _ = animation.RunAsync(target, stop.Token);
+        DispatcherTimer.RunOnce(() =>
+        {
+            stop.Cancel();
+            stop.Dispose();
+        }, animation.Duration + TimeSpan.FromMilliseconds(60));
+    }
+
+    /// <summary>How long a page takes to come in (<see cref="EnterPage"/>): short, so switching tabs never waits on it.</summary>
+    public static readonly TimeSpan PageDuration = TimeSpan.FromMilliseconds(150);
 
     /// <summary>
     /// A whole page coming on screen (a tool opened in the shell): its <see cref="Backdrop"/> stays put and everything on
-    /// it comes into focus, from blurred and clear to sharp. Nothing scales: a page that shrinks or fades as a whole shows
-    /// the empty (black) window behind it at its edges. Returns what was animated.
+    /// it fades in, quickly. Nothing scales or blurs: a page that shrinks or fades as a whole shows the empty (black) window
+    /// behind it at its edges, and a blur over a whole page made every tab switch stutter. Returns what was animated.
     /// </summary>
     public static IReadOnlyList<Control> EnterPage(Control page)
     {
         var targets = PageLayers(page);
         foreach (var target in targets)
         {
-            var start = new KeyFrame
-            {
-                Cue = new Cue(0),
-                Setters = { new Setter(Visual.OpacityProperty, 0d), new Setter(Visual.EffectProperty, new BlurEffect { Radius = PageBlur }) },
-            };
-            var end = new KeyFrame
-            {
-                Cue = new Cue(1),
-                Setters = { new Setter(Visual.OpacityProperty, 1d), new Setter(Visual.EffectProperty, new BlurEffect { Radius = 0 }) },
-            };
-            // Backward: the start shows before the first frame; afterwards the page has no effect left (a blur of 0 still costs).
-            var animation = new Animation { Duration = Duration, Easing = new CubicEaseOut(), FillMode = FillMode.Backward, Children = { start, end } };
-            _ = animation.RunAsync(target);
+            var start = new KeyFrame { Cue = new Cue(0), Setters = { new Setter(Visual.OpacityProperty, 0.0) } };
+            var end = new KeyFrame { Cue = new Cue(1), Setters = { new Setter(Visual.OpacityProperty, 1.0) } };
+            var animation = new Animation { Duration = PageDuration, Easing = new CubicEaseOut(), FillMode = FillMode.Backward, Children = { start, end } };
+            RunToEnd(animation, target);
         }
         return targets;
     }

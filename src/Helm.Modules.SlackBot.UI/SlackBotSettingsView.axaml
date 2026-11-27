@@ -166,7 +166,7 @@
                     <TextBlock Text="Channels and DMs" Classes="head" />
                     <TextBlock Text="{Binding ChannelsSummary}" Classes="secondary" TextWrapping="Wrap" />
                 </StackPanel>
-                <TextBox Classes="glass" PlaceholderText="Find a channel or person" Text="{Binding ChannelFilter}" AutomationProperties.Name="Find a channel">
+                <TextBox Classes="glass" PlaceholderText="Find a channel or person" core:TypingText.Text="{Binding ChannelFilter}" AutomationProperties.Name="Find a channel">
                     <TextBox.InnerLeftContent>
                         <ic:SymbolIcon Symbol="Search" FontSize="15" Margin="10,0,0,0" Foreground="{DynamicResource HelmSecondaryText}" />
                     </TextBox.InnerLeftContent>

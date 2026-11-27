@@ -28,9 +28,11 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 ## 2. Surface
 - Background: `core:Backdrop` behind every glass page (spec: `Helm.Core/Ui/BackdropSpec.cs`, the only place for its
   colours). Dark graphite (#15171C → #0B0C0F) with four faint corner glows in the Helm icon's colours: blue #0077F2
-  top left, sky #06AEFF bottom left, cyan #00C6E0 top right, teal #00CFC0 bottom right; they drift slowly on a shared
-  clock. Light theme: the same over #F7F8FA → #ECEFF3.
-- In the PC app the same background covers the whole window behind `ShellView`. No panel, border or divider between shell and page:
+  top left, sky #06AEFF bottom left, cyan #00C6E0 top right, teal #00CFC0 bottom right; they stand still
+  (never animate the backdrop: a moving background repaints every card and shadow on the page each frame, and made every
+  page and tab switch sluggish, worst on a phone). Light theme: the same over #F7F8FA → #ECEFF3.
+- In the PC app the same background covers the whole window behind `ShellView`; on Android it covers the screen behind the
+  app bar (`MainView`), and the app bar (menu, title, bug, sync) stays on every page, full pages too. No panel, border or divider between shell and page:
   the tab bar is one borderless pill (`SubtleFillColorTertiaryBrush`) with pill tabs.
 - Cards: `Border.glass` (radius 12, glass fill, thin stroke, soft shadow); `.glass.hero` (radius 16) for the one big
   card (first run). Sheets/dialogs: `Border.sheet` / `HelmSheetBackground` (solid, radius 26, 28 on top of a phone sheet, stroke): a floating card is more rounded than the cards under it, never sharper. Popup lists: radius 12.
@@ -83,8 +85,9 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - One adaptive view; below 720 px the view gets class `narrow` (set in code from `OnSizeChanged`). Select it with
   `:is(UserControl).narrow …` (a plain `UserControl.narrow` selector never matches the view's own type).
 - Phone: actions are icons in one row (labels `TextBlock.label` hidden), side-by-side things stack, lists of cards go
-  two by two or scroll sideways with the scrollbar hidden. The tabs and the gear stay on the **right**, as on PC (on a
-  phone on their own line under the date, right-aligned).
+  two by two or scroll sideways with the scrollbar hidden. The tabs and the gear sit beside the counts on PC; on a phone on
+  their own line under them, **on the left** (every page the same). A bar of buttons on a phone puts the search on its
+  own full-width row, the buttons under it (Scratch): never squeeze a search between buttons.
 - **Text never runs out of its card.** Text beside an icon or a button is in a `Grid` with an `Auto,*` column (the text in
   the `*` column, `TextWrapping="Wrap"`), never in a horizontal `StackPanel` (a StackPanel gives its children
   unlimited width, so a long sentence is cut at the card's edge). Check every message and warning at Phone 390.
@@ -103,8 +106,9 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   rows, messages); add `core:Motion.FromTop="True"` for a section opening under its header. `Motion.Enter(control)`
   in code (a list just picked, a sheet: phone sheets grow from the bottom edge). `Classes="enter"` for first load.
 - **A whole page never grows or fades as a whole** (a page in the shell sits in a child window with nothing behind it:
-  black shows at its edges). A page opened in the shell comes into focus: `Motion.EnterPage(page)` keeps its
-  `core:Backdrop` still and takes what is on it from blurred (16) and clear to sharp, 260 ms (`AvaloniaHost` does it).
+  black shows at its edges). A page opened in the shell fades in: `Motion.EnterPage(page)` keeps its `core:Backdrop`
+  still and fades what is on it in, 150 ms (`ShellView` does it). No blur or other effect over a whole page: it made
+  every tab switch stutter. Motion stops every animation once its time is up, so nothing is left at 0.9999.
 - ComboBox lists grow open from the top (`ComboBox.glass:dropdownopen` style) and open under the field with the left
   edges lined up (`Placement=BottomEdgeAlignedLeft` on its Popup; the default centres a list wider than the field).
 - Disclosure arrows point **right when closed, turn a quarter to point down when open, and turn back**: a
@@ -120,7 +124,7 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 ## 7. Reference components (copy these, do not reinvent)
 - **Page frame**: `core:Backdrop` + ScrollViewer + StackPanel. Margin 40,28 on PC, 16,18 on a phone. Spacing scale
   8 · 12 · 16 · 22 · 28; between a title and what follows 16–22.
-- **Top bar of a tool**: left the eyebrow line (today's date + counts, wraps on a phone); right the segmented tabs
+- **Top bar of a tool**: left the eyebrow line (counts only, no date: hidden when empty; wraps on a phone); right the segmented tabs
   (`RadioButton.seg` in a small glass group: the chosen one lighter and bold) and the gear (`chip`). Tab changes use
   `IsCheckedChanged`, so keyboard and screen readers work too.
 - **List switcher**: a row of `Button.glass` cards (initial tile, name, "n open · n overdue" with overdue in
@@ -164,6 +168,8 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - Placeholders say the action and the key ("Add a task — press Enter"). Empty states say what to do next and point at it.
 - A question names the thing ("Delete this task?"), then one sentence says what is removed and what stays.
 - Vietnamese typing must work in every text field (Helm Keyboard): use the shared `TextBox`, never a custom one.
+- A search box searches as you type: bind `core:TypingText.Text="{Binding Query}"` instead of `Text` (Helm Keyboard keeps
+  the word being typed out of `Text` until a space or Enter; TypingText includes it).
 
 ## 9. Inside the PC app
 - `Helm.App` is pure Avalonia (no WPF anywhere): the window holds `Helm.Shell.UI`'s `ShellView`; a tool's page comes

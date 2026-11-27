@@ -53,13 +53,13 @@ public partial class VaultView : UserControl
         Classes.Set("narrow", _narrow);
         Page.Margin = _narrow ? new Thickness(16, 18, 16, 16) : new Thickness(40, 28, 40, 24);
         MenuRow.IsVisible = _host?.OpenMenu is not null;
-        // The actions beside the title on a wide page, on their own line (right-aligned) on a phone.
+        // The actions beside the title on a wide page, on their own line (on the left) on a phone.
         var actions = Actions;
         Grid.SetColumn(actions, _narrow ? 0 : 1);
         Grid.SetRow(actions, _narrow ? 1 : 0);
         Grid.SetColumnSpan(actions, _narrow ? 2 : 1);
         actions.Margin = _narrow ? new Thickness(0, 12, 0, 0) : default;
-        actions.HorizontalAlignment = _narrow ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;
+        actions.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
         ItemsView.Narrow = _narrow;
     }
 

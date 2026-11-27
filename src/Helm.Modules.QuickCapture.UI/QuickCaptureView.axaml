@@ -14,7 +14,7 @@
                 <StackPanel Margin="0,0,0,6">
                     <TextBlock Classes="eyebrow" Text="ANY APP" />
                     <TextBlock Classes="display" Text="Quick Capture" />
-                    <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" TextWrapping="Wrap"
+                    <TextBlock x:Name="Lead" Classes="muted" FontSize="14" Margin="0,4,0,0" TextWrapping="Wrap"
                                Text="Press a shortcut in any app to save a note, a task or a debt in a second, without opening Helm." />
                 </StackPanel>
 
@@ -25,7 +25,7 @@
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Quick Capture is on" Classes="head" />
-                            <TextBlock Text="Off frees the shortcut for other apps." Classes="secondary" TextWrapping="Wrap" />
+                            <TextBlock x:Name="SwitchHint" Text="Off frees the shortcut for other apps." Classes="secondary" TextWrapping="Wrap" />
                         </StackPanel>
                         <ToggleSwitch x:Name="EnableSwitch" Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" AutomationProperties.Name="Quick Capture on or off" />
                     </Grid>
@@ -42,8 +42,10 @@
                 <!-- Activation -->
                 <Border Classes="glass">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="Activation" Classes="head" />
-                        <StackPanel Spacing="6">
+                        <TextBlock x:Name="ActivationTitle" Text="Activation" Classes="head" />
+                        <!-- Where there is no shortcut (a phone): how else it opens (the share sheet, a tile). -->
+                        <ContentControl x:Name="WaysToOpen" IsVisible="False" />
+                        <StackPanel x:Name="ShortcutPart" Spacing="6">
                             <TextBlock Text="Activation shortcut" />
                             <ContentControl x:Name="ActivationHotkey" />
                             <TextBlock Text="Opens the capture box over any app." Classes="secondary" TextWrapping="Wrap" />
@@ -66,7 +68,7 @@
                             <TextBlock Text="Save to" />
                             <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding TargetNames}" SelectedIndex="{Binding DefaultTargetIndex}"
                                       AutomationProperties.Name="Save to" />
-                            <TextBlock Text="Where the text goes when you just type and press Enter. Tab switches in the box." Classes="secondary" TextWrapping="Wrap" />
+                            <TextBlock x:Name="SaveToHint" Text="Where the text goes when you just type and press Enter. Tab switches in the box." Classes="secondary" TextWrapping="Wrap" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -76,7 +78,7 @@
                     <StackPanel Spacing="12">
                         <StackPanel Spacing="2">
                             <TextBlock Text="What to type" Classes="head" />
-                            <TextBlock Text="Start with a prefix to pick where it goes. Enter saves, Shift+Enter adds a line, Esc closes." Classes="secondary" TextWrapping="Wrap" />
+                            <TextBlock x:Name="TypeHint" Text="Start with a prefix to pick where it goes. Enter saves, Shift+Enter adds a line, Esc closes." Classes="secondary" TextWrapping="Wrap" />
                         </StackPanel>
                         <ItemsControl ItemsSource="{Binding Examples}">
                             <ItemsControl.ItemTemplate>

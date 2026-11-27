@@ -211,14 +211,13 @@ public sealed partial class MissionsViewModel : ObservableObject
     /// <summary>Raised when a step, a phase or the whole mission is done here, so the page can play its animation.</summary>
     public event EventHandler<CelebrationKind?>? Celebrated;
 
-    /// <summary>The line at the top of the page: "Thursday 26 November · 2 in progress".</summary>
+    /// <summary>The line at the top of the page: "2 in progress" (empty when none is).</summary>
     public string TodayLine
     {
         get
         {
-            var date = TodayDate.ToString("dddd d MMMM", CultureInfo.CurrentCulture);
             var running = _store.Missions().Count(m => m.Value.Status == MissionStatus.Active);
-            return running == 0 ? date : $"{date} · {running} in progress";
+            return running == 0 ? "" : $"{running} in progress";
         }
     }
 

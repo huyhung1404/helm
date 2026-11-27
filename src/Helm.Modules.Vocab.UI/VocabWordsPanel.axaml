@@ -134,7 +134,7 @@
                                  Content="{Binding ChineseTabText}" AutomationProperties.Name="Chinese words" />
                 </StackPanel>
             </Border>
-            <TextBox x:Name="SearchBox" Grid.Column="1" Classes="glass" PlaceholderText="Search words and meanings" Text="{Binding SearchText}"
+            <TextBox x:Name="SearchBox" Grid.Column="1" Classes="glass" PlaceholderText="Search words and meanings" core:TypingText.Text="{Binding SearchText}"
                      AutomationProperties.Name="Search words and meanings">
                 <TextBox.InnerLeftContent>
                     <ic:SymbolIcon Symbol="Search" FontSize="16" Margin="12,0,0,0" Foreground="{DynamicResource HelmSecondaryText}" />

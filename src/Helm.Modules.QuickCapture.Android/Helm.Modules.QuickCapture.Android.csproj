@@ -28,6 +28,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
+    <!-- The page: the shared Quick Capture view (the same as on Windows) and its view model and settings. -->
+    <ProjectReference Include="..\Helm.Modules.QuickCapture.Core\Helm.Modules.QuickCapture.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.QuickCapture.UI\Helm.Modules.QuickCapture.UI.csproj" />
     <!-- Ask Helm: the assistant and the API keys. -->
     <ProjectReference Include="..\Helm.Ai.Core\Helm.Ai.Core.csproj" />
   </ItemGroup>

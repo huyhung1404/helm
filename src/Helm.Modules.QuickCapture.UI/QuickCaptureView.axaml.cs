@@ -9,9 +9,15 @@ using Helm.Core.Ui;
 
 namespace Helm.Modules.QuickCapture.Ui;
 
-/// <summary>What the app does around the shared Quick Capture page (Windows: recording a shortcut).</summary>
+/// <summary>What the app does around the shared Quick Capture page (Windows: recording a shortcut; Android: share and tile).</summary>
 public interface IQuickCapturePageHost
 {
+    /// <summary>False on a phone: no shortcut, the box opens from the share sheet or a tile (<see cref="CreateWaysToOpen"/>).</summary>
+    bool HasShortcut => true;
+
+    /// <summary>Where there is no shortcut: how else the box opens (shown in the Activation card instead of the shortcut).</summary>
+    Control? CreateWaysToOpen() => null;
+
     /// <summary>
     /// A field that records a global shortcut (Helm.Ui.Windows' HotkeyBox), starting at <paramref name="gesture"/>.
     /// Null where there is none (the Gallery): the page then shows the keys only.
@@ -40,6 +46,17 @@ public partial class QuickCaptureView : UserControl
         _host = host;
         DataContext = viewModel;
         InitializeComponent();
+        if (!host.HasShortcut)
+        {
+            Lead.Text = "Save a note, a task or a debt from any app in a second: Share → Save to Helm, or the Quick Settings tile.";
+            SwitchHint.Text = "Off hides Helm from the share sheet and the tile.";
+            ActivationTitle.Text = "Where to find it";
+            ShortcutPart.IsVisible = false;
+            WaysToOpen.Content = host.CreateWaysToOpen();
+            WaysToOpen.IsVisible = WaysToOpen.Content is not null;
+            SaveToHint.Text = "The choice the box opens on. You can switch it in the box.";
+            TypeHint.Text = "Start with a prefix to pick where it goes.";
+        }
         // The tool's on/off switch (the first card).
         EnableSwitch.IsCheckedChanged += (_, _) => _module.IsEnabled = EnableSwitch.IsChecked == true;
         Refresh();
@@ -75,6 +92,7 @@ public partial class QuickCaptureView : UserControl
         TryButton.IsEnabled = _module.IsEnabled;
         ProblemText.Text = _module.StatusMessage;
         ProblemCard.IsVisible = _module.IsEnabled && !string.IsNullOrWhiteSpace(_module.StatusMessage);
+        if (_host?.HasShortcut == false) return;
         if (ActivationHotkey.Tag is HotkeyGesture shown && shown == vm.Hotkey) return;
         ActivationHotkey.Content = Picker(vm.Hotkey, g =>
         {

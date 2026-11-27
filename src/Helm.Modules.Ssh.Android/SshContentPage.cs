@@ -39,7 +39,6 @@ public sealed class SshContentPage : UserControl, IFullPage, ISshPageHost
 
     public string KeyProtection => "Its private half is protected by the Android Keystore and never leaves the phone.";
 
-    public Action<Control>? OpenMenu => ShellChrome.OpenNavigation;
 
     public ISshTerminal CreateTerminal(SshViewModel viewModel) => new TerminalHost(viewModel, _clipboard);
 }
