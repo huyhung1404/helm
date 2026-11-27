@@ -134,6 +134,36 @@ public sealed class VaultViewTests
         window.Close();
     }
 
+    [AvaloniaTheory]
+    [InlineData(860, 390)] // a phone on its side (B3: the new item's fields sat on each other)
+    [InlineData(390, 860)]
+    public void The_new_items_fields_never_overlap(double width, double height)
+    {
+        var view = (VaultView)VaultDemo.Create(new FakeModule("vault", "Vault"), VaultStage.Items);
+        var window = new Window { Content = view, Width = width, Height = height };
+        window.Show();
+        Pump();
+        Click(ButtonNamed(view, "New item"));
+        var editor = Assert.Single(window.GetVisualDescendants().OfType<VaultItemView>(), v => ((ItemDetailViewModel)v.DataContext!).IsEditing);
+
+        var fields = editor.GetVisualDescendants().OfType<Control>()
+            .Where(c => c is TextBox or ComboBox or Button && c.IsEffectivelyVisible && c.Bounds.Width > 0)
+            .Select(c => (Control: c, Box: new Rect(c.TranslatePoint(default, editor) ?? default, c.Bounds.Size)))
+            .ToList();
+        Assert.NotEmpty(fields);
+        foreach (var a in fields)
+        foreach (var b in fields)
+        {
+            if (ReferenceEquals(a.Control, b.Control) || a.Control.GetVisualAncestors().Contains(b.Control) || b.Control.GetVisualAncestors().Contains(a.Control)) continue;
+            var overlap = a.Box.Intersect(b.Box);
+            Assert.True(overlap.Width < 1 || overlap.Height < 1, $"{Describe(a.Control)} overlaps {Describe(b.Control)} at {width}×{height}");
+        }
+        window.Close();
+        while (Helm.Core.Ui.Sheet.CloseTopmost()) { }
+    }
+
+    private static string Describe(Control c) => Avalonia.Automation.AutomationProperties.GetName(c) is { Length: > 0 } name ? name : c.GetType().Name;
+
     [AvaloniaFact]
     public void The_gear_opens_the_settings_as_a_sheet_and_done_closes_it()
     {
