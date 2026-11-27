@@ -332,6 +332,23 @@ public sealed class ConnectorTests : IDisposable
     }
 
     [Fact]
+    public async Task WithNovelItServesTheReportsAndNamesButNoDictionariesOrVoices()
+    {
+        await using var services = Tools(SyncSelection.Resolve("ai,wallet,tracker,habits,vocab,novel", Data));
+        var server = ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), new ConfirmationGate(), NullLogger.Instance);
+
+        foreach (var tool in new[] { "novel_translation_reports", "novel_names", "novel_suggest_translations" }) Assert.Contains(tool, server.ToolNames);
+        Assert.Contains(services.GetServices<SyncGroup>(), g => g.Prefix == "novel.");
+        // Fairy suggests translations of the sentences the reader marked; the dictionaries (big files) never come here
+        Assert.Null(services.GetService<Helm.Modules.NovelReader.Dictionaries.DictionaryLibrary>());
+        var reports = await CallAsync(server, "novel_translation_reports", new JsonObject());
+        Assert.False(reports["isError"]!.GetValue<bool>());
+        var listed = JsonNode.Parse(reports["content"]![0]!["text"]!.GetValue<string>())!;
+        Assert.Equal(0, listed["total"]!.GetValue<int>());
+        Assert.False(listed["dictionaries_loaded"]!.GetValue<bool>());
+    }
+
+    [Fact]
     public async Task ADeletionOnlyDescribesItselfUntilTheUserConfirmsIt()
     {
         await using var services = Tools(SyncSelection.Resolve("ai,wallet,tracker,habits,notes,missions,vocab", Data));

@@ -23,6 +23,7 @@ internal sealed record SyncSelection(IReadOnlyList<string> Groups)
         ["notes."] = "Notes",
         ["missions."] = "Missions",
         ["vocab."] = "Vocabulary",
+        ["novel."] = "Novel Reader",
     };
 
     /// <summary>What the engine syncs: the groups, and AI's synced settings (the features' choices), outside its prefix.</summary>

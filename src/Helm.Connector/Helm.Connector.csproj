@@ -39,6 +39,7 @@
     <ProjectReference Include="..\Helm.Modules.Notes.Core\Helm.Modules.Notes.Core.csproj" />
     <ProjectReference Include="..\Helm.Modules.Missions.Core\Helm.Modules.Missions.Core.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vocab.Core\Helm.Modules.Vocab.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.NovelReader.Core\Helm.Modules.NovelReader.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

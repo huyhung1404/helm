@@ -19,22 +19,8 @@ public static class NovelReaderCoreServices
     /// </summary>
     public static IServiceCollection AddNovelReaderCore(this IServiceCollection services)
     {
-        services.AddSyncedCollection(NovelStore.BookOptions);
-        services.AddSyncedCollection(NovelStore.EntryOptions);
-        services.AddSyncedCollection(NovelStore.ProgressOptions);
-        services.AddSyncedCollection(DictionaryLibrary.Options);
-        services.AddSyncedCollection(TranslationReportStore.Options);
-        services.AddSyncGroup("novel.", NovelReaderIds.DisplayName);
-        services.AddSingleton(sp => new NovelStore(
-            sp.GetRequiredService<ISyncedCollection<NovelBook>>(),
-            sp.GetRequiredService<ISyncedCollection<NovelEntry>>(),
-            sp.GetRequiredService<ISyncedCollection<NovelProgress>>(),
-            sp.GetRequiredService<BlobStore>()));
+        services.AddNovelReaderAgentCore();
         services.AddSingleton<DictionaryLibrary>();
-        services.AddSingleton(sp => new TranslationReportStore(sp.GetRequiredService<ISyncedCollection<TranslationReport>>()));
-        // Tools for an AI on this PC (MCP, Windows only: other platforms never ask for them).
-        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, NovelReaderMcpTools>();
-        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, TranslationReportMcpTools>();
         // The VieNeu voices, running in Helm (downloaded once, on the user's word); platforms add their own engines
         // (Windows voices, the phone's) as ISpeechEngine too.
         services.AddSingleton(sp => new VieNeuInstaller(
@@ -47,6 +33,34 @@ public static class NovelReaderCoreServices
         services.AddSingleton(sp => new SpeechCatalog(sp.GetServices<ISpeechEngine>()));
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<NovelReaderViewModel>();
+        return services;
+    }
+
+    /// <summary>
+    /// What an agent reaches without the reader: the synced collections and the "novel." sync group, the novels' store
+    /// (their texts are files, read only when asked), the reports of wrong translations, and the tools for agents.
+    /// <see cref="AddNovelReaderCore"/> adds the dictionaries, the voices and the page; Fairy's connector stops here (no
+    /// dictionaries: a report comes without what Helm shows for it today, and names are looked for in Helm).
+    /// </summary>
+    public static IServiceCollection AddNovelReaderAgentCore(this IServiceCollection services)
+    {
+        services.AddSyncedCollection(NovelStore.BookOptions);
+        services.AddSyncedCollection(NovelStore.EntryOptions);
+        services.AddSyncedCollection(NovelStore.ProgressOptions);
+        services.AddSyncedCollection(DictionaryLibrary.Options);
+        services.AddSyncedCollection(TranslationReportStore.Options);
+        services.AddSyncGroup("novel.", NovelReaderIds.DisplayName);
+        services.AddSingleton(sp => new NovelStore(
+            sp.GetRequiredService<ISyncedCollection<NovelBook>>(),
+            sp.GetRequiredService<ISyncedCollection<NovelEntry>>(),
+            sp.GetRequiredService<ISyncedCollection<NovelProgress>>(),
+            sp.GetRequiredService<BlobStore>()));
+        services.AddSingleton(sp => new TranslationReportStore(sp.GetRequiredService<ISyncedCollection<TranslationReport>>()));
+        // Tools for an AI (MCP: Helm on the PC, Fairy's connector).
+        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider>(sp =>
+            new NovelReaderMcpTools(sp.GetRequiredService<NovelStore>(), sp.GetService<DictionaryLibrary>()));
+        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider>(sp =>
+            new TranslationReportMcpTools(sp.GetRequiredService<TranslationReportStore>(), sp.GetRequiredService<NovelStore>(), sp.GetService<DictionaryLibrary>()));
         return services;
     }
 }

@@ -10,6 +10,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   category, with the categories that fit, the ones you filed like them and the history's sure pick; Fairy files them
   through `wallet_update_transaction` (Undo works as before).
 
+- **Fairy can suggest translations in Novel Reader.** Fairy's connector serves the reports of wrong translations and
+  the novels' names (`novel.`, without the dictionaries or the novels' texts), so Fairy suggests the translations of the
+  sentences you marked; a suggestion never replaces your own.
+
 ### Changed
 - **Android: a transaction filed elsewhere stops asking "what was it?"** When a sync brings a transaction that Fairy or
   the PC filed, its question on the phone goes away.

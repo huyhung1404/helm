@@ -17,7 +17,9 @@ namespace Helm.Modules.NovelReader;
 /// never over a name the user saved, never one the user deleted), and set aside words that are not names. Nothing is
 /// deleted through here. The candidates of a novel are worked out once per scan (offset 0) and paged from there.
 /// </summary>
-public sealed class NovelReaderMcpTools(NovelStore store, DictionaryLibrary dictionaries) : IMcpToolProvider
+/// <param name="dictionaries">The dictionaries; null where there are none (Fairy's connector): names are looked for in
+/// Helm then.</param>
+public sealed class NovelReaderMcpTools(NovelStore store, DictionaryLibrary? dictionaries) : IMcpToolProvider
 {
     public const int DefaultPage = 80;
     public const int MaxPage = 150;
@@ -107,6 +109,7 @@ public sealed class NovelReaderMcpTools(NovelStore store, DictionaryLibrary dict
     /// <summary>Every candidate of a novel with the logic scan's verdict, worked out off the caller's thread.</summary>
     private async Task<IReadOnlyList<Candidate>> WorkOutAsync(string id, CancellationToken ct)
     {
+        if (dictionaries is null) throw new McpToolException("Names are looked for in Helm on the PC here: this host has no dictionaries.");
         var text = await store.ReadBookTextAsync(id, null, ct).ConfigureAwait(false);
         var set = await dictionaries.EnsureLoadedAsync().ConfigureAwait(false);
         return await Task.Run(() =>

@@ -2,6 +2,7 @@ using Helm.Core.Services;
 using Helm.Modules.Habits;
 using Helm.Modules.Missions;
 using Helm.Modules.Notes;
+using Helm.Modules.NovelReader;
 using Helm.Modules.Tracker;
 using Helm.Modules.Vocab;
 using Helm.Modules.Wallet;
@@ -28,6 +29,8 @@ internal static class HeadlessTools
         if (selection.Has("notes.")) services.AddNotesCore().AddNoteLinks(page);
         if (selection.Has("missions.")) services.AddMissionsCore().AddMissionLinks(page);
         if (selection.Has("vocab.")) services.AddVocabCore();
+        // the reports of wrong translations and the novels' names, without the dictionaries or the voices
+        if (selection.Has("novel.")) services.AddNovelReaderAgentCore();
         return services;
     }
 

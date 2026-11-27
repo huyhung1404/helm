@@ -12,7 +12,9 @@ namespace Helm.Modules.NovelReader.Reports;
 /// translation, the reader's note, the pieces Helm cut it into, and what Helm shows for it now with today's
 /// dictionaries and the novel's names; and write back suggested translations, which never replace the reader's own.
 /// </summary>
-public sealed class TranslationReportMcpTools(TranslationReportStore reports, NovelStore store, DictionaryLibrary dictionaries) : IMcpToolProvider
+/// <param name="dictionaries">The dictionaries; null where there are none (Fairy's connector): a report then comes without
+/// what Helm shows for it today.</param>
+public sealed class TranslationReportMcpTools(TranslationReportStore reports, NovelStore store, DictionaryLibrary? dictionaries) : IMcpToolProvider
 {
     public const int DefaultPage = 50;
     public const int MaxPage = 200;
@@ -48,7 +50,7 @@ public sealed class TranslationReportMcpTools(TranslationReportStore reports, No
         var limit = Math.Clamp(McpArgs.Int(args, "limit") ?? DefaultPage, 1, MaxPage);
         var all = reports.Reports(bookId).Where(r => ids.Count == 0 || ids.Contains(r.Id)).ToList();
         var page = all.Skip(offset).Take(limit).ToList();
-        var set = dictionaries.HasFiles ? await dictionaries.EnsureLoadedAsync().ConfigureAwait(false) : null;
+        var set = dictionaries is { HasFiles: true } ? await dictionaries.EnsureLoadedAsync().ConfigureAwait(false) : null;
         ct.ThrowIfCancellationRequested();
         // One converter per novel: its names decide how its sentences come out.
         var converters = new Dictionary<string, Converter>(StringComparer.Ordinal);
