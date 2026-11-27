@@ -3,6 +3,12 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.94.1] - 2026-11-27
+
+### Fixed
+- **Android: no empty band over the top bar.** The space for the status bar was left twice (Avalonia 12 now leaves it
+  too); Helm's background now runs under the status bar.
+
 ## [0.94.0] - 2026-11-27
 
 ### Fixed
