@@ -4,19 +4,21 @@ namespace Helm.Connector;
 
 /// <summary>
 /// The tools whose data the connector syncs (its allowlist, <see cref="Helm.Core.Sync.SyncEngine.SetIncluded"/>):
-/// <c>--sync ai,wallet</c>, else <c>"sync"</c> in &lt;data&gt;/connector.json, else <see cref="Default"/>. Only these
-/// tools' stores and agent tools are registered; nothing else is downloaded or uploaded.
+/// <c>--sync wallet,tracker</c>, else <c>"sync"</c> in &lt;data&gt;/connector.json, else <see cref="Default"/>. Only these
+/// tools' stores and agent tools are registered; nothing else is downloaded or uploaded. "ai" (Helm's own AI, gone since
+/// 0.96) is still accepted, so a connector.json that lists it keeps working: it syncs the old AI records as before
+/// (<see cref="Helm.Core.Sync.LeftoverAiCollections"/>) and registers no tool.
 /// </summary>
 internal sealed record SyncSelection(IReadOnlyList<string> Groups)
 {
     public const string FileName = "connector.json";
 
-    public static readonly IReadOnlyList<string> Default = ["ai.", "wallet.", "tracker.", "habits."];
+    public static readonly IReadOnlyList<string> Default = ["wallet.", "tracker.", "habits."];
 
     /// <summary>The groups the connector can host, with the names the apps give them. Vault is never one of them.</summary>
     public static readonly IReadOnlyDictionary<string, string> Known = new Dictionary<string, string>
     {
-        ["ai."] = "AI",
+        [Helm.Core.Sync.LeftoverAiCollections.Prefix] = "AI (old records only)",
         ["wallet."] = "Wallet",
         ["tracker."] = "Tracker",
         ["habits."] = "Habits",
@@ -26,8 +28,9 @@ internal sealed record SyncSelection(IReadOnlyList<string> Groups)
         ["novel."] = "Novel Reader",
     };
 
-    /// <summary>What the engine syncs: the groups, and AI's synced settings (the features' choices), outside its prefix.</summary>
-    public IReadOnlyList<string> Prefixes => [.. Groups, .. Has("ai.") ? new[] { "settings." + Helm.Ai.AiFeatureSettings.StoreId } : []];
+    /// <summary>What the engine syncs: the groups, and with "ai" the old AI settings (the features' choices), outside its prefix.</summary>
+    public IReadOnlyList<string> Prefixes =>
+        [.. Groups, .. Has(Helm.Core.Sync.LeftoverAiCollections.Prefix) ? new[] { Helm.Core.Sync.LeftoverAiCollections.FeatureSettings } : []];
 
     public bool Has(string group) => Groups.Contains(group);
 

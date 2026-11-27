@@ -2,7 +2,7 @@ using Helm.Modules.Wallet;
 
 namespace Helm.Tests;
 
-/// <summary>The Wallet page's Bills section: add, edit, delete, and "Paid" saving the transaction like Ask Helm's bill_pay, each with Undo.</summary>
+/// <summary>The Wallet page's Bills section: add, edit, delete, and "Paid" saving the transaction like the agent tool bill_pay, each with Undo.</summary>
 public sealed class WalletBillsViewTests
 {
     // Noon UTC: the 3rd of November in any zone a test machine is in.

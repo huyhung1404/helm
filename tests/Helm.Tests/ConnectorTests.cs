@@ -74,8 +74,9 @@ public sealed class ConnectorTests : IDisposable
     public void WhatItSyncsComesFromTheOptionTheFileThenTheDefault()
     {
         Directory.CreateDirectory(Data);
-        Assert.Equal(["ai.", "wallet.", "tracker.", "habits."], SyncSelection.Resolve(null, Data).Groups);
-        Assert.Equal(["ai.", "wallet.", "tracker.", "habits.", "settings.ai-features"], SyncSelection.Resolve(null, Data).Prefixes);
+        // Helm has no AI of its own since 0.96: a new box does not sync the old AI records.
+        Assert.Equal(["wallet.", "tracker.", "habits."], SyncSelection.Resolve(null, Data).Groups);
+        Assert.Equal(["wallet.", "tracker.", "habits."], SyncSelection.Resolve(null, Data).Prefixes);
 
         File.WriteAllText(Path.Combine(Data, SyncSelection.FileName), """{ "sync": ["wallet", "Notes."] }""");
         Assert.Equal(["wallet.", "notes."], SyncSelection.Resolve(null, Data).Prefixes);
@@ -85,6 +86,37 @@ public sealed class ConnectorTests : IDisposable
         Assert.Throws<FormatException>(() => SyncSelection.Resolve("", Data));
         File.WriteAllText(Path.Combine(Data, SyncSelection.FileName), "{ sync: ");
         Assert.Throws<FormatException>(() => SyncSelection.Resolve(null, Data));
+    }
+
+    [Fact]
+    public async Task A_connector_json_that_lists_ai_keeps_working_and_syncs_the_old_ai_records_as_before()
+    {
+        // Fairy's box, as written before 0.96: the connector must not stop after it updates itself.
+        Directory.CreateDirectory(Data);
+        File.WriteAllText(Path.Combine(Data, SyncSelection.FileName), """{ "sync": ["ai", "wallet", "tracker", "habits", "vocab", "novel"] }""");
+
+        var selection = SyncSelection.Resolve(null, Data);
+
+        Assert.Equal(["ai.", "wallet.", "tracker.", "habits.", "vocab.", "novel."], selection.Groups);
+        Assert.Equal(["ai.", "wallet.", "tracker.", "habits.", "vocab.", "novel.", "settings.ai-features"], selection.Prefixes);
+        Assert.Equal(["ai.", "wallet."], SyncSelection.Resolve("ai.,wallet", Data).Groups);
+
+        await using var services = Tools(selection);
+        var tools = ConnectorMcp.Tools(services.GetServices<IMcpToolProvider>(), new ConfirmationGate()).Select(t => t.Name).ToHashSet();
+        Assert.Contains("wallet_unfiled", tools);
+        Assert.Contains("novel_suggest_translations", tools);
+        Assert.DoesNotContain(tools, t => t.StartsWith("ai_", StringComparison.Ordinal));
+        // The old records stay known to sync with their old policies: none is an unknown collection, the keys' deletions stay held.
+        var descriptors = services.GetServices<SyncCollectionDescriptor>().ToDictionary(d => d.Name);
+        Assert.All(LeftoverAiCollections.All, name => Assert.True(descriptors.ContainsKey(name), name));
+        Assert.Equal(["ai.autoruns", "ai.briefs", "ai.jobs", "ai.keys", "ai.management", "ai.prompts", "ai.usage", "ai.workers", "settings.ai-features"],
+            LeftoverAiCollections.All.Order(StringComparer.Ordinal));
+        Assert.NotNull(descriptors["ai.keys"].ChangeGuard);
+        Assert.NotNull(descriptors["ai.management"].ChangeGuard);
+        Assert.Null(descriptors["ai.jobs"].ChangeGuard);
+        Assert.Equal(SyncConflictPolicy.RemoteWins, descriptors["ai.usage"].Policy);
+        Assert.Equal(SyncConflictPolicy.LastWriterWins, descriptors["settings.ai-features"].Policy);
+        Assert.Contains(services.GetServices<SyncGroup>(), g => g.Prefix == "ai.");
     }
 
     [Fact]
@@ -104,7 +136,7 @@ public sealed class ConnectorTests : IDisposable
         Assert.Equal(0, exit);
         Assert.Contains("(not created yet)", output, StringComparison.Ordinal);
         Assert.Contains("Sync       not connected (helm-connector sync connect)", output, StringComparison.Ordinal);
-        Assert.Contains("Syncs      AI (ai.), Wallet (wallet.), Tracker (tracker.), Habits (habits.)", output, StringComparison.Ordinal);
+        Assert.Contains("Syncs      Wallet (wallet.), Tracker (tracker.), Habits (habits.)", output, StringComparison.Ordinal);
         Assert.Contains("Serve      not running", output, StringComparison.Ordinal);
         Assert.Contains("Holds      none", output, StringComparison.Ordinal);
         Assert.False(Directory.Exists(Data));
@@ -318,7 +350,7 @@ public sealed class ConnectorTests : IDisposable
     }
 
     [Fact]
-    public async Task ByDefaultItServesWalletTrackerHabitsAndAiButNeverVault()
+    public async Task ByDefaultItServesWalletTrackerHabitsButNeverVault()
     {
         await using var services = Tools(SyncSelection.Resolve(null, Data));
         var tools = ConnectorMcp.Tools(services.GetServices<IMcpToolProvider>(), new ConfirmationGate()).Select(t => t.Name).ToHashSet();
@@ -327,7 +359,7 @@ public sealed class ConnectorTests : IDisposable
         Assert.DoesNotContain(tools, t => t.StartsWith("notes_", StringComparison.Ordinal) || t.StartsWith("mission", StringComparison.Ordinal)
             || t.StartsWith("vocab_", StringComparison.Ordinal));
         Assert.DoesNotContain(tools, t => t.Contains("vault", StringComparison.OrdinalIgnoreCase));
-        // Helm's automatic jobs and their briefs are gone (Fairy does these now): no ai_ tool.
+        // Helm has no AI of its own (Fairy does that work): no ai_ tool.
         Assert.DoesNotContain(tools, t => t.StartsWith("ai_", StringComparison.Ordinal));
         Assert.DoesNotContain(services.GetServices<IMcpToolProvider>(), p => p.GetType().Namespace?.Contains("Vault", StringComparison.Ordinal) == true);
         Assert.DoesNotContain(services.GetServices<SyncGroup>(), g => g.Prefix == "vault.");

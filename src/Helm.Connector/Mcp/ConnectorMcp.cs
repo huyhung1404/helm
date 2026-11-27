@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace Helm.Connector.Mcp;
 
 /// <summary>
-/// Helm's tools for Fairy Core, over MCP, from the same tool providers Ask Helm and Helm's own MCP server use. Nobody
+/// Helm's tools for Fairy Core, over MCP, from the same tool providers Helm's own MCP server uses. Nobody
 /// is at the box to ask, so a call runs without a question, except what <see cref="McpTool.Destructive"/> marks (a note
 /// to the trash, a mission replanned, any bulk deletion): those go through the <see cref="ConfirmationGate"/> and run
 /// only after the user's yes, confirmed by the host over <c>helm/confirm</c>. Tools that reach another machine are
@@ -27,7 +27,7 @@ internal static class ConnectorMcp
     public static IReadOnlyList<McpTool> Tools(IEnumerable<IMcpToolProvider> providers, ConfirmationGate gate) =>
         [.. providers.SelectMany(p => p.Tools).Select(t => t.Destructive ? gate.Guard(t) : t)];
 
-    /// <param name="methods">More host methods beside the gate's (none since the phone's jobs went with Ask Helm).</param>
+    /// <param name="methods">More host methods beside the gate's.</param>
     public static McpServer Server(IEnumerable<IMcpToolProvider> providers, ConfirmationGate gate, ILogger logger,
         IEnumerable<KeyValuePair<string, Func<JsonObject?, CancellationToken, Task<JsonNode?>>>>? methods = null) =>
         new(Tools(providers, gate), AppInfo.Version, Instructions, logger, consent: null)

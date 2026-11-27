@@ -27,7 +27,7 @@ Notes, tasks, a password vault and tools for Claude Code in one Fluent app, sync
 - **Keyboard-first.** Hold Ctrl, Alt or Win to see the shortcuts of the app in front, Win+Alt+N to capture a note or task from any app.
 - **Helm tools for AI agents (MCP).** Claude Code, VS Code, Claude Desktop, Cursor or any MCP client can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **General › MCP**. Helm itself is passive: Fairy and other agents do the automating through these tools.
 - **Report a bug from anywhere, with a black box.** Ctrl+Alt+F12 on PC, a shake or a Quick Settings tile on the phone: the report carries the last 60 seconds of what you did and how Helm answered (errors, freezes, never what you typed) and your own pictures; AI agents read, fix and hand bugs back through Helm's MCP tools, and only you close them ([docs/bug-fixing.md](docs/bug-fixing.md)).
-- **AI inside the tools keeps working, with no settings page.** The AI page (models and keys, proxy, features) and Ask Helm were removed in 0.93: the keys, agents and choices set before are kept and still used, and a feature with no model says so plainly ([docs/ai-keys.md](docs/ai-keys.md)). The old code is at tag `archive/helm-ai-2026-11-26`.
+- **No AI of its own.** Since 0.96 Helm calls no AI model, agent or API key itself: Fairy and other agents do the AI work through Helm's MCP tools (word analysis, translation suggestions, filing transactions). The AI records synced before (keys, usage) stay on the sync server untouched. The old code is at tags `archive/helm-ai-2026-11-26` and `archive/helm-ai-2026-11-27`.
 
 ## Tools
 

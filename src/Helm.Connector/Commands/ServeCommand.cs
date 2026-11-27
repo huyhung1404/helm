@@ -1,4 +1,3 @@
-using Helm.Ai.Assistant;
 using Helm.Connector.Hosting;
 using Helm.Connector.Mcp;
 using Helm.Connector.Sync;

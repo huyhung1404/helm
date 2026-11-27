@@ -1,9 +1,9 @@
 using Helm.Shell.Windows;
-using Helm.Ai.Agents;
 using Helm.App.Shell;
 using Helm.Core;
 using Helm.Core.Services;
 using Helm.Core.Settings;
+using Helm.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -31,13 +31,8 @@ internal static class HelmHost
         // Core infrastructure (settings, hooks, hotkeys, window/monitor services, module registry)
         builder.Services.AddHelmCore(paths);
 
-        // The AI models Helm calls with the user's API keys (on Helm Sync).
-        Helm.Ai.AiCoreServices.AddHelmAi(builder.Services);
-        // The proxy: the agents the user added to this PC (Codex, Claude Code…, each signed in to its own account) take
-        // Helm's AI jobs first, for this PC's features and the phone's (through Helm Sync, AgentJobWorker); the API key
-        // only when none answers. Helm runs its own tools for them. The same agents serve the user's own VPS too, when
-        // set up on AI → Proxy (this PC only: address and token are never synced). helm serve on Linux shares it.
-        builder.Services.AddAgentProxy(paths, _ => new Ai.WindowsAgentSignIn());
+        // Helm's old AI records on the sync server: still known to sync, read by nothing.
+        builder.Services.AddLeftoverAiCollections();
 
         // Modules — each module assembly exposes one registration extension.
         HelmModules.Register(builder.Services);

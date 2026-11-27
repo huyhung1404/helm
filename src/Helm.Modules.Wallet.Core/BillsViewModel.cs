@@ -55,7 +55,7 @@ public sealed partial class BillRow : ObservableObject
         IsPaid = bill.PaidMonths.Contains(month);
         var due = bill.DueIn(month);
         IsLate = !IsPaid && bill.StartMonth <= month && due < today;
-        // A bill added after its day still takes this month's payment (late), as Ask Helm's bill_pay does.
+        // A bill added after its day still takes this month's payment (late), as the agent tool bill_pay does.
         CanPay = !IsPaid;
         CountsThisMonth = IsPaid || bill.StartMonth <= month;
         StateText = IsPaid ? "Paid"
@@ -94,7 +94,7 @@ public sealed partial class BillRow : ObservableObject
 /// <summary>
 /// The Wallet page's Bills section (both apps): the recurring bills (<see cref="BillBook"/>, synced <c>wallet.bills</c>)
 /// with this month paid or not, adding, editing and deleting one, and "Paid", which saves the spending transaction and
-/// marks the month paid as Ask Helm's bill_pay does. The last payment or deletion can be taken back (Undo). UI thread.
+/// marks the month paid as the agent tool bill_pay does. The last payment or deletion can be taken back (Undo). UI thread.
 /// </summary>
 public sealed partial class BillsViewModel : ObservableObject
 {

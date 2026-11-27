@@ -10,8 +10,7 @@ namespace Helm.Connector.Sync;
 /// process restarts.
 /// </summary>
 /// <remarks>
-/// The box normally pushes about once a minute (a heartbeat, a tool call); a quick talk with Ask Helm through Fairy Core
-/// adds about three per turn (the claim, the answer, the warm-up). A push is one request of up to 100 records, so a
+/// The box normally pushes about once a minute (a heartbeat, a tool call). A push is one request of up to 100 records, so a
 /// minute carries 4,000 records: room for what piled up while it was offline. A runaway loop pushes far more than 40 a
 /// minute (urgent records go out within 50 ms); one that writes every second (about 30 runs a minute) trips the
 /// ten-minute limit within five.

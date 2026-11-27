@@ -55,7 +55,7 @@ public static class WalletCoreServices
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, DebtCaptureTarget>();
         // The AI agents' tools for the debt book (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, WalletMcpTools>();
-        // Ask Helm's: a bill split among friends, a debt reminder to share, recurring bills.
+        // The agent tools for a bill split among friends, a debt reminder to share, recurring bills.
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, WalletShareTools>();
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, BillMcpTools>();
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, GoalMcpTools>();

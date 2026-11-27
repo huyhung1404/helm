@@ -6,7 +6,7 @@ using Helm.Modules.Vocab;
 
 namespace Helm.Tests;
 
-/// <summary>A held sentence's word going to Vocabulary, and a batch of tasks added to Tracker over MCP.</summary>
+/// <summary>A held sentence's word going to Vocabulary, and Tracker's tools for a batch of tasks and a task done before.</summary>
 public sealed class LanguageToolsTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 11, 3, 8, 0, 0, TimeSpan.Zero);
@@ -121,7 +121,35 @@ public sealed class LanguageToolsTests
         await Assert.ThrowsAsync<McpToolException>(() => tool.Run(Json("""{"tasks": []}"""), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Ticking_a_task_already_done_changes_nothing_and_its_Undo_never_reopens_it()
+    {
+        var tracker = new TrackerStore(new MemorySynced<TrackerWorkspace>(), new MemorySynced<TrackerItem>(), new MemorySyncedLog<TrackerEvent>());
+        var list = tracker.AddWorkspace("Việc");
+        var id = tracker.AddItem(list, new TrackerItemDraft("Gọi khách"));
+        tracker.Complete(id);
+        var tools = new TrackerMcpTools(tracker);
+        var complete = tools.Tools.First(t => t.Name == "tracker_complete_task");
+
+        var json = Serialize(await complete.Run(Args(new { id }), CancellationToken.None));
+        Assert.True(McpTool.ChangedNothing(json));
+        await complete.Undo!(JsonDocument.Parse(json).RootElement, CancellationToken.None);
+        Assert.True(tracker.GetItem(id)!.IsCompleted);
+
+        // One it did tick goes back.
+        tracker.Reopen(id);
+        var ticked = Serialize(await complete.Run(Args(new { id }), CancellationToken.None));
+        Assert.False(McpTool.ChangedNothing(ticked));
+        await complete.Undo!(JsonDocument.Parse(ticked).RootElement, CancellationToken.None);
+        Assert.False(tracker.GetItem(id)!.IsCompleted);
+    }
+
     // ---- doubles ----------------------------------------------------------------------------------------------
+
+    private static string Serialize(object? result) =>
+        result as string ?? JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+    private static JsonElement Args(object value) => JsonDocument.Parse(JsonSerializer.Serialize(value)).RootElement.Clone();
 
     private static JsonElement Json(string text) => JsonDocument.Parse(text).RootElement.Clone();
 }

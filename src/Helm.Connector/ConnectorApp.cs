@@ -133,7 +133,7 @@ internal static class ConnectorApp
         output.WriteLine();
         output.WriteLine("Options:");
         output.WriteLine($"  --data-dir PATH  Helm's data folder (else ${DataDirectory.Variable}, else ~/.local/share/helm)");
-        output.WriteLine($"  --sync LIST      What to sync, e.g. ai,wallet,tracker,habits,notes (else {SyncSelection.FileName}, else");
+        output.WriteLine($"  --sync LIST      What to sync, e.g. wallet,tracker,habits,notes (else {SyncSelection.FileName}, else");
         output.WriteLine($"                   {string.Join(",", SyncSelection.Default.Select(g => g.TrimEnd('.')))})");
         output.WriteLine("  --version        Print the version");
         output.WriteLine("  --help           Print this help");

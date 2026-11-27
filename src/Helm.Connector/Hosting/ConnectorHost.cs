@@ -29,8 +29,8 @@ internal static class ConnectorHost
             new HttpSyncTransport(sp.GetRequiredService<ISyncCredentialStore>(), sp.GetRequiredService<SyncApiClient>()), time));
         services.AddSingleton<ISyncTransport>(sp => sp.GetRequiredService<PushBreaker>());
         services.AddHelmCommon(paths);
-        // AI's synced collections and stores (keys, usage, the features' settings).
-        Helm.Ai.AiCoreServices.AddHelmAi(services);
+        // Helm's old AI records on the sync server (when "ai" is synced): still known to sync, read by nothing.
+        services.AddLeftoverAiCollections();
 
         services.AddSingleton<IDeviceInfo, MachineDeviceInfo>();
         services.AddSingleton<IUiDispatcher, HeadlessUiDispatcher>();

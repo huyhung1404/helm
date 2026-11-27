@@ -107,21 +107,6 @@ public sealed class App : Application
             var engine = Services.GetRequiredService<Core.Sync.SyncEngine>();
             engine.Start();
             engine.SetLive(true);
-            // The agents on this PC take the phone's AI jobs through Helm Sync, from launch on; a sign-in or a change of
-            // the list tells the phone at once instead of at the next heartbeat.
-            var worker = Services.GetRequiredService<Helm.Ai.Assistant.AgentJobWorker>();
-            worker.Start();
-            // And the user's VPS, when it is set up and on; it hears of the ready agents too.
-            var vps = Services.GetRequiredService<Helm.Ai.Vps.VpsWorker>();
-            Services.GetRequiredService<Helm.Ai.Vps.VpsWorkerControl>().Apply();
-            Services.GetRequiredService<Helm.Ai.Agents.AgentRegistry>().Changed += (_, _) =>
-            {
-                worker.Beat();
-                vps.SendStatus();
-            };
-            // The keys' model lists are tested again once a day, and the features' prompts come from the user's Skill Hub.
-            Services.GetRequiredService<Helm.Ai.AiModelRefresher>().Start();
-            Services.GetRequiredService<Helm.Ai.Prompts.AiPromptRefresher>().Start();
             // The AI agents' tools (a pipe only this user can open; each connection checks the MCP settings).
             Services.GetRequiredService<Core.Mcp.McpPipeHost>().Start();
         }

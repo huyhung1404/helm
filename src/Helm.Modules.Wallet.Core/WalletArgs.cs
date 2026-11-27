@@ -37,7 +37,7 @@ internal static class WalletArgs
         record.TryGetProperty(name, out var id) && id.GetString() is { Length: > 0 } text ? text : throw new McpToolException($"The result has no {name}.");
 }
 
-/// <summary>Amounts and days as Ask Helm's card shows them: "300.000đ", "28/10".</summary>
+/// <summary>Amounts and days as the agent tools write them: "300.000đ", "28/10".</summary>
 public static class WalletSpeech
 {
     /// <summary>Dots between the thousands, whatever the device's language.</summary>

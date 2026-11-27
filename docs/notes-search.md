@@ -36,7 +36,7 @@ in Helm, offline, with no paid API.
 - `NoteMeaning` embeds the search on this device and gives each note the cosine of its closest part. `NoteRecall.Rank`
   blends meaning + 0.6 × words + 0.1 × recency; a note without the words is found from 0.4, or from 0.3 when it is
   within 0.05 of the closest note (a search padded with "ghi chú về… hôm trước" is less close to everything).
-- `notes_search` (agents, Ask Helm) uses the query, else its `any` words together. The Notes search box lists the notes
+- `notes_search` (agents) uses the query, else its `any` words together. The Notes search box lists the notes
   with the words as before, then, a moment after typing stops, the notes about the same thing.
 - Without the model on this device (or before any vectors exist), both search by words exactly as before.
 

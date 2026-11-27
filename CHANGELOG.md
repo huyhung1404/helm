@@ -20,6 +20,13 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   - Tracker and Notes: "Split into steps" and "Make tasks" are gone; the lines of a note that became tasks still show
     when their task is done.
   - The text actions on a selection (translate, rewrite…), already off since 26/11, are gone.
+- **The rest of Helm's own AI.** Helm has no AI of its own any more: no API keys, no agents on the PC (Claude Code,
+  Codex, Grok) taking the phone's jobs, no VPS worker, no costs book, no model lists, no prompts from the Skill Hub,
+  no AI settings. You talk to Fairy, and Fairy works through Helm's tools, which all stay. The AI records synced
+  before (your keys, the usage, the old jobs and briefs, the features' choices) stay on your sync server, untouched:
+  Helm no longer reads them, and deleting them is up to you.
+- **Fairy's connector:** a new box no longer syncs "ai" by default; a `connector.json` that lists `ai` keeps working.
+- **Android: the microphone and alarm permissions** Ask Helm used are no longer asked for.
 
 ## [0.95.0] - 2026-11-27
 

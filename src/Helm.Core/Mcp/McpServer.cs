@@ -53,9 +53,9 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
 
     /// <summary>
     /// Takes back what one call did, given that call's result (as JSON): a tool that only adds or ticks something can
-    /// offer it, so Helm's own assistant saves at once and shows Undo instead of asking first. Null: not undoable.
-    /// When the result has a <see cref="RecordsProperty"/> list (one call that made several records, each with its own
-    /// <c>summary</c>), Undo gets one of its items at a time, and the assistant lists each record with its own Undo.
+    /// offer it, so the host (Fairy Core, through the connector's helm/undo) runs it at once and offers Undo instead of
+    /// asking first. Null: not undoable. When the result has a <see cref="RecordsProperty"/> list (one call that made
+    /// several records, each with its own <c>summary</c>), Undo gets one of its items at a time.
     /// </summary>
     public Func<JsonElement, CancellationToken, Task>? Undo { get; init; }
 
@@ -63,9 +63,8 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     public const string RecordsProperty = "records";
 
     /// <summary>
-    /// What Helm's own assistant (Ask Helm, the agents on a PC) tells its model instead of <see cref="Description"/>:
-    /// shorter, since every call pays for it in tokens. With it, the schema goes without its descriptions but those of
-    /// <see cref="BriefArgs"/> (types, enums and required stay). Null: the full texts. MCP clients always get the full ones.
+    /// What Helm's own assistant (gone since 0.95; nothing reads it now) told its model instead of
+    /// <see cref="Description"/>: shorter, since every call paid for it in tokens. MCP clients always get the full texts.
     /// </summary>
     public string? Brief { get; init; }
 
@@ -73,8 +72,8 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     public IReadOnlyDictionary<string, string>? BriefArgs { get; init; }
 
     /// <summary>
-    /// What Helm's own assistant sends its model of a result: only what it needs to answer (<see cref="Keep"/>,
-    /// <see cref="Drop"/>). Undo, the card's records and MCP clients still get the whole result. Null: all of it.
+    /// What Helm's own assistant (gone; nothing reads it now) sent its model of a result: only what it needed to answer
+    /// (<see cref="Keep"/>, <see cref="Drop"/>). Undo and MCP clients get the whole result. Null: all of it.
     /// </summary>
     public Func<JsonNode, JsonNode?>? BriefResult { get; init; }
 

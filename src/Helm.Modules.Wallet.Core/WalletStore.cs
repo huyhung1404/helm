@@ -219,7 +219,7 @@ public sealed class WalletStore
     }
 
     /// <summary>
-    /// Fills in what a transaction was (Ask Helm, from what the user said): its category and/or description, each
+    /// Fills in what a transaction was (an agent, from what the user said): its category and/or description, each
     /// only when given. Returns the transaction as it was, for Undo (<see cref="Restore"/>); null when it is gone.
     /// </summary>
     public WalletTransaction? Describe(string id, string? categoryId, string? description)
