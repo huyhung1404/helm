@@ -5,8 +5,11 @@ namespace Helm.Ai;
 /// <summary>The AI features of Helm, each with its own choice of model (<see cref="AiFeatureSettings"/>).</summary>
 public static class AiFeatureIds
 {
-    /// <summary>The phone's voice assistant: the Quick Settings tile and its card.</summary>
-    public const string AskHelm = "ask-helm";
+    /// <summary>
+    /// The choice a feature with none of its own runs with. It was Ask Helm's (the phone's assistant, removed in 0.95):
+    /// the id stays, so the choice synced so far is kept.
+    /// </summary>
+    public const string Default = "ask-helm";
 
     /// <summary>Wallet: a new transaction the history cannot file (runs by itself: a PC agent only, unless chosen otherwise).</summary>
     public const string WalletCategorize = "wallet-categorize";
@@ -25,9 +28,6 @@ public static class AiFeatureIds
 
     /// <summary>Tracker: steps proposed for a big task, tasks proposed from a note.</summary>
     public const string TaskProposals = "task-proposals";
-
-    /// <summary>A8/M4: Ask Helm searches the web (weather, rates, gold, news, checking a post). Off until the user turns it on.</summary>
-    public const string WebSearch = "web-search";
 
     // Jobs a Helm PC runs by itself on its agents (Helm.Ai.Auto.AutoJobCatalog): each brief reaches the phone.
 
@@ -117,7 +117,7 @@ public sealed class AiFeatureSettings : IVersionedSettings
 
 public static class ClaudeModels
 {
-    /// <summary>The cheapest and fastest current model: Ask Helm's default.</summary>
+    /// <summary>The cheapest and fastest current model: the features' default.</summary>
     public const string Haiku = "claude-haiku-5-5";
 
     /// <summary>The current Sonnet: what reads a photo when the model picked cannot.</summary>

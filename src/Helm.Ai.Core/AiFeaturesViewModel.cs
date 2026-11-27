@@ -22,8 +22,7 @@ public sealed partial class AiFeatureGroup(string title, IReadOnlyList<AiFeature
 /// <summary>
 /// AI settings per feature, shared by both apps: AI → Features on the PC (one table) and General › AI features on the
 /// phone (a list, a detail per feature). Each row is one <see cref="AiFeatureIds"/> feature's synced
-/// <see cref="AiFeatureChoice"/>, saved at once, so a change on one device shows on the other; Ask Helm's route on the
-/// Proxy tab and the automatic jobs' times (Ask Helm sets them) are the same choices.
+/// <see cref="AiFeatureChoice"/>, saved at once, so a change on one device shows on the other.
 /// </summary>
 public sealed partial class AiFeaturesViewModel : ObservableObject
 {
@@ -42,7 +41,7 @@ public sealed partial class AiFeaturesViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsList), nameof(IsDetail))]
     private AiFeatureRow? _selected;
 
-    /// <param name="models">The models the user can pick (<see cref="HelmAssistant.Models"/>: the tested keys' chat models).</param>
+    /// <param name="models">The models the user can pick (<see cref="AssistantModelOption.Offered"/>: the tested keys' chat models).</param>
     /// <param name="workers">The PCs' agent heartbeats, for "Agents online: HUNG-PC" in the summary.</param>
     public AiFeaturesViewModel(ISyncedSettings<AiFeatureSettings> features, AiUsageBook usage, Func<IReadOnlyList<AssistantModelOption>> models,
         IUiDispatcher ui, ISyncedCollection<AiWorkerRecord>? workers = null, TimeProvider? time = null)

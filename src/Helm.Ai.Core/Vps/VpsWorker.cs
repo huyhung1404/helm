@@ -23,7 +23,7 @@ public sealed class VpsWorker : IDisposable
     /// <summary>How long an agent may take over a job.</summary>
     public static readonly TimeSpan JobTimeout = TimeSpan.FromMinutes(2);
 
-    internal const string NeutralSystem = "You are a helpful assistant. Answer the request directly, in the language it is written in.";
+    internal const string NeutralSystem = LocalAgentRoute.NeutralSystem;
 
     private static readonly TimeSpan MaxRetry = TimeSpan.FromMinutes(1);
 

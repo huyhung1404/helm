@@ -91,12 +91,12 @@ public sealed class AiModelRefresherTests
     public async Task A_pick_the_provider_retired_falls_back_to_its_default()
     {
         _keys.Add(AiProviders.Claude, "Helm", Claude, Check(_time.Now.AddDays(-2), "claude-haiku-5-5", "claude-sonnet-4-6"));
-        Pick(AiFeatureIds.AskHelm, AiProviders.Claude, "claude-sonnet-4-6");
+        Pick(AiFeatureIds.Default, AiProviders.Claude, "claude-sonnet-4-6");
         _claude.Next = Check(_time.Now, "claude-haiku-5-5", "claude-sonnet-5-5");
 
         await Refresher().RefreshDueAsync(CancellationToken.None);
 
-        var choice = _features.Current.For(AiFeatureIds.AskHelm);
+        var choice = _features.Current.For(AiFeatureIds.Default);
         Assert.Equal(ClaudeModels.Haiku, choice.Model);
         Assert.Equal(AiProviders.Claude.Id, choice.Provider);
     }
@@ -117,24 +117,23 @@ public sealed class AiModelRefresherTests
     {
         _keys.Add(AiProviders.Claude, "Helm", Claude, Check(_time.Now, "claude-haiku-5-5", "claude-opus-5-5"));
         _keys.Add(AiProviders.Grok, "Grok", Grok, new AiKeyCheck(_time.Now, AiKeyStatus.Rejected, "No.", []));
-        Pick(AiFeatureIds.AskHelm, AiProviders.Claude, "claude-opus-5-5");
+        Pick(AiFeatureIds.Default, AiProviders.Claude, "claude-opus-5-5");
         Pick("novel", AiProviders.Grok, "grok-old");
 
         Refresher().KeepPicksOffered();
 
-        Assert.Equal("claude-opus-5-5", _features.Current.For(AiFeatureIds.AskHelm).Model);
+        Assert.Equal("claude-opus-5-5", _features.Current.For(AiFeatureIds.Default).Model);
         Assert.Equal("grok-old", _features.Current.For("novel").Model);
     }
 
     [Fact]
-    public void Ask_Helm_lists_chat_models_only()
+    public void The_features_list_chat_models_only()
     {
         _keys.Add(AiProviders.Claude, "Helm", Claude, Check(_time.Now, "claude-haiku-5-5", "claude-embed-1"));
         _keys.Add(AiProviders.Grok, "Grok", Grok, Check(_time.Now, "grok-4.7", "grok-imagine-video", "grok-2-image-1212"));
-        var assistant = new HelmAssistant(_keys, _features, new AiUsageBook(new MemorySyncedLog<AiUsageEntry>()), [],
-            [new Chats(AiProviders.Claude), new Chats(AiProviders.Grok)], _ => true);
+        var offered = AssistantModelOption.Offered(_keys, [new Chats(AiProviders.Claude), new Chats(AiProviders.Grok)]);
 
-        Assert.Equal(["claude-haiku-5-5", "grok-4.7"], assistant.Models().Select(m => m.Model));
+        Assert.Equal(["claude-haiku-5-5", "grok-4.7"], offered.Select(m => m.Model));
     }
 
     [Fact]

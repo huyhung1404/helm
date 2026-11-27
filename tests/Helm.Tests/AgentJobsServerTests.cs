@@ -37,7 +37,7 @@ public sealed class AgentJobsServerTests : IDisposable
         pc.Engine.SetLive(true);
         await WaitUntil(() => phone.Engine.IsLive && pc.Engine.IsLive, "both live channels connect");
 
-        var local = new Local(new AiJobResult("Em ghi rồi nha Anh.", [new AiJobAction("wallet_add_transaction", "Chi 45.000đ · Phở", """{"id":"t1"}""")], [], 0.001m));
+        var local = new Local(new AiJobResult("Em ghi rồi nha Anh.", [], [], 0.001m));
         using var worker = new AgentJobWorker(pc.Jobs, pc.Workers, local, () => pc.Engine.DeviceId, "PC-HUNG", () => ["Codex"]);
         worker.Start();
         var route = new SyncAgentRoute(phone.Jobs, phone.Workers, () => phone.Engine.DeviceId, phone.Engine);
@@ -45,7 +45,7 @@ public sealed class AgentJobsServerTests : IDisposable
         Assert.Equal("PC-HUNG", route.Device);
 
         var took = Stopwatch.StartNew();
-        var result = await route.RunAsync(new AiJob(AiFeatureIds.AskHelm, "conv", "phở 45k", ["wallet_add_transaction"], [], "claude-haiku-5-5", "low"),
+        var result = await route.RunAsync(new AiJob(AiFeatureIds.Default, "conv", "phở 45k", [], [], "claude-haiku-5-5", "low"),
             TimeSpan.FromSeconds(8), CancellationToken.None);
         took.Stop();
 
@@ -54,8 +54,6 @@ public sealed class AgentJobsServerTests : IDisposable
         // Through the real Worker and both live channels, with a fake agent: the sync part of the time.
         Assert.True(took.Elapsed < TimeSpan.FromSeconds(8), $"The round trip took {took.Elapsed.TotalSeconds:0.0} s.");
 
-        await route.UndoAsync(result.Done[0], CancellationToken.None);
-        Assert.Single(local.Undone);
         phone.Engine.SetLive(false);
         pc.Engine.SetLive(false);
     }
@@ -104,7 +102,6 @@ public sealed class AgentJobsServerTests : IDisposable
     private sealed class Local(AiJobResult result) : IAgentRoute
     {
         public List<AiJob> Jobs { get; } = [];
-        public List<AiJobAction> Undone { get; } = [];
         public string Device => "PC-HUNG";
         public string? Unavailable() => null;
 
@@ -112,12 +109,6 @@ public sealed class AgentJobsServerTests : IDisposable
         {
             lock (Jobs) Jobs.Add(job);
             return Task.FromResult(result);
-        }
-
-        public Task UndoAsync(AiJobAction action, CancellationToken ct)
-        {
-            lock (Undone) Undone.Add(action);
-            return Task.CompletedTask;
         }
 
         public void End(string conversationId) { }

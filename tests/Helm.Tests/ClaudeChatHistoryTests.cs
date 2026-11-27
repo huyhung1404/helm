@@ -11,7 +11,7 @@ namespace Helm.Tests;
 /// the tools change (Claude refuses thinking written under other tools) or the history grows long, and a cache
 /// breakpoint after the instructions. Every request keeps each tool_use paired with its tool_result.
 /// </summary>
-public sealed class AskHelmHistoryTests
+public sealed class ClaudeChatHistoryTests
 {
     private readonly List<JsonObject> _sent = [];
     private readonly Queue<string> _answers = new();
@@ -79,26 +79,6 @@ public sealed class AskHelmHistoryTests
         await chat.NextAsync(CancellationToken.None);
 
         Assert.Equal("phở 45k", (string?)Assert.Single(_sent[^1]["messages"]!.AsArray())!["content"]);
-    }
-
-    [Fact]
-    public async Task Web_search_turned_on_in_the_middle_of_a_round_goes_on_from_a_recap_without_an_unanswered_call()
-    {
-        var chat = Chat(Add);
-        _answers.Enqueue(Calls(("toolu_1", "web_lookup")));
-        _answers.Enqueue(Text("Hôm nay Hà Nội 25 độ."));
-
-        chat.AddUser("thời tiết hôm nay?");
-        await chat.NextAsync(CancellationToken.None);
-        chat.AddWebSearch(3);
-        chat.AddResults([new ToolOutcome("toolu_1", """{"web_search":"on"}""", false)]);
-        await chat.NextAsync(CancellationToken.None);
-
-        var messages = _sent[^1]["messages"]!.AsArray();
-        var message = (string)Assert.Single(messages)!["content"]!;
-        AssertPaired(messages);
-        Assert.Contains("thời tiết hôm nay?", message);
-        Assert.Contains("Go on from here.", message);
     }
 
     [Fact]

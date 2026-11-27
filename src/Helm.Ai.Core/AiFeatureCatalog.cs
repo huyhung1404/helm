@@ -6,7 +6,7 @@ namespace Helm.Ai;
 /// <summary>One AI feature as the settings list it.</summary>
 /// <param name="Automatic">It runs by itself (not started by the user): on a PC agent only until the user says otherwise.</param>
 /// <param name="OnByDefault">On until the user turns it off; false: off until they turn it on (a paid extra).</param>
-/// <param name="Route">Where it runs until the user says otherwise; null: as Ask Helm does.</param>
+/// <param name="Route">Where it runs until the user says otherwise; null: as the default choice does.</param>
 /// <param name="Tool">The tool it belongs to (a module id): the settings show that tool's icon while it is in the app.</param>
 /// <param name="Symbol">
 /// Its Fluent symbol without a size ("Mic"), drawn when it belongs to no tool or the tool is not there; the PC adds "24".
@@ -25,13 +25,11 @@ public static class AiFeatureCatalog
 {
     private static readonly AiFeatureInfo[] Known =
     [
-        new(AiFeatureIds.AskHelm, "Ask Helm", "Voice and typed requests from the card", false, Symbol: "Mic"),
+        new(AiFeatureIds.Default, "Default", "The model a feature uses until you pick one for it", false),
         new(AiFeatureIds.TextActions, "Translate / rewrite selection", "Selected text in any app, from the phone's text menu", false, Symbol: "Translate"),
         new(AiFeatureIds.VocabQuick, "Word analysis", "Roots and meaning for a word added on the phone", false, Tool: "vocab", Symbol: "BookLetter"),
         new(AiFeatureIds.SentenceExplain, "Explain sentence", "Novel Reader: hold a sentence", false, Tool: "novel-reader", Symbol: "BookOpen"),
         new(AiFeatureIds.TaskProposals, "Task proposals", "Tracker: steps for a big task, tasks from a note", false, Tool: "tracker", Symbol: "TaskListAdd"),
-        new(AiFeatureIds.WebSearch, "Web search", "Ask Helm: weather, rates, gold, news, checking a post · API, about $0.01 a search", false,
-            OnByDefault: false, Route: AiRoutePolicy.ApiOnly, Symbol: "Globe"),
         new(AiFeatureIds.WalletReadNotification, "Read a bank notification", "Wallet: one Helm could not read, when you ask", false, Tool: "wallet", Symbol: "Wallet"),
         new(AiFeatureIds.WalletCategorize, "Auto-classify transactions", "Wallet: files a new payment the history cannot", true, Tool: "wallet", Symbol: "Wallet"),
         new(AiFeatureIds.MorningBrief, "Morning brief", "Today's tasks, habits to do, yesterday's spending", true, Symbol: "WeatherSunny"),
@@ -48,14 +46,14 @@ public static class AiFeatureCatalog
     public static AiFeatureInfo? Find(string id) => All.FirstOrDefault(f => f.Id == id);
 
     /// <summary>
-    /// The choice a feature runs with now: its own, else its default (an automatic job's), else Ask Helm's model, on,
+    /// The choice a feature runs with now: its own, else its default (an automatic job's), else the default model, on,
     /// and on a PC only when it runs by itself (as <see cref="Assistant.AiTextService"/> does).
     /// </summary>
     public static AiFeatureChoice Effective(AiFeatureSettings settings, string id)
     {
         if (settings.Features.TryGetValue(id, out var own)) return own;
-        if (id == AiFeatureIds.AskHelm || AutoJobCatalog.Find(id) is not null) return settings.For(id);
-        var inherited = settings.For(AiFeatureIds.AskHelm).Copy();
+        if (id == AiFeatureIds.Default || AutoJobCatalog.Find(id) is not null) return settings.For(id);
+        var inherited = settings.For(AiFeatureIds.Default).Copy();
         var info = Find(id);
         inherited.Enabled = info?.OnByDefault ?? true;
         inherited.At = null;

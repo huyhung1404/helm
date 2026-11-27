@@ -148,28 +148,17 @@ public sealed class AiPromptsTests : IDisposable
     }
 
     [Fact]
-    public void Every_feature_id_is_fetched() => Assert.Contains(AiFeatureIds.AskHelm, AiPromptRefresher.AllFeatures());
+    public void Every_feature_id_is_fetched() => Assert.Contains(AiFeatureIds.Default, AiPromptRefresher.AllFeatures());
 
     [Fact]
-    public void Ask_Helm_on_the_api_starts_with_the_override()
+    public async Task A_pc_agent_starts_with_the_override_unless_the_job_brings_its_own()
     {
         var prompts = Prompts();
-        prompts.Save(AiFeatureIds.AskHelm, "Em là trợ lý của Anh.");
-        var assistant = new HelmAssistant(new AiKeyStore(new MemorySynced<AiKey>()), new MemorySettings<AiFeatureSettings>(),
-            new AiUsageBook(new MemorySyncedLog<AiUsageEntry>()), [], [], _ => true, prompts: prompts);
-
-        Assert.Equal("Em là trợ lý của Anh.", assistant.SystemPrompt());
-    }
-
-    [Fact]
-    public async Task Ask_Helm_on_a_pc_agent_starts_with_the_override_unless_the_job_brings_its_own()
-    {
-        var prompts = Prompts();
-        prompts.Save(AiFeatureIds.AskHelm, "Em là trợ lý của Anh.");
+        prompts.Save(AiFeatureIds.Default, "Em là trợ lý của Anh.");
         var agent = new Capture();
-        using var local = new LocalAgentRoute("PC-HUNG", "Codex", agent, [], _ => true, () => null, prompts: prompts);
+        using var local = new LocalAgentRoute("PC-HUNG", "Codex", agent, () => null, prompts: prompts);
 
-        await local.RunAsync(new AiJob(AiFeatureIds.AskHelm, "c1", "hi", [], [], "m", "low"), TimeSpan.FromSeconds(5), CancellationToken.None);
+        await local.RunAsync(new AiJob(AiFeatureIds.Default, "c1", "hi", [], [], "m", "low"), TimeSpan.FromSeconds(5), CancellationToken.None);
         Assert.Equal("Em là trợ lý của Anh.", agent.System);
 
         await local.RunAsync(new AiJob("blog.summary", "c2", "hi", [], [], "m", "low") { System = "You summarise posts." },

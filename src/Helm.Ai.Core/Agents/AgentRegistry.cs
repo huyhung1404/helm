@@ -1,5 +1,4 @@
 using Helm.Ai.Assistant;
-using Helm.Core.Mcp;
 using Helm.Core.Processes;
 using Helm.Core.Settings;
 using Microsoft.Extensions.Logging;
@@ -55,12 +54,9 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
     private readonly HelmPaths _paths;
     private readonly IChildProcessLauncher _launcher;
     private readonly IAgentSignIn _signIn;
-    private readonly IReadOnlyList<IMcpToolProvider> _tools;
-    private readonly Func<string?, bool> _isToolOn;
     private readonly ILoggerFactory _loggers;
     private readonly Prompts.IAiPrompts? _prompts;
     private readonly AiKeyStore? _keys;
-    private readonly Func<McpTool, bool>? _offers;
     private readonly object _gate = new();
     private IReadOnlyList<Agent> _agents = [];
     private readonly AgentChain _chain = new([]);
@@ -69,19 +65,14 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
 
     /// <param name="signIn">Shows an agent's sign-in to the user (a console window on Windows, the terminal on Linux).</param>
     /// <param name="keys">The API keys whose last test lists the models an agent of their provider can be asked for.</param>
-    /// <param name="offers">The tools its agents may offer a job at all; null: Ask Helm's own.</param>
     public AgentRegistry(ISettingsStoreFactory settings, HelmPaths paths, IChildProcessLauncher launcher, IAgentSignIn signIn,
-        IEnumerable<IMcpToolProvider> tools, Func<string?, bool> isToolOn, ILoggerFactory loggers, Prompts.IAiPrompts? prompts = null,
-        AiKeyStore? keys = null, Func<McpTool, bool>? offers = null)
+        ILoggerFactory loggers, Prompts.IAiPrompts? prompts = null, AiKeyStore? keys = null)
     {
         _keys = keys;
-        _offers = offers;
         _store = settings.Get<AiAgentSettings>(AiAgentSettings.StoreId);
         _paths = paths;
         _launcher = launcher;
         _signIn = signIn;
-        _tools = [.. tools];
-        _isToolOn = isToolOn;
         _loggers = loggers;
         _prompts = prompts;
         Build();
@@ -103,17 +94,11 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
 
     public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct) => _chain.RunAsync(job, wait, ct);
 
-    public Task UndoAsync(AiJobAction action, CancellationToken ct) => _chain.UndoAsync(action, ct);
-
     public void End(string conversationId) => _chain.End(conversationId);
-
-    public void Warm(AiJob job) => _chain.Warm(job);
 
     public IReadOnlyList<AiAgentOffer> Offers => _chain.Offers;
 
     public string? UnavailableFor(string agent) => _chain.UnavailableFor(agent);
-
-    public bool ReadsPhotos => _chain.ReadsPhotos;
 
     /// <summary>"Ready", "Off", or why it takes no job.</summary>
     public string Status(AgentProfile profile)
@@ -297,8 +282,8 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
         };
         if (made is not { } m) return null;
         return new Agent(profile, m.Factory, m.Unavailable,
-            new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts,
-                logger: _loggers.CreateLogger<LocalAgentRoute>(), kind: profile.Kind, models: () => ModelsOf(profile.Kind), offers: _offers));
+            new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, m.Unavailable, prompts: _prompts,
+                logger: _loggers.CreateLogger<LocalAgentRoute>(), kind: profile.Kind, models: () => ModelsOf(profile.Kind)));
     }
 
     /// <summary>

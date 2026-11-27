@@ -7,28 +7,26 @@ using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Helm.Modules.Tracker;
 using Helm.Modules.Wallet;
-using static Helm.Tests.AskHelmScript;
+using static Helm.Tests.ChatScript;
 
 namespace Helm.Tests;
 
 /// <summary>
-/// The pre-release review's findings on Ask Helm and the router: two PCs online, Undo that did nothing, the tool scope,
-/// a task done before, unpriced models and the cap, tool names a job brings, the old management key, the PC's agent
-/// list, the live channel, and the one text call.
+/// The pre-release review's findings on the router: two PCs online, a task done before, unpriced models and the cap,
+/// the old management key, the PC's agent list, the live channel, and the one text call.
 /// </summary>
 public sealed class AiReviewFixesTests : IDisposable
 {
     private readonly MemorySynced<AiJobRecord> _jobs = new();
     private readonly MemorySynced<AiWorkerRecord> _workers = new();
-    private readonly WalletStore _wallet = new(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>());
     private readonly TempDir _dir = new();
 
     public void Dispose() => _dir.Dispose();
 
-    // ---- 1. Two PCs: a conversation stays where it began, Undo and End go where the record was made ---------------
+    // ---- 1. Two PCs: a conversation stays where it began, End goes where it ran ------------------------------------
 
     [Fact]
-    public async Task With_two_PCs_a_conversation_stays_on_its_PC_and_Undo_and_End_go_where_the_record_was_made()
+    public async Task With_two_PCs_a_conversation_stays_on_its_PC_and_End_goes_where_it_ran()
     {
         var a = new Pc("PC-A");
         var b = new Pc("PC-B");
@@ -51,12 +49,6 @@ public sealed class AiReviewFixesTests : IDisposable
         Assert.Equal("PC-A", other.Device);
         Assert.Single(a.Jobs);
 
-        await phone.UndoAsync(first.Done[0], CancellationToken.None);
-        Assert.Single(b.Undone);
-        Assert.Empty(a.Undone);
-        await phone.UndoAsync(other.Done[0], CancellationToken.None);
-        Assert.Single(a.Undone);
-
         phone.End("conv-1");
         await Eventually(() => b.Ended.Contains("conv-1"));
         Assert.DoesNotContain("conv-1", a.Ended);
@@ -77,81 +69,10 @@ public sealed class AiReviewFixesTests : IDisposable
         await Assert.ThrowsAsync<AiRouteException>(() => phone.RunAsync(Job("conv-1"), TimeSpan.FromSeconds(1), CancellationToken.None));
     }
 
-    // ---- 2. Undo that did nothing says so -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task Undo_of_a_spending_already_gone_fails_with_a_reason_and_stays_offered()
-    {
-        var script = new AskHelmScript(Step(Call("wallet_add_transaction", """{"amount":"45k","direction":"spend","description":"Phở","summary":"Chi 45.000đ · Phở"}""")));
-        var reply = await script.Say("phở 45k", [Wallet()]);
-        var action = Assert.Single(reply.Done);
-        _wallet.Delete(Assert.Single(_wallet.Transactions()).Id);
-
-        var failed = await Assert.ThrowsAsync<McpToolException>(() => action.UndoAsync(CancellationToken.None));
-
-        Assert.Equal(McpTool.NothingUndone, failed.Message);
-        Assert.False(action.Undone);
-        Assert.True(action.CanUndo);
-    }
-
-    [Fact]
-    public async Task Undo_on_the_PC_of_a_debt_already_gone_comes_back_to_the_phone_as_a_failure()
-    {
-        var debts = new DebtBook(new MemorySynced<WalletDebt>(), _wallet);
-        using var local = new LocalAgentRoute("PC-HUNG", "Codex", new AskHelmScript(), [new WalletMcpTools(debts, _wallet)], _ => true, () => null);
-        using var worker = new AgentJobWorker(_jobs, _workers, local, () => "pc-id", "PC-HUNG", () => ["Codex"]);
-        worker.Start();
-        var phone = new SyncAgentRoute(_jobs, _workers, () => "phone-id");
-        var gone = new AiJobAction("wallet_add_debt", "Nam nợ 200.000đ", """{"id":"not-there"}""") { Worker = "pc-id" };
-
-        var failed = await Assert.ThrowsAsync<AiRouteException>(() => phone.UndoAsync(gone, CancellationToken.None));
-
-        Assert.Equal(McpTool.NothingUndone, failed.Message);
-    }
-
-    // ---- 3. The tool scope ----------------------------------------------------------------------------------------
-
-    [Fact]
-    public void A_later_turn_that_names_no_group_reaches_every_tool()
-    {
-        var all = Tools("wallet_add_transaction", "habit_check", "tracker_add_task");
-        var scope = new HashSet<string>();
-        Assert.DoesNotContain(ToolScope.Pick(all, scope, "phở 45k"), t => t.Name == "habit_check");
-
-        Assert.Contains(ToolScope.Pick(all, scope, "anh đi bơi rồi"), t => t.Name == "habit_check");
-        Assert.Contains("habit", ToolScope.GroupsFor("anh đi gym rồi"));
-    }
-
-    [Theory]
-    [InlineData("uống đủ nước rồi")]
-    [InlineData("ăn sáng rồi")]
-    public void Eating_or_drinking_without_an_amount_may_be_a_habit(string said)
-    {
-        var groups = ToolScope.GroupsFor(said);
-        Assert.Contains("habit", groups);
-        Assert.Contains("wallet", groups);
-    }
-
-    [Fact]
-    public void Eating_with_an_amount_is_money_only() => Assert.DoesNotContain("habit", ToolScope.GroupsFor("ăn phở 45k"));
-
-    [Theory]
-    [InlineData("lẩu 1tr2")]
-    [InlineData("tháng này 1tr5")]
-    [InlineData("được 2tr")]
-    [InlineData("hết 1,2tr")]
-    [InlineData("500k")]
-    [InlineData("45 nghìn")]
-    [InlineData("30.000đ")]
-    public void Every_way_of_saying_an_amount_is_money(string said) => Assert.Contains("wallet", ToolScope.GroupsFor(said));
-
-    [Fact]
-    public void A_unit_inside_a_word_is_no_amount() => Assert.Empty(ToolScope.GroupsFor("5 kg"));
-
     // ---- 4. A task done before ------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task Ticking_a_task_already_done_offers_no_Undo_and_its_Undo_never_reopens_it()
+    public async Task Ticking_a_task_already_done_changes_nothing_and_its_Undo_never_reopens_it()
     {
         var tracker = new TrackerStore(new MemorySynced<TrackerWorkspace>(), new MemorySynced<TrackerItem>(), new MemorySyncedLog<TrackerEvent>());
         var list = tracker.AddWorkspace("Việc");
@@ -160,18 +81,14 @@ public sealed class AiReviewFixesTests : IDisposable
         var tools = new TrackerMcpTools(tracker);
         var complete = tools.Tools.First(t => t.Name == "tracker_complete_task");
 
-        var json = HelmAssistant.Serialize(await complete.Run(Args(new { id }), CancellationToken.None));
+        var json = Serialize(await complete.Run(Args(new { id }), CancellationToken.None));
         Assert.True(McpTool.ChangedNothing(json));
         await complete.Undo!(JsonDocument.Parse(json).RootElement, CancellationToken.None);
         Assert.True(tracker.GetItem(id)!.IsCompleted);
 
-        var script = new AskHelmScript(Step(Call("tracker_complete_task", $$"""{"id":"{{id}}","summary":"Xong: Gọi khách"}""")));
-        var reply = await script.Say("xong việc gọi khách", [tools]);
-        Assert.False(Assert.Single(reply.Done).CanUndo);
-
         // One it did tick goes back.
         tracker.Reopen(id);
-        var ticked = HelmAssistant.Serialize(await complete.Run(Args(new { id }), CancellationToken.None));
+        var ticked = Serialize(await complete.Run(Args(new { id }), CancellationToken.None));
         Assert.False(McpTool.ChangedNothing(ticked));
         await complete.Undo!(JsonDocument.Parse(ticked).RootElement, CancellationToken.None);
         Assert.False(tracker.GetItem(id)!.IsCompleted);
@@ -183,27 +100,13 @@ public sealed class AiReviewFixesTests : IDisposable
     public void A_model_with_no_price_counts_at_its_providers_dearest_against_the_cap()
     {
         var usage = new AiUsageBook(new MemorySyncedLog<AiUsageEntry>());
-        var entry = usage.Record(AiFeatureIds.AskHelm, AiProviders.Grok, "grok-9-preview", "k", 1_000_000, 0, 0, 0);
+        var entry = usage.Record(AiFeatureIds.Default, AiProviders.Grok, "grok-9-preview", "k", 1_000_000, 0, 0, 0);
         Assert.Null(entry.Usd);
 
-        Assert.Equal(AiPrices.Ceiling(AiProviders.Grok.Id).Input, usage.SpentToday(AiFeatureIds.AskHelm));
+        Assert.Equal(AiPrices.Ceiling(AiProviders.Grok.Id).Input, usage.SpentToday(AiFeatureIds.Default));
         Assert.Equal(AiPrices.For("claude-fable-5-1"), AiPrices.Ceiling(AiProviders.Claude.Id));
-        usage.Record(AiFeatureIds.AskHelm, AiProviders.Claude, "claude-next", "k", 0, 100_000, 0, 0);
-        Assert.Equal(2m + 5m, usage.SpentToday(AiFeatureIds.AskHelm));
-    }
-
-    // ---- 6. A job's tool names are checked --------------------------------------------------------------------------
-
-    [Fact]
-    public void A_job_cannot_ask_a_PC_for_tools_Ask_Helm_never_offers()
-    {
-        using var local = new LocalAgentRoute("PC-HUNG", "Codex", new AskHelmScript(), [Wallet(), new Foreign()], _ => true, () => null);
-        var job = new AiJob(AiFeatureIds.AskHelm, "c1", "hi", ["wallet_add_transaction", "slack_post", "ssh_exec", "novel_add_names"], [],
-            "claude-haiku-5-5", "low");
-
-        var offered = local.Tools(job).Select(t => t.Name).ToList();
-
-        Assert.Equal(["wallet_add_transaction"], offered);
+        usage.Record(AiFeatureIds.Default, AiProviders.Claude, "claude-next", "k", 0, 100_000, 0, 0);
+        Assert.Equal(2m + 5m, usage.SpentToday(AiFeatureIds.Default));
     }
 
     // ---- 7. The old management key waits for the first pull -------------------------------------------------------
@@ -285,8 +188,8 @@ public sealed class AiReviewFixesTests : IDisposable
     [Fact]
     public async Task A_conversation_stays_on_its_agent_when_the_list_is_reordered()
     {
-        using var first = new LocalAgentRoute("PC", "Codex", new AskHelmScript(Answer("ok"), Answer("ok"), Answer("ok")), [], _ => true, () => null);
-        using var second = new LocalAgentRoute("PC", "Claude Code", new AskHelmScript(Answer("ok"), Answer("ok"), Answer("ok")), [], _ => true, () => null);
+        using var first = new LocalAgentRoute("PC", "Codex", new ChatScript(Answer("ok"), Answer("ok"), Answer("ok")), () => null);
+        using var second = new LocalAgentRoute("PC", "Claude Code", new ChatScript(Answer("ok"), Answer("ok"), Answer("ok")), () => null);
         var chain = new AgentChain([first, second]);
         Assert.Equal("Codex", (await chain.RunAsync(Job("c1"), TimeSpan.FromSeconds(5), CancellationToken.None)).Agent);
 
@@ -347,7 +250,7 @@ public sealed class AiReviewFixesTests : IDisposable
         var features = new MemorySettings<AiFeatureSettings>();
         var keys = new AiKeyStore(new MemorySynced<AiKey>());
         keys.Add(AiProviders.Claude, "Helm", "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123-x7Qa");
-        var api = new AskHelmScript(Answer("from the API"));
+        var api = new ChatScript(Answer("from the API"));
         var text = new AiTextService(keys, features, new AiUsageBook(new MemorySyncedLog<AiUsageEntry>()), [api], new AiRouter([new Failing()]));
         // Allowed on the API for both, so only who started it differs.
         features.Update(s => s.Features["x.background"] = new AiFeatureChoice { Route = AiRoutePolicy.PreferPc });
@@ -365,15 +268,13 @@ public sealed class AiReviewFixesTests : IDisposable
     // ---- helpers ----------------------------------------------------------------------------------------------------
 
     private static AiJob Job(string conversation) =>
-        new(AiFeatureIds.AskHelm, conversation, "phở 45k", ["wallet_add_transaction"], [], "claude-haiku-5-5", "low");
+        new(AiFeatureIds.Default, conversation, "phở 45k", [], [], "claude-haiku-5-5", "low");
 
     private void Seen(string id, string device, int minutesAgo) =>
         _workers.Upsert(id, new AiWorkerRecord { Device = device, Agents = ["Codex"], SeenAt = DateTimeOffset.UtcNow.AddMinutes(-minutesAgo) });
 
-    private WalletMcpTools Wallet() => new(new DebtBook(new MemorySynced<WalletDebt>(), _wallet), _wallet);
-
-    private static IReadOnlyList<AssistantTool> Tools(params string[] names) =>
-        [.. names.Select(n => new AssistantTool(new McpTool(n, n, McpTool.NoArguments(), (_, _) => Task.FromResult<object?>("ok")), AssistantToolMode.Auto))];
+    private static string Serialize(object? result) =>
+        result as string ?? JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
     private static JsonElement Args(object value) => JsonDocument.Parse(JsonSerializer.Serialize(value)).RootElement.Clone();
 
@@ -385,11 +286,10 @@ public sealed class AiReviewFixesTests : IDisposable
 
     private sealed record Agent(string Id);
 
-    /// <summary>A PC's agent: records one action per turn, its Undo and the conversations ended.</summary>
+    /// <summary>A PC's agent: records each turn and the conversations ended.</summary>
     private sealed class Pc(string device) : IAgentRoute
     {
         public List<AiJob> Jobs { get; } = [];
-        public List<AiJobAction> Undone { get; } = [];
         public List<string> Ended { get; } = [];
         public string Device => device;
         public string? Unavailable() => null;
@@ -397,13 +297,7 @@ public sealed class AiReviewFixesTests : IDisposable
         public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
         {
             lock (Jobs) Jobs.Add(job);
-            return Task.FromResult(new AiJobResult("ok", [new AiJobAction("wallet_add_transaction", $"on {device}", """{"id":"t1"}""")], [], null));
-        }
-
-        public Task UndoAsync(AiJobAction action, CancellationToken ct)
-        {
-            lock (Undone) Undone.Add(action);
-            return Task.CompletedTask;
+            return Task.FromResult(new AiJobResult($"ok on {device}", [], [], null));
         }
 
         public void End(string conversationId)
@@ -418,21 +312,7 @@ public sealed class AiReviewFixesTests : IDisposable
         public string Device => "PC-HUNG";
         public string? Unavailable() => null;
         public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct) => throw new AiRouteTakenException("Codex stopped.");
-        public Task UndoAsync(AiJobAction action, CancellationToken ct) => Task.CompletedTask;
         public void End(string conversationId) { }
-    }
-
-    /// <summary>Tools of other modules that Ask Helm never offers.</summary>
-    private sealed class Foreign : IMcpToolProvider
-    {
-        public string? ModuleId => null;
-
-        public IEnumerable<McpTool> Tools =>
-        [
-            new("slack_post", "Post.", McpTool.NoArguments(), (_, _) => Task.FromResult<object?>("ok")) { Undo = (_, _) => Task.CompletedTask },
-            new("ssh_exec", "Run.", McpTool.NoArguments(), (_, _) => Task.FromResult<object?>("ok")) { ReadOnly = true },
-            new("novel_add_names", "Names.", McpTool.NoArguments(), (_, _) => Task.FromResult<object?>("ok")) { Undo = (_, _) => Task.CompletedTask },
-        ];
     }
 
     private sealed class FakeSync : ISyncService

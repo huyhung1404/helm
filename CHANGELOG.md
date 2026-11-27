@@ -18,6 +18,12 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - **Android: a transaction filed elsewhere stops asking "what was it?"** When a sync brings a transaction that Fairy or
   the PC filed, its question on the phone goes away.
 
+### Removed
+- **What was left of Ask Helm.** Its card went in 0.94; now its engine goes too (its tools, photos, web search, model
+  sheet, and the PC's side that ran its turns): you talk to Fairy now, and Fairy does these things through Helm's tools.
+  Helm's other AI features (word analysis, translations, explaining a sentence, filing and reading bank notifications)
+  work as before, on your PC's agents first and the API last.
+
 ## [0.94.1] - 2026-11-27
 
 ### Fixed

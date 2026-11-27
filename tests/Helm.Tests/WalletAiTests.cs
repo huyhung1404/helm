@@ -362,7 +362,7 @@ public sealed class WalletAiTests : IDisposable
         Assert.NotNull(tool.Undo);
 
         var result = await tool.Run(Args(new { id, category = "food & drinks", description = "Ăn trưa với Nam" }), CancellationToken.None);
-        var json = JsonDocument.Parse(HelmAssistant.Serialize(result)).RootElement.Clone();
+        var json = JsonDocument.Parse(JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web))).RootElement.Clone();
         var updated = _store.Get(id)!;
         Assert.Equal(WalletCategories.Food, updated.CategoryId);
         Assert.Equal("Ăn trưa với Nam", updated.Description);
@@ -401,7 +401,6 @@ public sealed class WalletAiTests : IDisposable
             return answer is null ? throw new AiRouteException("timed out") : Task.FromResult(new AiJobResult(answer, [], [], 0.001m) { Agent = "Claude Code" });
         }
 
-        public Task UndoAsync(AiJobAction action, CancellationToken ct) => Task.CompletedTask;
 
         public void End(string conversationId) { }
     }

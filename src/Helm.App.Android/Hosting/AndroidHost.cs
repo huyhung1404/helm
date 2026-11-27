@@ -47,7 +47,7 @@ internal static class AndroidHost
         // Tools — the Android list (see AndroidModules.cs).
         AndroidModules.Register(services);
 
-        // The API keys (synced from the PC's AI page), what the calls cost, and Ask Helm's assistant.
+        // The API keys (synced from the PC's AI page), what the calls cost, and the features' text calls (IAiText).
         Helm.Ai.AiCoreServices.AddHelmAi(services);
 
         // Platform services

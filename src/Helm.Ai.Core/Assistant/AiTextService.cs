@@ -7,8 +7,8 @@ namespace Helm.Ai.Assistant;
 /// <summary>
 /// <see cref="IAiText"/> on the router, for every feature that needs one answer and no tools (translate a selection,
 /// analyse a word, file a transaction, read a bank notification): an agent on a Helm PC first (a text-only job), then
-/// the API with the feature's model, within its daily cap. A feature with no choice of its own uses Ask Helm's (the
-/// model picked in the card), on a PC only when it runs by itself. Nothing a text call does changes data, so a PC that
+/// the API with the feature's model, within its daily cap. A feature with no choice of its own uses the default one
+/// (<see cref="AiFeatureIds.Default"/>), on a PC only when it runs by itself. Nothing a text call does changes data, so a PC that
 /// took a call the user started and failed is no reason not to try the API; one that runs by itself stops there.
 /// </summary>
 public sealed class AiTextService(
@@ -24,14 +24,14 @@ public sealed class AiTextService(
     private readonly IReadOnlyList<IAssistantChatFactory> _factories = [.. factories];
 
     /// <summary>
-    /// The feature's own choice, else Ask Helm's (on: the feature is on while it has no choice of its own), on a PC only
-    /// when it was not started by the user.
+    /// The feature's own choice, else the default one (on: the feature is on while it has no choice of its own), on a PC
+    /// only when it was not started by the user.
     /// </summary>
     public AiFeatureChoice ChoiceFor(string feature, bool userStarted = true)
     {
         var all = features.Current;
         if (all.Features.TryGetValue(feature, out var own)) return own;
-        var shared = all.For(AiFeatureIds.AskHelm).Copy();
+        var shared = all.For(AiFeatureIds.Default).Copy();
         shared.Enabled = true;
         // The owner's rule: what runs by itself never spends on the API unless the user said so.
         if (!userStarted) shared.Route = AiRoutePolicy.PcOnly;

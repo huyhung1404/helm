@@ -217,10 +217,6 @@ public sealed class AutoJobsTests
         await set.Undo!(result, default);
         Assert.False(_features.Current.For(AiFeatureIds.HabitCoach).Enabled);
         Assert.Null(_features.Current.For(AiFeatureIds.HabitCoach).At);
-
-        Assert.Contains("ai_briefs", HelmAssistant.Tools);
-        Assert.Contains("ai", ToolScope.GroupsFor("bản tin sáng nay nói gì?"));
-        Assert.Contains("notes", ToolScope.GroupsFor("nhớ giúp anh sinh nhật mẹ 15/3"));
     }
 }
 
@@ -271,7 +267,6 @@ internal static class AutoKit
             return Task.FromResult(new AiJobResult(Answer(job), [], [], 0.002m) { Agent = "Claude Code" });
         }
 
-        public Task UndoAsync(AiJobAction action, CancellationToken ct) => Task.CompletedTask;
 
         public void End(string conversationId) => Ended.Add(conversationId);
     }

@@ -28,7 +28,7 @@ public sealed class AiFeaturesViewModelTests
 
         Assert.Equal(ids.Order(), vm.Rows.Select(r => r.Id).Order());
         Assert.Equal(["On request", "Automatic"], vm.Groups.Select(g => g.Title));
-        Assert.Contains(vm.Groups[0].Rows, r => r.Id == AiFeatureIds.AskHelm);
+        Assert.Contains(vm.Groups[0].Rows, r => r.Id == AiFeatureIds.Default);
         Assert.All(AutoJobCatalog.All, job => Assert.Contains(vm.Groups[1].Rows, r => r.Id == job.Feature));
         Assert.Contains(vm.Groups[1].Rows, r => r.Id == AiFeatureIds.WalletCategorize);
         Assert.All(vm.Rows, r => Assert.False(string.IsNullOrWhiteSpace(r.Name)));
@@ -40,9 +40,7 @@ public sealed class AiFeaturesViewModelTests
         var vm = Build();
 
         Assert.All(vm.Groups[1].Rows, r => Assert.Equal(AiRoutePolicy.PcOnly, r.Route.Policy));
-        // Web search is the API's alone (agents on a PC do not search the web).
-        Assert.All(vm.Groups[0].Rows.Where(r => r.Id != AiFeatureIds.WebSearch), r => Assert.Equal(AiRoutePolicy.PreferPc, r.Route.Policy));
-        Assert.Equal(AiRoutePolicy.ApiOnly, Row(vm, AiFeatureIds.WebSearch).Route.Policy);
+        Assert.All(vm.Groups[0].Rows, r => Assert.Equal(AiRoutePolicy.PreferPc, r.Route.Policy));
         var brief = Row(vm, AiFeatureIds.MorningBrief);
         Assert.Equal("Runs on your PC agents · 0đ", brief.CostText);
         Assert.False(brief.HasCostDetail);
@@ -56,7 +54,7 @@ public sealed class AiFeaturesViewModelTests
     [Fact]
     public void A_feature_without_its_own_choice_shows_Ask_Helms_model()
     {
-        _features.Update(s => s.Features[AiFeatureIds.AskHelm] = new AiFeatureChoice { Model = Sonnet.Model, Enabled = false });
+        _features.Update(s => s.Features[AiFeatureIds.Default] = new AiFeatureChoice { Model = Sonnet.Model, Enabled = false });
 
         var vm = Build();
 
@@ -65,7 +63,7 @@ public sealed class AiFeaturesViewModelTests
         Assert.True(text.IsOn);
         Assert.Equal("Agents → API · Claude Sonnet 5.5", text.StateText);
         Assert.Equal(AiRoutePolicy.PcOnly, Row(vm, AiFeatureIds.WalletCategorize).Route.Policy);
-        Assert.Equal("Off", Row(vm, AiFeatureIds.AskHelm).StateText);
+        Assert.Equal("Off", Row(vm, AiFeatureIds.Default).StateText);
     }
 
     [Fact]
@@ -87,11 +85,11 @@ public sealed class AiFeaturesViewModelTests
     public void The_daily_cap_stays_within_its_limits()
     {
         var vm = Build();
-        var row = Row(vm, AiFeatureIds.AskHelm);
+        var row = Row(vm, AiFeatureIds.Default);
 
         row.Cap = 50;
         Assert.Equal(AiFeatureRow.MaxCapUsd, row.Cap);
-        Assert.Equal((decimal)AiFeatureRow.MaxCapUsd, _features.Current.For(AiFeatureIds.AskHelm).DailyCapUsd);
+        Assert.Equal((decimal)AiFeatureRow.MaxCapUsd, _features.Current.For(AiFeatureIds.Default).DailyCapUsd);
 
         row.Cap = -3;
         Assert.Equal(0, row.Cap);
@@ -99,7 +97,7 @@ public sealed class AiFeaturesViewModelTests
         row.MoreCapCommand.Execute(null);
         row.MoreCapCommand.Execute(null);
         Assert.Equal(0.2, row.Cap);
-        Assert.Equal(0.2m, _features.Current.For(AiFeatureIds.AskHelm).DailyCapUsd);
+        Assert.Equal(0.2m, _features.Current.For(AiFeatureIds.Default).DailyCapUsd);
         row.LessCapCommand.Execute(null);
         row.LessCapCommand.Execute(null);
         row.LessCapCommand.Execute(null);
@@ -150,17 +148,17 @@ public sealed class AiFeaturesViewModelTests
         // The Proxy tab writes the same choice.
         _features.Update(s =>
         {
-            var choice = s.For(AiFeatureIds.AskHelm).Copy();
+            var choice = s.For(AiFeatureIds.Default).Copy();
             choice.Route = AiRoutePolicy.PcOnly;
             choice.PcWaitSeconds = 20;
-            s.Features[AiFeatureIds.AskHelm] = choice;
+            s.Features[AiFeatureIds.Default] = choice;
         });
-        var row = Row(vm, AiFeatureIds.AskHelm);
+        var row = Row(vm, AiFeatureIds.Default);
         Assert.Equal(AiRoutePolicy.PcOnly, row.Route.Policy);
 
         row.Model = Sonnet;
-        Assert.Equal(20, _features.Current.For(AiFeatureIds.AskHelm).PcWaitSeconds);
-        Assert.Equal(AiRoutePolicy.PcOnly, _features.Current.For(AiFeatureIds.AskHelm).Route);
+        Assert.Equal(20, _features.Current.For(AiFeatureIds.Default).PcWaitSeconds);
+        Assert.Equal(AiRoutePolicy.PcOnly, _features.Current.For(AiFeatureIds.Default).Route);
     }
 
     [Fact]
@@ -181,9 +179,9 @@ public sealed class AiFeaturesViewModelTests
         var vm = Build();
         Assert.Equal("No AI run today yet", vm.SummaryText);
 
-        usage.RecordAgent(AiFeatureIds.AskHelm, "Claude Code", ClaudeModels.Haiku, "PC-HUNG", 0.01m);
+        usage.RecordAgent(AiFeatureIds.Default, "Claude Code", ClaudeModels.Haiku, "PC-HUNG", 0.01m);
         usage.RecordAgent(AiFeatureIds.MorningBrief, "Claude Code", ClaudeModels.Haiku, "PC-HUNG", 0.01m);
-        usage.Record(AiFeatureIds.AskHelm, AiProviders.Claude, "claude-sonnet-5-5", null, 1_000_000, 100_000, 0, 0);
+        usage.Record(AiFeatureIds.Default, AiProviders.Claude, "claude-sonnet-5-5", null, 1_000_000, 100_000, 0, 0);
         vm.Refresh();
 
         Assert.Equal("Today 3 runs · 2 on PC agents · 0đ · 1 on API · $3.00", vm.SummaryText);
@@ -216,8 +214,8 @@ public sealed class AiFeaturesViewModelTests
             Assert.True(Enum.TryParse<FluentIcons.Common.Symbol>(r.Symbol, out _), r.Symbol);
         });
         Assert.Equal("wallet", Row(vm, AiFeatureIds.WalletCategorize).Tool);
-        Assert.Null(Row(vm, AiFeatureIds.AskHelm).Tool);
-        Assert.Equal("Mic", Row(vm, AiFeatureIds.AskHelm).Symbol);
+        Assert.Null(Row(vm, AiFeatureIds.Default).Tool);
+        Assert.Equal(AiFeatureInfo.DefaultSymbol, Row(vm, AiFeatureIds.Default).Symbol);
     }
 
     [Fact]

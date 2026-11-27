@@ -1,56 +1,45 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using Helm.Ai.Prompts;
-using Helm.Core.Mcp;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Helm.Ai.Assistant;
 
 /// <summary>
-/// An agent CLI on this device (Codex, Claude Code) as Ask Helm's brain: Helm runs its own tools in-process for it (no
-/// MCP, so no consent dialog on the PC for a request that came from the user's own phone), the agent only decides.
-/// One chat per conversation, kept until it ends or sits idle; Undo runs here, where the records were made.
+/// An agent CLI on this device (Codex, Claude Code, Grok) answering text-only jobs: the features' calls
+/// (<see cref="AiTextService"/>), the phone's through Helm Sync (<see cref="AgentJobWorker"/>), a VPS service's. No tool of
+/// Helm's runs for it. One chat per conversation, kept until it ends or sits idle.
 /// </summary>
 public sealed class LocalAgentRoute : IAgentRoute, IDisposable
 {
     /// <summary>A conversation's chat goes after this long without a turn.</summary>
     internal static readonly TimeSpan IdleFor = TimeSpan.FromMinutes(5);
 
+    /// <summary>The system prompt of a job that brings none (and has no prompt of the user's on the Skill Hub).</summary>
+    internal const string NeutralSystem = "You are a helpful assistant. Answer the request directly, in the language it is written in.";
+
     private readonly IAssistantChatFactory _agent;
-    private readonly IReadOnlyList<IMcpToolProvider> _providers;
-    private readonly Func<string?, bool> _isToolOn;
     private readonly Func<string?> _unavailable;
     private readonly TimeProvider _time;
     private readonly IAiPrompts? _prompts;
     private readonly ConcurrentDictionary<string, Conversation> _conversations = new(StringComparer.Ordinal);
     private readonly Timer _reaper;
-
-    /// <summary>How long a warm-up may take (an agent's process starting) before it is given up.</summary>
-    internal static readonly TimeSpan WarmFor = TimeSpan.FromSeconds(30);
-
     private readonly ILogger _logger;
     private readonly string _kind;
     private readonly Func<IReadOnlyList<string>> _models;
-    private readonly Func<McpTool, bool> _offers;
 
     /// <param name="agentName">The agent as the user knows it ("Codex", "Claude Code").</param>
     /// <param name="prompts">The user's own prompts (Skill Hub), for a job that brings none of its own.</param>
     /// <param name="kind">"codex", "claude-code" or "grok", for the phone's picker.</param>
     /// <param name="models">The models it runs, the one for a job whose model is not of its kind first; empty: its own only.</param>
-    /// <param name="offers">The tools it may offer a job at all; null: Ask Helm's own (<see cref="HelmAssistant.Tools"/>).</param>
-    public LocalAgentRoute(string device, string agentName, IAssistantChatFactory agent, IEnumerable<IMcpToolProvider> providers,
-        Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null, IAiPrompts? prompts = null, ILogger? logger = null,
-        string kind = "", Func<IReadOnlyList<string>>? models = null, Func<McpTool, bool>? offers = null)
+    public LocalAgentRoute(string device, string agentName, IAssistantChatFactory agent, Func<string?> unavailable, TimeProvider? time = null,
+        IAiPrompts? prompts = null, ILogger? logger = null, string kind = "", Func<IReadOnlyList<string>>? models = null)
     {
-        _offers = offers ?? (t => HelmAssistant.Tools.Contains(t.Name));
         _kind = kind;
         _models = models ?? (() => []);
         Device = device;
         AgentName = agentName;
         _agent = agent;
-        _providers = [.. providers];
-        _isToolOn = isToolOn;
         _unavailable = unavailable;
         _time = time ?? TimeProvider.System;
         _prompts = prompts;
@@ -65,10 +54,8 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
 
     public string? Unavailable() => _unavailable();
 
-    public bool ReadsPhotos => _agent.ReadsImages && Unavailable() is null;
-
     /// <summary>What the phone's picker shows of it.</summary>
-    public AiWorkerAgent Offer() => new() { Name = AgentName, Kind = _kind, Models = _models(), Problem = Unavailable(), ReadsPhotos = _agent.ReadsImages };
+    public AiWorkerAgent Offer() => new() { Name = AgentName, Kind = _kind, Models = _models(), Problem = Unavailable() };
 
     public IReadOnlyList<AiAgentOffer> Offers => [new(Device, Offer())];
 
@@ -87,84 +74,46 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
         if (Unavailable() is { } why) throw new AiRouteException(why);
-        if (job.Images.Count > 0 && !_agent.ReadsImages) throw new AiRouteException($"{AgentName} cannot read photos.");
-        var timings = new TurnTimings();
-        var conversation = Open(job, out var fresh);
-        // A warm-up still starting the agent holds the gate: the turn waits for it rather than start a second one.
+        var started = _time.GetTimestamp();
+        var conversation = Open(job);
         await conversation.Gate.WaitAsync(ct);
-        timings.Mark(fresh ? "queue (cold start)" : conversation.Turns == 0 ? "queue (warmed)" : "queue");
         try
         {
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
             limit.CancelAfter(wait);
-            long input = 0, output = 0, cacheRead = 0, cacheWrite = 0;
-            // A later turn may need a group of tools the conversation did not: only those are added.
-            var added = Tools(job).Where(t => conversation.Tools.All(h => h.Name != t.Name)).ToList();
-            if (added.Count > 0)
-            {
-                conversation.Chat.AddTools(added);
-                conversation.Tools.AddRange(added);
-            }
-            AssistantLoop.Outcome outcome;
-            var records = new List<AiJobAction>();
+            AssistantStep step;
             try
             {
-                AddUser(conversation.Chat, job);
-                outcome = await AssistantLoop.RunAsync(conversation.Chat, conversation.Tools, _ => Task.FromResult(false),
-                    u => { input += u.Input; output += u.Output; cacheRead += u.CacheRead; cacheWrite += u.CacheWrite; },
-                    () => null, phoneHere: false, job.Model, limit.Token, records, timings: timings);
-                conversation.Turns++;
-                _logger.LogDebug("{Agent} turn: {Timings}", AgentName, timings);
+                conversation.Chat.AddUser(job.Text);
+                step = await conversation.Chat.NextAsync(limit.Token);
+                _logger.LogDebug("{Agent} answered in {Took:0} ms", AgentName, _time.GetElapsedTime(started).TotalMilliseconds);
             }
             catch (Exception ex) when (ex is OperationCanceledException or AssistantException or AssistantImageException or IOException or InvalidOperationException)
             {
-                // Too long, cancelled by the asker, or the agent's process broke: the chat is not reused. What it already
-                // recorded is kept and goes back with Undo, never as a failure that someone might run again.
-                _logger.LogDebug("{Agent} turn stopped ({Error}): {Timings}", AgentName, ex.GetType().Name, timings);
+                // Too long, cancelled by the asker, or the agent's process broke: the chat is not reused.
+                _logger.LogDebug("{Agent} turn stopped ({Error})", AgentName, ex.GetType().Name);
                 End(job.ConversationId);
-                var stopped = ex is OperationCanceledException
-                    ? ct.IsCancellationRequested ? "Em dừng giữa chừng." : $"{Device} did not answer within {wait.TotalSeconds:0} s."
-                    : ex.Message;
-                if (records.Count > 0)
-                    return new AiJobResult($"Em làm được một phần thì dừng ({stopped}).", [.. records], [],
-                        AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = AgentName, Model = ModelFor(job.Model) };
                 if (ex is OperationCanceledException && ct.IsCancellationRequested) throw;
-                throw new AiRouteException(stopped);
+                throw new AiRouteException(ex is OperationCanceledException ? $"{Device} did not answer within {wait.TotalSeconds:0} s." : ex.Message);
             }
             conversation.LastTurn = _time.GetUtcNow();
-            if (outcome.Problem is { } problem && outcome.Records.Count == 0 && outcome.ForPhone.Count == 0)
+            if (step.Refused)
             {
                 End(job.ConversationId);
-                throw new AiRouteException(problem);
+                throw new AiRouteException($"{job.Model} declined this request.");
             }
             // What it saved: the same tokens on the API with the model picked for the fallback.
-            return new AiJobResult(outcome.Problem ?? outcome.Text, outcome.Records, outcome.ForPhone,
-                AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = AgentName, Model = ModelFor(job.Model) };
+            var u = step.Usage;
+            return new AiJobResult(step.Text, [], [], AiPrices.Usd(job.Model, u.Input, u.Output, u.CacheRead, u.CacheWrite))
+            {
+                Agent = AgentName,
+                Model = ModelFor(job.Model),
+            };
         }
         finally
         {
             conversation.Gate.Release();
-            // A photo is never kept after its turn: the chat (and the agent's process) that saw it goes.
-            if (job.Images.Count > 0) End(job.ConversationId);
         }
-    }
-
-    /// <summary>The job's words, with its photos when it has some (the words go with the first).</summary>
-    private static void AddUser(IAssistantChat chat, AiJob job)
-    {
-        if (job.Images.Count == 0)
-        {
-            chat.AddUser(job.Text);
-            return;
-        }
-        for (var i = 0; i < job.Images.Count; i++) chat.AddUser(i == 0 ? job.Text : "", job.Images[i]);
-    }
-
-    public async Task UndoAsync(AiJobAction action, CancellationToken ct)
-    {
-        var tool = _providers.SelectMany(p => p.Tools).FirstOrDefault(t => t.Name == action.Tool);
-        if (tool?.Undo is not { } undo) throw new McpToolException($"Helm on {Device} cannot undo {action.Tool}.");
-        await undo(JsonDocument.Parse(action.ResultJson).RootElement.Clone(), ct);
     }
 
     public void End(string conversationId)
@@ -172,79 +121,17 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         if (_conversations.TryRemove(conversationId, out var conversation)) (conversation.Chat as IDisposable)?.Dispose();
     }
 
-    /// <summary>
-    /// Opens the conversation's chat now and lets the agent get ready (<see cref="IAssistantChat.WarmAsync"/>: its
-    /// process starts) off the caller's thread. The first turn then finds it ready; one that never comes ends with
-    /// <see cref="End"/> or after <see cref="IdleFor"/>.
-    /// </summary>
-    public void Warm(AiJob job)
+    /// <summary>The conversation's chat, opened for this job when it has none.</summary>
+    private Conversation Open(AiJob job) => _conversations.GetOrAdd(job.ConversationId, _ =>
     {
-        if (Unavailable() is not null) return;
-        var conversation = Open(job, out var fresh);
-        if (fresh) _ = Task.Run(() => WarmAsync(job.ConversationId, conversation));
-    }
-
-    private async Task WarmAsync(string id, Conversation conversation)
-    {
-        await conversation.Gate.WaitAsync();
-        var started = _time.GetTimestamp();
-        bool Kept() => _conversations.TryGetValue(id, out var now) && ReferenceEquals(now, conversation);
-        try
-        {
-            if (!Kept()) return;
-            using var limit = new CancellationTokenSource(WarmFor);
-            await conversation.Chat.WarmAsync(limit.Token);
-            // Ended while its process started: that process must not outlive it.
-            if (!Kept()) (conversation.Chat as IDisposable)?.Dispose();
-            else _logger.LogDebug("{Agent} ready for a conversation in {Took:0} ms", AgentName, _time.GetElapsedTime(started).TotalMilliseconds);
-        }
-        catch (Exception ex) when (ex is AssistantException or IOException or InvalidOperationException or ObjectDisposedException or OperationCanceledException)
-        {
-            // The first turn starts it again, as without a warm-up.
-            _logger.LogDebug("{Agent} could not get ready ahead of the turn: {Error}", AgentName, ex.Message);
-        }
-        finally
-        {
-            conversation.Gate.Release();
-        }
-    }
-
-    /// <summary>The conversation's chat, opened for this job when it has none (<paramref name="fresh"/>).</summary>
-    private Conversation Open(AiJob job, out bool fresh)
-    {
-        var made = false;
-        var conversation = _conversations.GetOrAdd(job.ConversationId, _ =>
-        {
-            made = true;
-            var tools = Tools(job);
-            var system = job.System ?? _prompts?.Get(job.Feature, HelmAssistant.Instructions) ?? HelmAssistant.Instructions;
-            return new Conversation(_agent.Create("", ModelFor(job.Model) ?? job.Model, job.Effort, system, tools), tools, _time.GetUtcNow());
-        });
-        fresh = made;
-        return conversation;
-    }
+        var system = job.System ?? _prompts?.Get(job.Feature, NeutralSystem) ?? NeutralSystem;
+        return new Conversation(_agent.Create("", ModelFor(job.Model) ?? job.Model, job.Effort, system, []), _time.GetUtcNow());
+    });
 
     public void Dispose()
     {
         _reaper.Dispose();
         foreach (var id in _conversations.Keys.ToList()) End(id);
-    }
-
-    /// <summary>
-    /// The job's tools that need no yes (a PC cannot ask the phone mid-turn), Helm's own ones run here, and the phone's
-    /// handed back to it. Only Ask Helm's own tools (<see cref="HelmAssistant.Tools"/>), whatever names the job brings:
-    /// a device in the sync group cannot ask for Slack, SSH or any tool Ask Helm never offers.
-    /// </summary>
-    internal IReadOnlyList<AssistantTool> Tools(AiJob job)
-    {
-        var mine = _providers.Where(p => _isToolOn(p.ModuleId)).SelectMany(p => p.Tools)
-            .Where(t => job.Tools.Contains(t.Name) && _offers(t) && t.Risk != McpRisk.Remote)
-            .GroupBy(t => t.Name, StringComparer.Ordinal).Select(g => g.First())
-            .Select(t => new AssistantTool(t, HelmAssistant.ModeOf(t)))
-            .Where(t => t.Mode != AssistantToolMode.Confirm);
-        var phone = PhoneToolSpecs.All.Where(s => !s.ReadOnly && job.PhoneTools.Contains(s.Name))
-            .Select(s => new AssistantTool(PhoneToolSpecs.HandedBack(s), AssistantToolMode.Auto));
-        return [.. mine, .. phone];
     }
 
     internal void Reap()
@@ -254,16 +141,13 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
             if (now - conversation.LastTurn > IdleFor && conversation.Gate.CurrentCount == 1) End(id);
     }
 
-    private sealed class Conversation(IAssistantChat chat, IReadOnlyList<AssistantTool> tools, DateTimeOffset opened)
+    private sealed class Conversation(IAssistantChat chat, DateTimeOffset opened)
     {
         public IAssistantChat Chat { get; } = chat;
-        public List<AssistantTool> Tools { get; } = [.. tools];
         public SemaphoreSlim Gate { get; } = new(1, 1);
 
-        /// <summary>Its last turn, or when it was opened (a warm-up that no turn followed goes after the same idle time).</summary>
+        /// <summary>Its last turn, or when it was opened.</summary>
         public DateTimeOffset LastTurn { get; set; } = opened;
-
-        public int Turns { get; set; }
     }
 }
 
@@ -293,8 +177,6 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
     /// <summary>The agents that can take a job now, best first.</summary>
     public IReadOnlyList<string> Ready() => [.. _agents.Where(a => a.Unavailable() is null).Select(a => a.AgentName)];
 
-    public bool ReadsPhotos => _agents.Any(a => a.ReadsPhotos);
-
     public IReadOnlyList<AiAgentOffer> Offers => [.. _agents.SelectMany(a => a.Offers)];
 
     public string? UnavailableFor(string agent) =>
@@ -318,34 +200,16 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
         {
             if (UnavailableFor(picked) is { } why) throw new AiRouteException(why);
             var named = Named(picked)!;
-            if (job.Images.Count == 0) _taken[job.ConversationId] = named;
+            _taken[job.ConversationId] = named;
             return named.RunAsync(job, wait, ct);
         }
         var agents = _agents;
-        // A photo goes to the first agent that reads pictures (Grok's CLI takes none): each photo turn is a chat of its own.
-        if (job.Images.Count > 0)
-            return (agents.FirstOrDefault(a => a.ReadsPhotos) ?? throw new AiRouteException("No agent on this PC that reads photos can take it now."))
-                .RunAsync(job, wait, ct);
         var agent = _taken.TryGetValue(job.ConversationId, out var kept) && agents.Contains(kept) && kept.Unavailable() is null
             ? kept
             : agents.FirstOrDefault(a => a.Unavailable() is null) ?? throw new AiRouteException(Unavailable() ?? "No agent can take it.");
         _taken[job.ConversationId] = agent;
         return agent.RunAsync(job, wait, ct);
     }
-
-    /// <summary>The agent a new conversation would go to gets ready, and keeps the conversation (as its first turn would).</summary>
-    public void Warm(AiJob job)
-    {
-        var ready = job.Agent is { } picked ? Named(picked) is { } named && named.Unavailable() is null ? named : null
-            : _agents.FirstOrDefault(a => a.Unavailable() is null);
-        if (_taken.ContainsKey(job.ConversationId) || ready is not { } agent) return;
-        _taken[job.ConversationId] = agent;
-        agent.Warm(job);
-    }
-
-    /// <summary>The tools are Helm's own on this PC: whichever agent asked for them, Helm takes the record back.</summary>
-    public Task UndoAsync(AiJobAction action, CancellationToken ct) =>
-        _agents is { Count: > 0 } agents ? agents[0].UndoAsync(action, ct) : throw new AiRouteException("No agent is set up on this PC to undo it.");
 
     public void End(string conversationId)
     {

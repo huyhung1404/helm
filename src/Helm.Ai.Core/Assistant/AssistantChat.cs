@@ -116,17 +116,8 @@ public interface IAssistantChat
     /// <summary>The results of the calls of the last step, one per call.</summary>
     void AddResults(IReadOnlyList<ToolOutcome> results);
 
-    /// <summary>
-    /// More tools from the next call on: a later turn asked for a group the conversation did not need before
-    /// (<see cref="ToolScope"/>).
-    /// </summary>
+    /// <summary>More tools from the next call on: a later turn asked for some the conversation did not need before.</summary>
     void AddTools(IReadOnlyList<AssistantTool> tools) { }
-
-    /// <summary>
-    /// The provider's own web search from the next call on, at most <paramref name="maxUses"/> searches per call
-    /// (<see cref="WebSearch"/>). False when this provider has none here (the caller asks Claude instead).
-    /// </summary>
-    bool AddWebSearch(int maxUses) => false;
 }
 
 /// <summary>Opens conversations with one provider's models.</summary>
@@ -136,8 +127,7 @@ public interface IAssistantChatFactory
 
     /// <summary>
     /// An agent CLI's chats take photos (<see cref="IAssistantChat.AddUser(string, AssistantImage)"/>): one that cannot
-    /// gets no photo job, and the next agent or the API reads it. The API's chats are checked per model instead
-    /// (<see cref="AssistantPhotos.Reads"/>).
+    /// gets no photo job, and the next agent or the API reads it.
     /// </summary>
     bool ReadsImages => false;
 
@@ -149,7 +139,7 @@ public sealed record AssistantImage(byte[] Data, string MediaType = "image/jpeg"
 
 /// <summary>
 /// The model does not take pictures (the provider said so for the photo just added): the caller may ask another model.
-/// Not an <see cref="AssistantException"/>, so it leaves <see cref="AssistantLoop"/> instead of ending the turn there.
+/// Not an <see cref="AssistantException"/>.
 /// </summary>
 public sealed class AssistantImageException(string message, Exception? inner = null) : Exception(message, inner);
 

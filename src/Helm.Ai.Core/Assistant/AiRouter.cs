@@ -1,9 +1,9 @@
 namespace Helm.Ai.Assistant;
 
 /// <summary>
-/// One turn of a conversation for Claude Code to run: the user's words, the Helm tools it may use (by their MCP names),
-/// the phone tools it may hand back, and the Claude model. A conversation keeps its id across turns, so a worker can
-/// keep one Claude Code process for it.
+/// One text-only call for an agent to run (a feature's <see cref="Helm.Core.Ai.IAiText"/> call, a VPS service's job):
+/// the words, the model and the effort. <paramref name="Tools"/> and <paramref name="PhoneTools"/> are always empty now
+/// (Ask Helm, which used them, is gone); they stay in the record because a Helm PC before 0.95 reads them.
 /// </summary>
 public sealed record AiJob(
     string Feature,
@@ -14,7 +14,7 @@ public sealed record AiJob(
     string Model,
     string Effort)
 {
-    /// <summary>The job's own system prompt (a VPS service's job); null for Ask Helm's instructions.</summary>
+    /// <summary>The job's own system prompt; null: a neutral one.</summary>
     public string? System { get; init; }
 
     /// <summary>
@@ -22,24 +22,15 @@ public sealed record AiJob(
     /// null: any, in the PC's order. A Helm before 0.82 does not read it and runs the job on its first agent.
     /// </summary>
     public string? Agent { get; init; }
-
-    /// <summary>
-    /// The photos the user sent with the words (a receipt, a whiteboard), for an agent that reads pictures
-    /// (<see cref="IAgentRoute.ReadsPhotos"/>). Never written into a synced record: between devices each one travels as a
-    /// blob of its own (<see cref="AiJobRecord.Photos"/>), gone once the turn is over.
-    /// </summary>
-    [System.Text.Json.Serialization.JsonIgnore]
-    public IReadOnlyList<AssistantImage> Images { get; init; } = [];
 }
 
-/// <summary>A change Claude Code made with one of Helm's tools on the PC, with the tool's result (for Undo).</summary>
-public sealed record AiJobAction(string Tool, string Summary, string ResultJson)
-{
-    /// <summary>The Helm PC (its sync device id) that made it, where its Undo goes; null when it was made on this device.</summary>
-    public string? Worker { get; init; }
-}
+/// <summary>
+/// A change an agent made with one of Helm's tools (Ask Helm's, gone): never made now, kept in <see cref="AiJobResult"/>
+/// because a Helm phone before 0.95 reads the list.
+/// </summary>
+public sealed record AiJobAction(string Tool, string Summary, string ResultJson);
 
-/// <summary>A phone tool Claude Code asked for (alarm, calendar…): the phone runs it when the result arrives.</summary>
+/// <summary>A phone tool an agent asked for (Ask Helm's, gone): never asked now, kept for a phone before 0.95.</summary>
 public sealed record AiJobPhoneAction(string Tool, string ArgumentsJson, string Summary);
 
 /// <param name="SavedUsd">What the same turn would have cost on the API with the picked model, if known.</param>
@@ -76,8 +67,7 @@ public sealed class AiRouteTakenException(string message) : AiRouteException(mes
 
 /// <summary>
 /// A way to an AI agent on the user's own plan (Claude Code first; Codex, Gemini CLI or a local model can follow): on
-/// this PC itself, or on another Helm PC through Helm Sync. Helm runs its own tools there for it; what they write syncs
-/// to every device.
+/// this PC itself, or on another Helm PC through Helm Sync. Text only: no tool runs for it.
 /// </summary>
 public interface IAgentRoute
 {
@@ -96,21 +86,8 @@ public interface IAgentRoute
     /// <exception cref="AiRouteException">No answer within <paramref name="wait"/>, or it failed.</exception>
     Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct);
 
-    /// <summary>Takes back an action it did (Undo runs where the record was made, so it never misses one not synced yet).</summary>
-    Task UndoAsync(AiJobAction action, CancellationToken ct);
-
     /// <summary>The conversation is over: the process kept for it may stop.</summary>
     void End(string conversationId);
-
-    /// <summary>
-    /// The user is about to ask in this conversation (the card opened): its agent gets ready (a process started, the
-    /// way to it open) so the first turn answers sooner. <paramref name="job"/> has no text yet: its model and tools.
-    /// Returns at once; a warm-up that no turn follows ends with <see cref="End"/> or after the agent's idle time.
-    /// </summary>
-    void Warm(AiJob job) { }
-
-    /// <summary>It can take a job with photos (<see cref="AiJob.Images"/>) now: an agent that reads pictures is ready.</summary>
-    bool ReadsPhotos => false;
 }
 
 /// <summary>The ways a feature's call may take, in order: Claude Code first (free) as its policy allows, the API last.</summary>

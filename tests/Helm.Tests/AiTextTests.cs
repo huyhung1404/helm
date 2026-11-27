@@ -105,9 +105,9 @@ public sealed class AiTextTests
     }
 
     [Fact]
-    public void A_feature_without_a_choice_of_its_own_uses_Ask_Helms_model()
+    public void A_feature_without_a_choice_of_its_own_uses_the_default_model()
     {
-        _features.Update(s => s.Features[AiFeatureIds.AskHelm] = new AiFeatureChoice { Model = "claude-sonnet-5-5", Enabled = false });
+        _features.Update(s => s.Features[AiFeatureIds.Default] = new AiFeatureChoice { Model = "claude-sonnet-5-5", Enabled = false });
         var (text, _) = Build(null);
 
         var choice = text.ChoiceFor(AiFeatureIds.VocabQuick);
@@ -228,7 +228,6 @@ public sealed class AiTextTests
             return next is { } result ? Task.FromResult(result) : throw new AiRouteException("timed out");
         }
 
-        public Task UndoAsync(AiJobAction action, CancellationToken ct) => Task.CompletedTask;
 
         public void End(string conversationId) => Ended.Add(conversationId);
     }

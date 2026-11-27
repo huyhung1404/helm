@@ -212,7 +212,7 @@ public sealed class VpsWorkerTests : IDisposable
     public async Task On_a_real_agent_the_job_has_its_system_prompt_and_no_tool()
     {
         var agent = new Capture();
-        using var local = new LocalAgentRoute("PC-HUNG", "Codex", agent, [new AnyTool()], _ => true, () => null);
+        using var local = new LocalAgentRoute("PC-HUNG", "Codex", agent, () => null);
         var job = new AiJob("blog.summary", "j1", "hi", [], [], "claude-haiku-5-5", "low") { System = "You summarise posts." };
 
         var result = await local.RunAsync(job, Wait, CancellationToken.None);
@@ -222,9 +222,9 @@ public sealed class VpsWorkerTests : IDisposable
         Assert.Empty(agent.Tools);
         // Told nothing about calling tools it does not have.
         Assert.DoesNotContain("\"calls\"", CliAgentProtocol.Preamble(agent.System!, agent.Tools));
-        // Ask Helm's turns keep its instructions.
-        await local.RunAsync(new AiJob(AiFeatureIds.AskHelm, "c2", "hi", [], [], "m", "low"), Wait, CancellationToken.None);
-        Assert.Equal(HelmAssistant.Instructions, agent.System);
+        // A job that brings none is told a neutral one.
+        await local.RunAsync(new AiJob(AiFeatureIds.Default, "c2", "hi", [], [], "m", "low"), Wait, CancellationToken.None);
+        Assert.Equal(VpsWorker.NeutralSystem, agent.System);
     }
 
     [Theory]
@@ -390,7 +390,6 @@ public sealed class VpsWorkerTests : IDisposable
             return Answer(job);
         }
 
-        public Task UndoAsync(AiJobAction action, CancellationToken ct) => Task.CompletedTask;
 
         public void End(string conversationId)
         {
@@ -417,14 +416,4 @@ public sealed class VpsWorkerTests : IDisposable
 
         public void AddResults(IReadOnlyList<ToolOutcome> results) { }
     }
-
-    /// <summary>A Helm tool that would be offered to Ask Helm, never to a VPS job.</summary>
-    private sealed class AnyTool : IMcpToolProvider
-    {
-        public string? ModuleId => null;
-
-        public IEnumerable<McpTool> Tools =>
-            [new("notes_search", "Search notes.", McpTool.NoArguments(), (_, _) => Task.FromResult<object?>("[]")) { ReadOnly = true }];
-    }
 }
-

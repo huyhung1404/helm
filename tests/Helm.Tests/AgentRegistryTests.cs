@@ -22,7 +22,7 @@ public sealed class AgentRegistryTests : IDisposable
     {
         _paths = new HelmPaths(_dir.Path);
         _settings = new SettingsStoreFactory(_paths);
-        _registry = new AgentRegistry(_settings, _paths, new NoLauncher(), _signIn, [], _ => true, NullLoggerFactory.Instance);
+        _registry = new AgentRegistry(_settings, _paths, new NoLauncher(), _signIn, NullLoggerFactory.Instance);
     }
 
     public void Dispose()
