@@ -21,6 +21,9 @@ public partial class MainView : UserControl
     public MainView()
     {
         InitializeComponent();
+        // Helm pads itself clear of the status bar (ContentInsets, below), with its background under the bar. Avalonia 12
+        // pads a window's content too by default (AutoSafeAreaPadding): both together left an empty band over the app bar (B4).
+        TopLevel.SetAutoSafeAreaPadding(this, false);
         _drawer = new DrawerController(Drawer, (TranslateTransform)Drawer.RenderTransform!, DrawerScrim, () => _viewModel);
         SheetScrim.PointerPressed += (_, _) => _viewModel?.HideSheetCommand.Execute(null);
         LayoutUpdated += (_, _) => AlignPageBackdrop();
@@ -77,6 +80,7 @@ public partial class MainView : UserControl
         base.OnAttachedToVisualTree(e);
         _topLevel = TopLevel.GetTopLevel(this);
         if (_topLevel is null) return;
+        TopLevel.SetAutoSafeAreaPadding(_topLevel, false);
 
         // Android 15+ always draws edge to edge; pad the shell by the status/navigation bars and display cutout.
         _insets = _topLevel.InsetsManager;

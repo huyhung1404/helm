@@ -28,6 +28,7 @@ internal sealed class ToolWindowView : UserControl
         _moveToMain = moveToMain;
         _close = close;
         this.Bind(BackgroundProperty, this.GetResourceObservable("HelmBarBackground"));
+        TopLevel.SetAutoSafeAreaPadding(this, false);
 
         var title = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 8, 0) };
         title.Children.Add(new ModuleIcon { Symbol = tab.Icon, Image = tab.Image, Size = 22 });
@@ -77,6 +78,9 @@ internal sealed class ToolWindowView : UserControl
         base.OnAttachedToVisualTree(e);
         _topLevel = TopLevel.GetTopLevel(this);
         if (_topLevel is null) return;
+        // This view pads itself by the safe area (below); Avalonia 12 would pad it once more (B4).
+        TopLevel.SetAutoSafeAreaPadding(this, false);
+        TopLevel.SetAutoSafeAreaPadding(_topLevel, false);
         _topLevel.BackRequested += OnBackRequested;
         // A full page's own menu button offers what the bar would.
         ShellChrome.SetNavigation(_topLevel, ShowMenu);
