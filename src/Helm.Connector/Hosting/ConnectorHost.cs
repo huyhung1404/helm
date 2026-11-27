@@ -29,7 +29,7 @@ internal static class ConnectorHost
             new HttpSyncTransport(sp.GetRequiredService<ISyncCredentialStore>(), sp.GetRequiredService<SyncApiClient>()), time));
         services.AddSingleton<ISyncTransport>(sp => sp.GetRequiredService<PushBreaker>());
         services.AddHelmCommon(paths);
-        // AI's synced collections and stores (keys, briefs, the features' settings) and Ask Helm's tools on them.
+        // AI's synced collections and stores (keys, usage, the features' settings).
         Helm.Ai.AiCoreServices.AddHelmAi(services);
 
         services.AddSingleton<IDeviceInfo, MachineDeviceInfo>();

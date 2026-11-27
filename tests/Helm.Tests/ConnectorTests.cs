@@ -323,10 +323,12 @@ public sealed class ConnectorTests : IDisposable
         await using var services = Tools(SyncSelection.Resolve(null, Data));
         var tools = ConnectorMcp.Tools(services.GetServices<IMcpToolProvider>(), new ConfirmationGate()).Select(t => t.Name).ToHashSet();
 
-        foreach (var tool in new[] { "tracker_add_task", "wallet_add_debt", "wallet_summary", "habit_check", "ai_briefs" }) Assert.Contains(tool, tools);
+        foreach (var tool in new[] { "tracker_add_task", "wallet_add_debt", "wallet_summary", "habit_check" }) Assert.Contains(tool, tools);
         Assert.DoesNotContain(tools, t => t.StartsWith("notes_", StringComparison.Ordinal) || t.StartsWith("mission", StringComparison.Ordinal)
             || t.StartsWith("vocab_", StringComparison.Ordinal));
         Assert.DoesNotContain(tools, t => t.Contains("vault", StringComparison.OrdinalIgnoreCase));
+        // Helm's automatic jobs and their briefs are gone (Fairy does these now): no ai_ tool.
+        Assert.DoesNotContain(tools, t => t.StartsWith("ai_", StringComparison.Ordinal));
         Assert.DoesNotContain(services.GetServices<IMcpToolProvider>(), p => p.GetType().Namespace?.Contains("Vault", StringComparison.Ordinal) == true);
         Assert.DoesNotContain(services.GetServices<SyncGroup>(), g => g.Prefix == "vault.");
     }

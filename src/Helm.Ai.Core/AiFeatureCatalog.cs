@@ -1,5 +1,4 @@
 using System.Reflection;
-using Helm.Ai.Auto;
 
 namespace Helm.Ai;
 
@@ -32,13 +31,6 @@ public static class AiFeatureCatalog
         new(AiFeatureIds.TaskProposals, "Task proposals", "Tracker: steps for a big task, tasks from a note", false, Tool: "tracker", Symbol: "TaskListAdd"),
         new(AiFeatureIds.WalletReadNotification, "Read a bank notification", "Wallet: one Helm could not read, when you ask", false, Tool: "wallet", Symbol: "Wallet"),
         new(AiFeatureIds.WalletCategorize, "Auto-classify transactions", "Wallet: files a new payment the history cannot", true, Tool: "wallet", Symbol: "Wallet"),
-        new(AiFeatureIds.MorningBrief, "Morning brief", "Today's tasks, habits to do, yesterday's spending", true, Symbol: "WeatherSunny"),
-        new(AiFeatureIds.EveningReview, "Evening review", "What got done, what slips to tomorrow", true, Symbol: "WeatherMoon"),
-        new(AiFeatureIds.SpendingDigest, "Weekly spending", "Where the week's and the month's money went", true, Tool: "wallet", Symbol: "Wallet"),
-        new(AiFeatureIds.HabitCoach, "Habit coach", "Reads skip reasons, suggests a smaller step", true, Tool: "habits", Symbol: "ArrowRepeatAll"),
-        new(AiFeatureIds.ImportantDays, "Important dates", "Birthdays, giỗ and renewals, a few days before", true, Symbol: "CalendarStar"),
-        new(AiFeatureIds.NoteTitles, "Note titles", "A title and tags for new notes without one", true, Tool: "notes", Symbol: "Note"),
-        new(AiFeatureIds.ScratchTidy, "Tidy Scratch", "What to keep or drop in Scratch (suggestions only)", true, Tool: "scratch", Symbol: "Notepad"),
     ];
 
     public static IReadOnlyList<AiFeatureInfo> All { get; } = Build();
@@ -46,13 +38,13 @@ public static class AiFeatureCatalog
     public static AiFeatureInfo? Find(string id) => All.FirstOrDefault(f => f.Id == id);
 
     /// <summary>
-    /// The choice a feature runs with now: its own, else its default (an automatic job's), else the default model, on,
+    /// The choice a feature runs with now: its own, else the default model, on,
     /// and on a PC only when it runs by itself (as <see cref="Assistant.AiTextService"/> does).
     /// </summary>
     public static AiFeatureChoice Effective(AiFeatureSettings settings, string id)
     {
         if (settings.Features.TryGetValue(id, out var own)) return own;
-        if (id == AiFeatureIds.Default || AutoJobCatalog.Find(id) is not null) return settings.For(id);
+        if (id == AiFeatureIds.Default) return settings.For(id);
         var inherited = settings.For(AiFeatureIds.Default).Copy();
         var info = Find(id);
         inherited.Enabled = info?.OnByDefault ?? true;
@@ -69,7 +61,7 @@ public static class AiFeatureCatalog
             .Where(f => f.IsLiteral && f.FieldType == typeof(string))
             .Select(f => (string)f.GetRawConstantValue()!);
         foreach (var id in ids.Where(id => all.All(f => f.Id != id)))
-            all.Add(new AiFeatureInfo(id, Name(id), "", AutoJobCatalog.Find(id) is not null));
+            all.Add(new AiFeatureInfo(id, Name(id), "", false));
         return all;
     }
 

@@ -23,6 +23,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   sheet, and the PC's side that ran its turns): you talk to Fairy now, and Fairy does these things through Helm's tools.
   Helm's other AI features (word analysis, translations, explaining a sentence, filing and reading bank notifications)
   work as before, on your PC's agents first and the API last.
+- **Helm's automatic jobs and their briefs.** The PC no longer writes the morning brief, the evening review, the weekly
+  spending, the habit coach, the important days, note titles or the Scratch tidy-up, and the phone no longer shows their
+  notifications: Fairy does these now. The agent tools that read and set them (`ai_briefs`, `ai_brief_undo`,
+  `ai_auto_jobs`, `ai_auto_job_set`) are gone too. The briefs already written stay on your sync server, untouched.
 
 ## [0.94.1] - 2026-11-27
 

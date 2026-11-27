@@ -122,10 +122,6 @@ public sealed class App : Application
             // The keys' model lists are tested again once a day, and the features' prompts come from the user's Skill Hub.
             Services.GetRequiredService<Helm.Ai.AiModelRefresher>().Start();
             Services.GetRequiredService<Helm.Ai.Prompts.AiPromptRefresher>().Start();
-            // The jobs this PC runs by itself on those agents, and a notification for each new brief, from this PC or another.
-            Services.GetRequiredService<Helm.Ai.Auto.AutoJobScheduler>().Start();
-            var notifications = Services.GetRequiredService<IUserNotifications>();
-            Services.GetRequiredService<Helm.Ai.Auto.AiBriefAlerts>().Start(brief => notifications.Show(brief.Value.Title, brief.Value.Text));
             // The AI agents' tools (a pipe only this user can open; each connection checks the MCP settings).
             Services.GetRequiredService<Core.Mcp.McpPipeHost>().Start();
         }

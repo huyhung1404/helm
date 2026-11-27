@@ -2,7 +2,6 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Helm.Ai.Assistant;
-using Helm.Ai.Auto;
 using Helm.Core.Services;
 using Helm.Core.Sync;
 
@@ -109,7 +108,7 @@ public sealed partial class AiFeaturesViewModel : ObservableObject
         foreach (var row in Rows)
         {
             var choice = AiFeatureCatalog.Effective(all, row.Id);
-            row.Show(choice, ModelsFor(choice), Describe(row.Id, choice));
+            row.Show(choice, ModelsFor(choice), AiFeatureCatalog.Find(row.Id)?.Description ?? "");
         }
         foreach (var group in Groups)
         {
@@ -118,7 +117,7 @@ public sealed partial class AiFeaturesViewModel : ObservableObject
         }
     }
 
-    /// <summary>Every change goes on top of what the feature runs with now (an automatic job keeps its time).</summary>
+    /// <summary>Every change goes on top of what the feature runs with now.</summary>
     private void Save(string feature, Action<AiFeatureChoice> change) => _features.Update(s =>
     {
         var choice = AiFeatureCatalog.Effective(s, feature).Copy();
@@ -138,14 +137,5 @@ public sealed partial class AiFeaturesViewModel : ObservableObject
         if (_offered.Any(m => m.Provider.Id == choice.Provider && m.Model == choice.Model)) return _offered;
         var provider = AiProviders.Find(choice.Provider) ?? AiProviders.Claude;
         return [.. _offered, new AssistantModelOption(provider, choice.Model, choice.Model)];
-    }
-
-    /// <summary>An automatic job's description starts with its time ("07:00 · …").</summary>
-    private static string Describe(string feature, AiFeatureChoice choice)
-    {
-        var description = AiFeatureCatalog.Find(feature)?.Description ?? "";
-        if (AutoJobCatalog.Find(feature) is not { } job) return description;
-        var when = feature == AiFeatureIds.NoteTitles ? "Every hour" : AutoJobCatalog.TimeOf(choice, job).ToString("HH:mm", CultureInfo.InvariantCulture);
-        return $"{when} · {description}";
     }
 }

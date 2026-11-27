@@ -1,7 +1,6 @@
 using System.Reflection;
 using Helm.Ai;
 using Helm.Ai.Assistant;
-using Helm.Ai.Auto;
 
 namespace Helm.Tests;
 
@@ -29,8 +28,8 @@ public sealed class AiFeaturesViewModelTests
         Assert.Equal(ids.Order(), vm.Rows.Select(r => r.Id).Order());
         Assert.Equal(["On request", "Automatic"], vm.Groups.Select(g => g.Title));
         Assert.Contains(vm.Groups[0].Rows, r => r.Id == AiFeatureIds.Default);
-        Assert.All(AutoJobCatalog.All, job => Assert.Contains(vm.Groups[1].Rows, r => r.Id == job.Feature));
-        Assert.Contains(vm.Groups[1].Rows, r => r.Id == AiFeatureIds.WalletCategorize);
+        // Helm's own automatic jobs are gone (Fairy does these now): filing a transaction is the one left.
+        Assert.Equal([AiFeatureIds.WalletCategorize], vm.Groups[1].Rows.Select(r => r.Id));
         Assert.All(vm.Rows, r => Assert.False(string.IsNullOrWhiteSpace(r.Name)));
     }
 
@@ -41,18 +40,17 @@ public sealed class AiFeaturesViewModelTests
 
         Assert.All(vm.Groups[1].Rows, r => Assert.Equal(AiRoutePolicy.PcOnly, r.Route.Policy));
         Assert.All(vm.Groups[0].Rows, r => Assert.Equal(AiRoutePolicy.PreferPc, r.Route.Policy));
-        var brief = Row(vm, AiFeatureIds.MorningBrief);
-        Assert.Equal("Runs on your PC agents · 0đ", brief.CostText);
-        Assert.False(brief.HasCostDetail);
-        Assert.False(brief.CanReachApi);
-        Assert.StartsWith("07:00 · ", brief.Description);
+        var filing = Row(vm, AiFeatureIds.WalletCategorize);
+        Assert.Equal("Runs on your PC agents · 0đ", filing.CostText);
+        Assert.False(filing.HasCostDetail);
+        Assert.False(filing.CanReachApi);
         Assert.Equal("all on your PC agents · 0đ", vm.Groups[1].Note);
         // Nothing was saved just by looking.
         Assert.Empty(_features.Current.Features);
     }
 
     [Fact]
-    public void A_feature_without_its_own_choice_shows_Ask_Helms_model()
+    public void A_feature_without_its_own_choice_shows_the_default_model()
     {
         _features.Update(s => s.Features[AiFeatureIds.Default] = new AiFeatureChoice { Model = Sonnet.Model, Enabled = false });
 
@@ -125,23 +123,7 @@ public sealed class AiFeaturesViewModelTests
     }
 
     [Fact]
-    public void Turning_a_job_off_keeps_its_time()
-    {
-        _features.Update(s => s.Features[AiFeatureIds.EveningReview] = new AiFeatureChoice { Route = AiRoutePolicy.PcOnly, At = "22:15" });
-        var vm = Build();
-        var row = Row(vm, AiFeatureIds.EveningReview);
-        Assert.StartsWith("22:15 · ", row.Description);
-
-        row.IsOn = false;
-
-        var saved = _features.Current.For(AiFeatureIds.EveningReview);
-        Assert.False(saved.Enabled);
-        Assert.Equal("22:15", saved.At);
-        Assert.Equal(AiRoutePolicy.PcOnly, saved.Route);
-    }
-
-    [Fact]
-    public void Ask_Helms_route_is_one_choice_with_the_Proxy_tab()
+    public void The_default_route_is_one_choice_with_the_Proxy_tab()
     {
         var vm = Build();
 
@@ -180,7 +162,7 @@ public sealed class AiFeaturesViewModelTests
         Assert.Equal("No AI run today yet", vm.SummaryText);
 
         usage.RecordAgent(AiFeatureIds.Default, "Claude Code", ClaudeModels.Haiku, "PC-HUNG", 0.01m);
-        usage.RecordAgent(AiFeatureIds.MorningBrief, "Claude Code", ClaudeModels.Haiku, "PC-HUNG", 0.01m);
+        usage.RecordAgent(AiFeatureIds.WalletCategorize, "Claude Code", ClaudeModels.Haiku, "PC-HUNG", 0.01m);
         usage.Record(AiFeatureIds.Default, AiProviders.Claude, "claude-sonnet-5-5", null, 1_000_000, 100_000, 0, 0);
         vm.Refresh();
 
@@ -224,7 +206,7 @@ public sealed class AiFeaturesViewModelTests
         var vm = Build();
         Assert.False(vm.Back());
 
-        vm.OpenCommand.Execute(Row(vm, AiFeatureIds.HabitCoach));
+        vm.OpenCommand.Execute(Row(vm, AiFeatureIds.VocabQuick));
         Assert.True(vm.IsDetail);
 
         Assert.True(vm.Back());
